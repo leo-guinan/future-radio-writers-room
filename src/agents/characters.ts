@@ -14,7 +14,9 @@ const template = (name: string) => readFileSync(join(CHAR_DIR, `${name}.md`), "u
 /** A character's persona comes from their dressing room once it exists; characters/ holds the templates. */
 export const persona = (c: Character) => (reposEnabled() ? dressingRoom(c).persona() : template(c));
 export const showBible = () => template("show-bible");
-export const systemFor = (c: Character) => `${showBible()}\n\n---\n\n${persona(c)}`;
+/** Merged canon — the producer's notes and viewer notes merged by pull request — rides along on every run. */
+export const canon = (c: Character) => (reposEnabled() ? dressingRoom(c).canon() : "");
+export const systemFor = (c: Character) => [showBible(), "---", persona(c), canon(c)].filter(Boolean).join("\n\n");
 
 export const DEFAULT_CEILING = Number(process.env.DEFAULT_CASH_CEILING ?? 20);
 

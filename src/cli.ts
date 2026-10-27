@@ -16,6 +16,9 @@ import { dressingRoom } from "./repos/dressing-room.ts";
 import { EpisodeRepo } from "./repos/episode-repo.ts";
 import { localRepos, planPublish, publish } from "./repos/publish.ts";
 import { REPOS_DIR } from "./repos/git.ts";
+import { syncAll } from "./repos/sync.ts";
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { CAST } from "./core/types.ts";
 
 const INTAKE = process.env.INTAKE_EPISODE ?? "E02";
@@ -76,6 +79,12 @@ Showrunner & repos
   remember borges|leonardo|agnolo "note" [--source ref]  Add a durable note to a dressing room
   repos list                             Dressing rooms and episode repos, with heads
   repos publish --owner GH_OWNER [--public] [--yes]   Create/push GitHub repos (dry run without --yes)
+  repos sync                             Pull merged viewer PRs into dressing rooms, rebuild bibles, push
+
+Character bibles
+  bible build [character]                Rebuild bible/ in one or all dressing rooms
+  bible show <character>                 Print the character's loadable system prompt
+  bible chat <character> [--from name]   Talk with the character locally; /propose drafts a viewer note
 
 Agnolo's screen
   scorecard                              Observed / projected / disputed / unknown, three ledgers
@@ -281,6 +290,26 @@ async function main() {
       if (!CAST.includes(c)) throw new RuleError("usage", `Characters: ${CAST.join(", ")}`);
       return out(dressingRoom(c).remember(need(pos[1], "note"), flags.source ?? by));
     }
+    case "bible": {
+      const [sub, who] = pos;
+      const pick = (w?: string): Character[] => {
+        if (!w) return CAST;
+        if (!CAST.includes(w as Character)) throw new RuleError("usage", `Characters: ${CAST.join(", ")}`);
+        return [w as Character];
+      };
+      if (sub === "build") {
+        for (const c of pick(who)) out(`${c}: ${dressingRoom(c).ensure().refresh()} `);
+        return;
+      }
+      const c = pick(need(who, "character"))[0];
+      const dir = dressingRoom(c).ensure().repo.dir;
+      const bin = createRequire(import.meta.url).resolve("future-radio-character-bible/bin/character-bible.js");
+      if (sub === "show" || sub === "chat") {
+        spawnSync(process.execPath, [bin, sub, dir, ...(flags.from ? ["--from", flags.from] : [])], { stdio: "inherit" });
+        return;
+      }
+      throw new RuleError("usage", "bible build [character] | bible show <character> | bible chat <character>");
+    }
     case "repos": {
       if (pos[0] === "list") {
         out(`Repos in ${REPOS_DIR()}`);
@@ -297,10 +326,18 @@ async function main() {
           for (const s of steps) out(`  ${s.action.padEnd(6)} ${s.target}\n         ${s.command.join(" ")}`);
           return;
         }
-        for (const r of publish(steps)) out(`${r.ok ? "✓" : "✗"} ${r.action} ${r.target}${r.ok ? "" : ` — ${r.error}`}`);
+        // Point every dressing room's CI at the published bible tool before it goes up.
+        const pkg = `github:${flags.owner}/future-radio-character-bible`;
+        for (const c of CAST) dressingRoom(c).retarget(pkg);
+        for (const r of publish(planPublish(flags.owner, flags.public ? "public" : "private"))) out(`${r.ok ? "✓" : "✗"} ${r.action} ${r.target}${r.ok ? "" : ` — ${r.error}`}`);
         return;
       }
-      throw new RuleError("usage", "repos list | repos publish --owner X [--public] [--yes]");
+      if (pos[0] === "sync") {
+        for (const r of syncAll(room))
+          out(`${r.status === "synced" ? "✓" : r.status === "no-remote" ? "·" : "✗"} ${r.repo.padEnd(24)} ${r.status}${r.pulled.length ? ` · ${r.pulled.length} in` : ""}${r.newViewerNotes.length ? ` · new viewer notes: ${r.newViewerNotes.join(", ")}` : ""}${r.message ? ` — ${r.message}` : ""}`);
+        return;
+      }
+      throw new RuleError("usage", "repos list | repos publish --owner X [--public] [--yes] | repos sync");
     }
     case "loop":
       return out(LOOP.map((l) => `${l.stage.padEnd(9)} ${l.does}`).join("\n"));

@@ -185,3 +185,16 @@ dialog::backdrop { background: rgba(20, 16, 10, .45); }
 details summary { cursor: pointer; color: var(--ink-2); font-size: .92rem; margin: 6px 0; }
 pre.md { white-space: pre-wrap; font: .85rem/1.5 var(--mono); background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 12px; color: var(--ink); }
 h3 { margin-top: 18px; margin-bottom: 6px; }
+
+/* cast */
+.cast { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .cast { grid-template-columns: 1fr; } }
+.member { background: var(--card); border: 1px solid var(--rule); border-top: 4px solid var(--ink-2); border-radius: 3px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.member.borges { border-top-color: var(--borges); } .member.leonardo { border-top-color: var(--leonardo); } .member.agnolo { border-top-color: var(--agnolo); }
+.member h3 { margin: 0; font-size: 1.25rem; }
+.member.borges h3 { color: var(--borges); } .member.leonardo h3 { color: var(--leonardo); } .member.agnolo h3 { color: var(--agnolo); }
+.member .intro { margin: 0; font-size: .92rem; color: var(--ink-2); }
+.member blockquote { margin: 2px 0; padding-left: 10px; border-left: 2px solid var(--rule); font-style: italic; font-size: .92rem; }
+.member .stats { margin: 0; font: .72rem var(--mono); color: var(--muted); }
+.member .vnotes { margin: 0; padding-left: 1rem; font-size: .86rem; }
+.member .links { margin: auto 0 0; font-size: .85rem; padding-top: 4px; }

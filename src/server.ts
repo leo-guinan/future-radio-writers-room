@@ -13,6 +13,9 @@ import { ask, explore } from "./agents/characters.ts";
 import { checklist, nextStep } from "./production/loop.ts";
 import { tick } from "./showrunner/showrunner.ts";
 import { EpisodeRepo } from "./repos/episode-repo.ts";
+import { dressingRoom, reposEnabled } from "./repos/dressing-room.ts";
+import { syncAll } from "./repos/sync.ts";
+import { CAST } from "./core/types.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TOKEN = process.env.PRODUCER_TOKEN ?? "";
@@ -25,6 +28,39 @@ const PUBLIC_DIR = join(process.cwd(), "public");
 const INTAKE = process.env.INTAKE_EPISODE ?? "E02";
 const SHOWRUNNER_AUTO = process.env.SHOWRUNNER_AUTO !== "0";
 const SHOWRUNNER_EVERY = Number(process.env.SHOWRUNNER_EVERY_SECONDS ?? 300);
+const SYNC_EVERY = Number(process.env.SYNC_EVERY_SECONDS ?? 600);
+
+/** A GitHub web URL for a remote, if it is one. */
+function githubUrl(remote: string): string | null {
+  const m = remote.match(/github\.com[:/]([^/]+\/[^/.]+)(\.git)?$/);
+  return m ? `https://github.com/${m[1]}` : null;
+}
+
+function cast() {
+  if (!reposEnabled()) return [];
+  return CAST.map((c) => {
+    const dr = dressingRoom(c).ensure();
+    const b = dr.bible();
+    const url = githubUrl(dr.repo.remote());
+    return {
+      character: c,
+      name: b.name,
+      intro: b.identity.intro.split("\n\n")[0],
+      conflict: b.identity.conflict,
+      runs: b.record.runs,
+      lastSeen: b.record.lastSeen,
+      episodes: b.record.episodes.map((e) => e.id),
+      canon: b.canon.notes.length,
+      viewerNotes: b.canon.viewerNotes.map((v) => ({ from: v.from, note: v.note.split("\n")[0], episode: v.episode })),
+      voice: b.voice.samples.at(-1)?.line ?? null,
+      repo: dr.repo.name,
+      head: dr.repo.head(),
+      links: url
+        ? { repo: url, bible: `${url}/blob/main/bible/BIBLE.md`, contribute: `${url}/blob/main/CONTRIBUTING.md`, note: `${url}/issues/new?template=viewer-note.yml`, pulls: `${url}/pulls` }
+        : null,
+    };
+  });
+}
 
 const room = openRoom();
 const llm = makeLLM();
@@ -150,6 +186,7 @@ function snapshot() {
 type Handler = (req: IncomingMessage, res: ServerResponse, m: RegExpMatchArray) => Promise<void> | void;
 const routes: Array<[string, RegExp, Handler]> = [
   ["GET", /^\/api\/room$/, (_q, res) => send(res, 200, snapshot())],
+  ["GET", /^\/api\/cast$/, (_q, res) => send(res, 200, cast())],
   ["GET", /^\/api\/events$/, (req, res) => {
     const since = Number(new URL(req.url!, "http://x").searchParams.get("since") ?? 0);
     send(res, 200, room.publicEvents(since).slice(-300));
@@ -311,6 +348,11 @@ export const server = createServer(async (req, res) => {
 
 // Stream CLI-written events to watchers without waiting for a request.
 setInterval(() => room.store.sync(), 1500).unref();
+// Merged viewer PRs come back into the room on a timer (only dressing rooms with a remote).
+if (reposEnabled() && SYNC_EVERY > 0)
+  setInterval(() => {
+    try { syncAll(room); } catch (e: any) { console.error("sync:", e.message); }
+  }, SYNC_EVERY * 1000).unref();
 // The showrunner also makes rounds on its own.
 if (SHOWRUNNER_AUTO && SHOWRUNNER_EVERY > 0) setInterval(() => activeEpisodes().forEach(scheduleTick), SHOWRUNNER_EVERY * 1000).unref();
 

@@ -24,6 +24,7 @@ async function refresh() {
   renderSeason();
   renderScore();
   renderBoard();
+  renderCast();
   const sel = $("#ep-select");
   if (sel.options.length === 1)
     for (const e of snap.episodes) if (!e.releases.length) sel.add(new Option(`${e.number}. ${e.title}`, e.episodeId));
@@ -86,6 +87,26 @@ function renderBoard() {
         )
         .join("")
     : `<p class="empty">No ideas yet. Be the first.</p>`;
+}
+
+// ------------------------------------------------------------ cast
+
+async function renderCast() {
+  const cast = await api("/api/cast").catch(() => []);
+  $("#cast").innerHTML = cast
+    .map((c) => `<article class="member ${esc(c.character)}">
+      <h3>${esc(c.name)}</h3>
+      <p class="intro">${esc(c.intro)}</p>
+      ${c.voice ? `<blockquote>${esc(c.voice)}</blockquote>` : ""}
+      <p class="stats">${c.runs} run${c.runs === 1 ? "" : "s"}${c.lastSeen ? ` · last seen ${esc(c.lastSeen)}` : ""}${c.episodes.length ? ` · ${esc(c.episodes.join(", "))}` : ""} · ${c.canon + c.viewerNotes.length} canon note${c.canon + c.viewerNotes.length === 1 ? "" : "s"}${c.viewerNotes.length ? `, ${c.viewerNotes.length} from viewers` : ""}</p>
+      ${c.viewerNotes.length ? `<ul class="vnotes">${c.viewerNotes.slice(-2).map((v) => `<li>${esc(v.note)} <span class="muted">— ${esc(v.from)}</span></li>`).join("")}</ul>` : ""}
+      <p class="links">${
+        c.links
+          ? `<a class="link" href="${esc(c.links.bible)}" target="_blank" rel="noopener">Read the bible</a> · <a class="link" href="${esc(c.links.contribute)}" target="_blank" rel="noopener">Propose a change</a> · <a class="link" href="${esc(c.links.note)}" target="_blank" rel="noopener">Leave a viewer note</a>`
+          : `<span class="muted">Dressing room <code>${esc(c.repo)}@${esc(c.head.slice(0, 7))}</code> — on GitHub soon, open to pull requests.</span>`
+      }</p>
+    </article>`)
+    .join("");
 }
 
 // ------------------------------------------------------------ feed
