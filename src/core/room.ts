@@ -24,7 +24,9 @@ import {
   type ForecastResolved,
   type IdeaProposed,
   type IdeaSignal,
+  type IdeaCut,
   type IdeaStatus,
+  type ShowrunnerTick,
   type IdeaTransitioned,
   type LedgerEntry,
   type RoomEvent,
@@ -85,6 +87,8 @@ export class Room {
   forecasts = new Map<string, Forecast>();
   runs = new Map<string, AgentRun & { at: string; eventId: string }>();
   conferences: Array<ConferenceHeld & { at: string }> = [];
+  cuts: Array<IdeaCut & { at: string; eventId: string }> = [];
+  ticks: Array<ShowrunnerTick & { at: string; eventId: string }> = [];
   rulesLocked = false;
 
   constructor(readonly store: EventStore) {
@@ -186,6 +190,12 @@ export class Room {
         break;
       case "conference.held":
         this.conferences.push({ ...(p as ConferenceHeld), at: e.ts });
+        break;
+      case "idea.cut":
+        this.cuts.push({ ...(p as IdeaCut), at: e.ts, eventId: e.id });
+        break;
+      case "showrunner.tick":
+        this.ticks.push({ ...(p as ShowrunnerTick), at: e.ts, eventId: e.id });
         break;
     }
   }

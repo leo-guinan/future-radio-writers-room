@@ -1,4 +1,8 @@
 import { test } from "node:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+process.env.REPOS_DIR = mkdtempSync(join(tmpdir(), "fr-room-"));
 import assert from "node:assert/strict";
 import { EventStore, sha256 } from "../src/core/events.ts";
 import { Room, RuleError } from "../src/core/room.ts";

@@ -1,0 +1,15 @@
+{
+  "$comment": "Quality gates for the showrunner. 'activateAt' is the number of open candidates for an episode at which a gate switches on (0 = always on). Each episode repo gets a copy at creation; edit that copy to tune one episode.",
+  "capacity": { "maxCutsPerTick": 2, "maxCutsPerEpisode": 6, "maxExploresPerTick": 3 },
+  "gates": [
+    { "gate": "consent", "activateAt": 0, "why": "'ask-first' ideas need a producer note containing 'consent confirmed'." },
+    { "gate": "explored", "activateAt": 0, "why": "Borges, Leonardo and Agnolo have each worked on the idea." },
+    { "gate": "not-declined", "activateAt": 0, "why": "Agnolo didn't recommend declining it." },
+    { "gate": "stopping-rule", "activateAt": 0, "why": "The chosen approach says when it's done." },
+    { "gate": "budget-fit", "activateAt": 0, "why": "The chosen approach fits what's left of the episode's cash ceiling." },
+    { "gate": "agnolo-score", "activateAt": 6, "min": 5, "why": "Story + business + participation reaches the minimum (of 9)." },
+    { "gate": "signal", "activateAt": 10, "minCommunity": 1, "minCreative": 2, "why": "At least one vote from the community, or a creative judgment of 2+." },
+    { "gate": "novelty", "activateAt": 15, "maxSimilarity": 0.5, "why": "Not a near-duplicate of an idea already cut — merge it instead." },
+    { "gate": "producer-approval", "activateAt": 25, "why": "The producer has given it a creative signal." }
+  ]
+}

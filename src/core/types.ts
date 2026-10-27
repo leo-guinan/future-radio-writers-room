@@ -32,7 +32,10 @@ export type EventType =
   | "ledger.entry"
   | "forecast.recorded"
   | "forecast.resolved"
-  | "conference.held";
+  | "conference.held"
+  | "repo.commit"
+  | "idea.cut"
+  | "showrunner.tick";
 
 // ---------- Ideas: the central unit of the room ----------
 
@@ -179,7 +182,8 @@ export interface ForecastResolved {
 
 // ---------- Agents ----------
 
-export type Character = "borges" | "leonardo" | "agnolo";
+export type Character = "borges" | "leonardo" | "agnolo" | "showrunner";
+export const CAST: Character[] = ["borges", "leonardo", "agnolo"];
 
 export interface AgentRun {
   runId: string;
@@ -204,4 +208,44 @@ export interface ConferenceHeld {
   title: string;
   exhibits: string[]; // event ids put on Agnolo's screen
   notes: string;
+}
+
+// ---------- Repos ----------
+
+export interface RepoCommit {
+  repo: string; // dressing-room-borges, episode-e02
+  sha: string;
+  message: string;
+  files: string[];
+  runId?: string;
+  ideaId?: string;
+  episodeId?: string;
+}
+
+export interface IdeaCut {
+  ideaId: string;
+  episodeId: string;
+  repo: string;
+  sha: string;
+  path: string; // cuts/I-0008
+  approach: string;
+  gatesPassed: string[];
+  projections: Array<{ character: Character; repo: string; sha: string }>;
+}
+
+export interface GateResult {
+  gate: string;
+  pass: boolean;
+  why: string;
+}
+
+export interface ShowrunnerTick {
+  episodeId: string;
+  load: number;
+  activeGates: string[];
+  explored: string[];
+  cut: string[];
+  held: Array<{ ideaId: string; failed: GateResult[] }>;
+  queued: string[]; // ready, but over capacity
+  repoSha: string;
 }

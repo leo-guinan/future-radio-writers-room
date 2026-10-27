@@ -71,9 +71,48 @@ Producer-only: ledger line items, financial signals, contributor contact details
 
 Limits (all in `.env`): `PATRON_DAILY_RUNS` character questions per day across the room, `PATRON_RUNS_PER_IP`, `IDEAS_PER_IP`. Each run is on the ledger, so patron curiosity has a visible cost.
 
+## Dressing rooms, episode repos, and the showrunner
+
+```
+repos/
+  dressing-room-borges/      CHARACTER.md · history/ · history.jsonl · memory/ · voice/
+  dressing-room-leonardo/
+  dressing-room-agnolo/
+  dressing-room-showrunner/
+  episode-e02/               SHOW_PLAN.md · gates.json · cast/ · cuts/ · GATES.md · PROVENANCE.json
+```
+
+**Dressing rooms.** Each character has their own repo. Their persona is `CHARACTER.md` there — the room reads it on every run, so editing a dressing room changes the character. Every run is a commit with a history file whose frontmatter carries the room event id and hash; the room log records the commit sha back. `remember borges "…"` adds a durable note.
+
+**Episode repos** start with only `SHOW_PLAN.md` and `gates.json`. Everything else arrives by *projection*: `cast/<character>.md` is a copy of that character's persona, notes and most relevant history, pinned to a dressing-room commit, with `PROVENANCE.json` recording repo, commit, source files and sha256. Episodes never edit dressing rooms.
+
+**The showrunner** makes rounds on an episode (`showrunner tick EP`, automatically when ideas arrive, and on a timer):
+
+1. opens the episode repo from the show plan if it doesn't exist,
+2. sends unexplored ideas to Borges → Leonardo → Agnolo (capped per round and per day),
+3. switches gates on by load and checks every open candidate,
+4. for the best ready ideas within capacity, projects the cast and assembles a first cut (`cuts/<idea>/CARD.md, BEATS.md, SCRIPT.md`), commits it, and marks the idea *compared*,
+5. writes `GATES.md` — every idea held back, and the gate that held it.
+
+A first cut is a draft for comparison. Selection stays with you.
+
+**Gates tighten with load** (`gates.json`; each episode repo has its own editable copy):
+
+| Open candidates | Gates on |
+|---|---|
+| any | consent (ask-first needs a "consent confirmed" note), explored, not-declined, stopping-rule, budget-fit |
+| 6+ | agnolo-score ≥ 5/9 |
+| 10+ | signal: a community vote or creative judgment ≥ 2 |
+| 15+ | novelty: not a near-duplicate of an existing cut (merge instead) |
+| 25+ | producer-approval |
+
+Capacity: 2 cuts and 3 explorations per round, 6 cuts per episode; ready ideas over capacity are queued, not dropped.
+
+**Publishing to GitHub** is explicit: `repos publish --owner YOU` prints the plan; add `--yes` to create the repos (private by default) with `gh` and push. Dressing rooms contain producer-only runs, so keep them private unless you've decided otherwise.
+
 ## Characters
 
-Voices live in `characters/*.md` — edit them without touching code. `show-bible.md` is shared by all three.
+Templates live in `characters/*.md` and seed each dressing room the first time. After that, edit `CHARACTER.md` in the dressing room. `show-bible.md` is shared by all.
 
 ## Deploy
 
@@ -93,6 +132,9 @@ characters/           personas (Markdown)
 seed/season-1.json    the plan, as data
 src/core/             event log, rules, state
 src/agents/           Borges, Leonardo, Agnolo + model client
+src/repos/            git wrapper, dressing rooms, episode repos, GitHub publish
+src/showrunner/       the showrunner and its quality gates
+gates.json            default gates and capacity
 src/production/       the daily loop and checklist
 src/server.ts         workshop API + live stream
 src/cli.ts            producer console

@@ -1,10 +1,13 @@
 FROM node:22-slim
 WORKDIR /app
-ENV NODE_ENV=production DATA_DIR=/data PORT=8787
+# The showrunner and dressing rooms are git repos; gh is optional for publishing.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+ENV NODE_ENV=production DATA_DIR=/data REPOS_DIR=/data/repos PORT=8787
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY characters ./characters
 COPY seed ./seed
+COPY gates.json ./gates.json
 COPY public ./public
 COPY src ./src
 VOLUME ["/data"]

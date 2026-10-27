@@ -11,6 +11,14 @@ import { makeLLM } from "./agents/llm.ts";
 import { ask, explore } from "./agents/characters.ts";
 import { account, checklist, fileSha, LOOP, nextStep } from "./production/loop.ts";
 import { seed } from "./seed.ts";
+import { tick } from "./showrunner/showrunner.ts";
+import { dressingRoom } from "./repos/dressing-room.ts";
+import { EpisodeRepo } from "./repos/episode-repo.ts";
+import { localRepos, planPublish, publish } from "./repos/publish.ts";
+import { REPOS_DIR } from "./repos/git.ts";
+import { CAST } from "./core/types.ts";
+
+const INTAKE = process.env.INTAKE_EPISODE ?? "E02";
 
 const PRODUCER = process.env.PRODUCER_NAME ?? "leo";
 
@@ -61,6 +69,13 @@ Ideas
 The characters
   explore ID                             Borges remembers → Leonardo creates → Agnolo evaluates
   ask borges|leonardo|agnolo "..." [--idea ID] [--public]
+
+Showrunner & repos
+  showrunner tick EP [--no-explore] [--assigned-only]   Explore, gate, and assemble first cuts into the episode repo
+  showrunner gates EP                    Active gates and why each open candidate is held
+  remember borges|leonardo|agnolo "note" [--source ref]  Add a durable note to a dressing room
+  repos list                             Dressing rooms and episode repos, with heads
+  repos publish --owner GH_OWNER [--public] [--yes]   Create/push GitHub repos (dry run without --yes)
 
 Agnolo's screen
   scorecard                              Observed / projected / disputed / unknown, three ledgers
@@ -242,6 +257,51 @@ async function main() {
           notes: flags.notes ?? "",
         }).id,
       );
+    case "showrunner": {
+      const [sub, epId] = pos;
+      if (sub === "tick") {
+        const llm = makeLLM();
+        const t = await tick(room, llm, need(epId, "episode id"), { explore: !flags["no-explore"], includeUnassigned: flags["assigned-only"] ? false : epId === INTAKE });
+        out(`${t.episodeId}: load ${t.load} · gates ${t.activeGates.join(", ")}`);
+        if (t.explored.length) out(`  explored: ${t.explored.join(", ")}`);
+        out(`  cut: ${t.cut.join(", ") || "none"}${t.queued.length ? ` · queued: ${t.queued.join(", ")}` : ""}`);
+        for (const h of t.held) out(`  held ${h.ideaId}: ${h.failed.map((f) => `${f.gate} (${f.why})`).join("; ")}`);
+        out(`  repo ${new EpisodeRepo(t.episodeId).repo.dir} @ ${t.repoSha.slice(0, 7)}`);
+        return;
+      }
+      if (sub === "gates") {
+        const repo = new EpisodeRepo(need(epId, "episode id"));
+        if (!repo.repo.exists) return out(`No repo for ${epId} yet. Run: showrunner tick ${epId}`);
+        return out(repo.repo.read("GATES.md"));
+      }
+      throw new RuleError("usage", "showrunner tick EP | showrunner gates EP");
+    }
+    case "remember": {
+      const c = need(pos[0], "character") as Character;
+      if (!CAST.includes(c)) throw new RuleError("usage", `Characters: ${CAST.join(", ")}`);
+      return out(dressingRoom(c).remember(need(pos[1], "note"), flags.source ?? by));
+    }
+    case "repos": {
+      if (pos[0] === "list") {
+        out(`Repos in ${REPOS_DIR()}`);
+        for (const r of localRepos()) {
+          const l = r.log(1)[0];
+          out(`  ${r.name.padEnd(24)} ${l ? `${l.sha.slice(0, 7)} ${l.message}` : "(empty)"}${r.remote() ? `  → ${r.remote()}` : ""}`);
+        }
+        return;
+      }
+      if (pos[0] === "publish") {
+        const steps = planPublish(need(flags.owner, "--owner (GitHub user or org)"), flags.public ? "public" : "private");
+        if (!flags.yes) {
+          out(`Dry run. Re-run with --yes to execute:`);
+          for (const s of steps) out(`  ${s.action.padEnd(6)} ${s.target}\n         ${s.command.join(" ")}`);
+          return;
+        }
+        for (const r of publish(steps)) out(`${r.ok ? "✓" : "✗"} ${r.action} ${r.target}${r.ok ? "" : ` — ${r.error}`}`);
+        return;
+      }
+      throw new RuleError("usage", "repos list | repos publish --owner X [--public] [--yes]");
+    }
     case "loop":
       return out(LOOP.map((l) => `${l.stage.padEnd(9)} ${l.does}`).join("\n"));
     default:

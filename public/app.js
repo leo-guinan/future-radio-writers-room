@@ -4,7 +4,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const usd = (n) => `$${(n ?? 0).toFixed(2)}`;
 const STAGES = ["planned", "select", "write", "generate", "review", "publish", "account"];
-const CHARS = { borges: "Borges", leonardo: "Leonardo", agnolo: "Agnolo" };
+const CHARS = { borges: "Borges", leonardo: "Leonardo", agnolo: "Agnolo", showrunner: "Showrunner" };
 let snap = null;
 const seen = new Set();
 
@@ -93,6 +93,7 @@ function renderBoard() {
 function who(e) {
   if (e.type === "agent.run") return e.payload.character;
   if (e.actor.startsWith("patron")) return "patron";
+  if (e.actor === "showrunner") return "showrunner";
   return "";
 }
 
@@ -117,6 +118,12 @@ function line(e) {
     case "ledger.entry": return [actor, `${esc(p.ledger)} ledger: ${esc(p.kind)} ${p.unit === "usd" ? usd(p.amount) : `${p.amount} ${esc(p.unit)}`} <span class="tag">${esc(p.status)}</span> ${esc(p.label)}`];
     case "forecast.recorded": return [actor, `recorded a forecast, due ${esc(p.dueBy)}: <i>${esc(p.claim)}</i>`];
     case "forecast.resolved": return [actor, `resolved ${esc(p.forecastId)} as <b>${esc(p.outcome)}</b>: ${esc(p.observation)}`];
+    case "showrunner.tick": {
+      const held = p.held.length ? ` Held ${p.held.length}: ${p.held.slice(0, 4).map((h) => `${ideaLink(h.ideaId)} (${esc(h.failed.map((f) => f.gate).join(", "))})`).join(", ")}${p.held.length > 4 ? "…" : ""}.` : "";
+      return [actor, `made rounds on ${epLink(p.episodeId)}: ${p.load} open, ${p.activeGates.length} gates on${p.cut.length ? `, <b>cut ${p.cut.map(ideaLink).join(", ")}</b>` : ""}${p.queued.length ? `, ${p.queued.length} queued` : ""}.${held}`];
+    }
+    case "idea.cut": return [actor, `assembled a <b>first cut</b> of ${ideaLink(p.ideaId)} in <code>${esc(p.repo)}@${esc(p.sha.slice(0, 7))}</code> — ${esc(p.approach)}`];
+    case "repo.commit": return [actor, `committed to <code>${esc(p.repo)}@${esc(p.sha.slice(0, 7))}</code>: ${esc(p.message)}`];
     case "conference.held": return [actor, `held the <b>${esc(p.kind)}</b> press conference "${esc(p.title)}"`];
     default: return [actor, esc(e.type)];
   }
@@ -128,6 +135,7 @@ function runBody(p) {
   const o = p.output || {};
   if (p.character === "leonardo" && o.approaches)
     extra = `<ol class="approaches">${o.approaches.map((a) => `<li><b>${esc(a.title)}</b> — ${esc(a.deliverable)} · ~${usd(a.estCashUsd)} · ~${esc(a.estHours)}h · <i>stop: ${esc(a.stoppingRule)}</i></li>`).join("")}</ol>`;
+  if (p.character === "showrunner") extra = "";
   if (p.character === "agnolo" && o.scores)
     extra = `<div class="scores"><span>story <b>${o.scores.story}</b>/3</span><span>business <b>${o.scores.business}</b>/3</span><span>participation <b>${o.scores.participation}</b>/3</span><span>→ <b>${esc(o.recommend)}</b></span>${o.budget ? `<span>remaining ${usd(o.budget.remaining)}</span>` : ""}</div>`;
   const flags = p.flags?.length ? `<div class="flags">⚑ ${p.flags.map(esc).join(" · ")}</div>` : "";
@@ -149,7 +157,7 @@ function feedItem(e) {
 
 function addToFeed(events, prepend = true) {
   const feed = $("#feed");
-  const fresh = events.filter((e) => e && !seen.has(e.id));
+  const fresh = events.filter((e) => e && !seen.has(e.id) && !(e.type === "repo.commit" && e.actor !== "showrunner") && !(e.type === "repo.commit" && /^First cut/.test(e.payload.message)));
   fresh.forEach((e) => seen.add(e.id));
   const html = fresh.map(feedItem).reverse().join("");
   if (prepend) feed.insertAdjacentHTML("afterbegin", html);
@@ -191,6 +199,11 @@ async function showEpisode(id) {
       ${e.next ? `<dt>Next</dt><dd><b>${esc(e.next.stage)}</b> — ${esc(e.next.does)}</dd>` : ""}
     </dl>
     ${e.releases.map((r) => `<p><b>Released ${esc(r.version)}</b> ${esc(r.at.slice(0, 10))} — locked. <code>sha256 ${esc(r.sha256)}</code><br>${/^https?:/.test(r.uri) ? `<a class="link" href="${esc(r.uri)}" target="_blank" rel="noopener">Listen</a> · ` : ""}${esc(r.invitation)}</p>`).join("")}
+    <h3>In the showrunner's office</h3>
+    ${e.repo ? `<p class="muted">Repo <code>${esc(e.repo.name)}@${esc(e.repo.head.slice(0, 7))}</code>${e.repo.remote ? ` · <a class="link" href="${esc(e.repo.remote.replace(/\.git$/, ""))}" target="_blank" rel="noopener">on GitHub</a>` : ""} — started from the show plan alone.</p>` : `<p class="muted">No repo yet. The showrunner opens it with the show plan when the first idea arrives.</p>`}
+    ${e.lastTick ? `<p>Last rounds ${esc(e.lastTick.at.slice(0, 16).replace("T", " "))}: <b>${e.lastTick.load}</b> open candidates · gates on: ${e.lastTick.activeGates.map((g) => `<span class="tag">${esc(g)}</span>`).join(" ")}</p>` : ""}
+    ${e.cuts.length ? `<ul class="scenes">${e.cuts.map((c) => `<li><code>${esc(c.ideaId)}</code><div><a class="link" data-cut="${esc(c.episodeId)}|${esc(c.ideaId)}"><b>${esc(c.title)}</b></a><br><span class="muted">${esc(c.approach)} · cast pinned at ${c.projections.map((p) => `${esc(p.character)}@${esc(p.sha.slice(0, 7))}`).join(", ")}</span></div><span class="tag">${esc(c.status)}</span></li>`).join("")}</ul>` : ""}
+    ${e.lastTick?.held.length ? `<details><summary>${e.lastTick.held.length} held back, and why</summary><ul class="history">${e.lastTick.held.map((h) => `<li><a class="link" data-idea="${esc(h.ideaId)}">${esc(h.ideaId)}</a>: ${h.failed.map((f) => `<b>${esc(f.gate)}</b> — ${esc(f.why)}`).join("; ")}</li>`).join("")}</ul></details>` : ""}
     <h3>Release checklist</h3>
     <ul class="checklist">${e.checklist.map((c) => `<li class="${c.done ? "done" : ""}">${esc(c.task)}${c.detail ? ` <span class="muted">(${esc(c.detail)})</span>` : ""}</li>`).join("")}</ul>
     ${scenes.length ? `<h3>Scenes</h3><ul class="scenes">${scenes.map((s) => `<li class="${s.selected === false ? "cut" : ""}"><code>${esc(s.sceneId)}</code><div><span class="tt"><b>${esc(s.title)}</b> · ${esc(s.role)}</span><br><span class="muted">${esc(s.summary)}</span></div><span class="tag">${s.selected === null ? "open" : s.selected ? "kept" : "cut"}</span></li>`).join("")}</ul>` : ""}
@@ -212,6 +225,7 @@ async function showIdea(id) {
       <dt>Signals</dt><dd>creative ${creative} · community ${s.community} · patron support ${s.financial ? usd(s.financial) : "–"}</dd>
     </dl>
     ${i.history.length ? `<h3>Decisions</h3><ol class="history">${i.history.map((h) => `<li>${esc(h.from)} → <b>${esc(h.to)}</b> (${esc(h.by)}, ${esc(h.at.slice(0, 10))}): ${esc(h.reason)}${h.result ? ` <i>Result: ${esc(h.result)}</i>` : ""}</li>`).join("")}</ol>` : ""}
+    ${i.cuts?.length ? `<h3>First cuts</h3><ul class="history">${i.cuts.map((c) => `<li><a class="link" data-ep="${esc(c.episodeId)}">${esc(c.episodeId)}</a> — ${esc(c.approach)} · <code>${esc(c.repo)}@${esc(c.sha.slice(0, 7))}</code> · passed ${c.gatesPassed.length} gates · <a class="link" data-cut="${esc(c.episodeId)}|${esc(c.ideaId)}">read the cut</a></li>`).join("")}</ul>` : ""}
     ${i.notes.length ? `<h3>Notes</h3>${i.notes.map((n) => `<p class="muted">${esc(n.text)}</p>`).join("")}` : ""}
     ${i.runs.length ? `<h3>The room's work</h3><ol class="feed">${i.runs.map((r) => feedItem({ id: r.eventId, ts: r.at, type: "agent.run", actor: r.character, payload: { ...r, ideaId: undefined } })).join("")}</ol>` : ""}
     <div class="askbox">
@@ -248,7 +262,20 @@ async function showIdea(id) {
     };
 }
 
+async function showCut(episodeId, ideaId) {
+  const c = await api(`/api/episodes/${encodeURIComponent(episodeId)}/cuts/${encodeURIComponent(ideaId)}`);
+  open(`
+    <p class="kicker">${esc(episodeId)} · first cut · <code>${esc(c.repo)}@${esc(c.sha.slice(0, 7))}</code></p>
+    <h2 id="drawer-title"><a class="link" data-idea="${esc(ideaId)}">${esc(ideaId)}</a> — ${esc(c.approach)}</h2>
+    <h3>Beats</h3><pre class="md">${esc(c.beats)}</pre>
+    <h3>Script</h3><pre class="md">${esc(c.script)}</pre>
+    <details><summary>Card: gates, estimates, cast pins</summary><pre class="md">${esc(c.card)}</pre></details>
+  `);
+}
+
 document.addEventListener("click", (ev) => {
+  const cut = ev.target.closest("[data-cut]");
+  if (cut) { ev.preventDefault(); const [e, i] = cut.dataset.cut.split("|"); return showCut(e, i); }
   const ep = ev.target.closest("[data-ep]");
   const idea = ev.target.closest("[data-idea]");
   if (ep) (ev.preventDefault(), showEpisode(ep.dataset.ep));

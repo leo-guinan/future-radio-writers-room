@@ -11,6 +11,8 @@ import type { Character, EpisodeStage, IdeaStatus, OutputKind, RoomEvent, Signal
 import { makeLLM } from "./agents/llm.ts";
 import { ask, explore } from "./agents/characters.ts";
 import { checklist, nextStep } from "./production/loop.ts";
+import { tick } from "./showrunner/showrunner.ts";
+import { EpisodeRepo } from "./repos/episode-repo.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TOKEN = process.env.PRODUCER_TOKEN ?? "";
@@ -20,10 +22,44 @@ const PATRON_RUNS_PER_IP = Number(process.env.PATRON_RUNS_PER_IP ?? 5);
 const IDEAS_PER_IP = Number(process.env.IDEAS_PER_IP ?? 5);
 const PUBLIC_DIR = join(process.cwd(), "public");
 
+const INTAKE = process.env.INTAKE_EPISODE ?? "E02";
+const SHOWRUNNER_AUTO = process.env.SHOWRUNNER_AUTO !== "0";
+const SHOWRUNNER_EVERY = Number(process.env.SHOWRUNNER_EVERY_SECONDS ?? 300);
+
 const room = openRoom();
 const llm = makeLLM();
 const votes = new Set<string>(); // ip|idea, lifetime of the process
 const ipCounts = new Map<string, number>(); // day|kind|ip
+
+// ---------------------------------------------------------------- showrunner
+
+// Ticks run one at a time; requests for the same episode while one is queued coalesce.
+let chain = Promise.resolve();
+const pending = new Set<string>();
+function scheduleTick(episodeId: string) {
+  if (!SHOWRUNNER_AUTO || pending.has(episodeId)) return;
+  const ep = room.episodes.get(episodeId);
+  if (!ep || ep.releases.length) return;
+  pending.add(episodeId);
+  chain = chain
+    .then(() => new Promise((r) => setTimeout(r, 2000)))
+    .then(() => {
+      pending.delete(episodeId);
+      room.store.sync();
+      return tick(room, llm, episodeId, { includeUnassigned: episodeId === INTAKE });
+    })
+    .then((t) => {
+      // More work waiting (queued, or not yet explored)? Make another round.
+      const unexplored = t.held.some((h) => h.failed.some((f) => f.gate === "explored"));
+      const progressed = t.cut.length > 0 || t.explored.length > 0;
+      if (progressed && (t.queued.length || unexplored)) setTimeout(() => scheduleTick(episodeId), 1000);
+    })
+    .catch((e) => console.error(`showrunner ${episodeId}:`, e.message));
+}
+function activeEpisodes() {
+  const withIdeas = new Set([...room.ideas.values()].map((i) => i.episodeId).filter(Boolean) as string[]);
+  return [...room.episodes.values()].filter((e) => !e.releases.length && (withIdeas.has(e.episodeId) || e.episodeId === INTAKE)).map((e) => e.episodeId);
+}
 
 // ---------------------------------------------------------------- helpers
 
@@ -138,7 +174,20 @@ const routes: Array<[string, RegExp, Handler]> = [
       assets: e.assets.filter((a) => room.store.all().some((ev) => ev.type === "episode.asset_added" && ev.visibility === "public" && (ev.payload as any).uri === a.uri)),
       cash: room.episodeCash(e.episodeId), hours: room.episodeHours(e.episodeId),
       checklist: checklist(room, e.episodeId), next: nextStep(room, e.episodeId),
+      repo: (() => {
+        const r = new EpisodeRepo(e.episodeId).repo;
+        return r.exists ? { name: r.name, head: r.head(), remote: r.remote() || null, log: r.log(8) } : null;
+      })(),
+      cuts: room.cuts.filter((c) => c.episodeId === e.episodeId).map((c) => ({ ...c, title: room.ideas.get(c.ideaId)?.title, status: room.ideas.get(c.ideaId)?.status })),
+      lastTick: room.ticks.filter((t) => t.episodeId === e.episodeId).at(-1) ?? null,
     });
+  }],
+  ["GET", /^\/api\/episodes\/([\w-]+)\/cuts\/([\w-]+)$/, (_q, res, m) => {
+    const cut = room.cuts.filter((c) => c.episodeId === m[1] && c.ideaId === m[2]).at(-1);
+    if (!cut) throw new RuleError("episode", `No cut of ${m[2]} in ${m[1]}.`);
+    const r = new EpisodeRepo(m[1]).repo;
+    const file = (f: string) => { try { return r.showAt(cut.sha, `${cut.path}/${f}`); } catch { return ""; } };
+    send(res, 200, { ...cut, card: file("CARD.md"), beats: file("BEATS.md"), script: file("SCRIPT.md") });
   }],
   ["GET", /^\/api\/ideas\/([\w-]+)$/, (_q, res, m) => {
     const i = room.mustIdea(m[1]);
@@ -147,6 +196,7 @@ const routes: Array<[string, RegExp, Handler]> = [
       ...i,
       contributor: contributor.credit ? contributor : { ...contributor, name: "anonymous patron" },
       runs: i.runs.map(publicRun).filter(Boolean),
+      cuts: room.cuts.filter((c) => c.ideaId === i.ideaId),
     });
   }],
 
@@ -164,6 +214,7 @@ const routes: Array<[string, RegExp, Handler]> = [
       episodeId: b.episodeId && room.episodes.has(b.episodeId) ? b.episodeId : undefined,
       contributor: { name, credit: b.credit !== false, reuse: ["cc-by", "show-only", "ask-first"].includes(b.reuse) ? b.reuse : "show-only", contact: clip(b.contact, 120) || undefined },
     });
+    scheduleTick((ev.payload as any).episodeId ?? INTAKE);
     send(res, 201, { ideaId: (ev.payload as any).ideaId, eventId: ev.id });
   }],
   ["POST", /^\/api\/ideas\/([\w-]+)\/vote$/, (req, res, m) => {
@@ -208,6 +259,10 @@ const routes: Array<[string, RegExp, Handler]> = [
     requireProducer(req);
     const b = await body(req);
     send(res, 201, room.advanceEpisode(PRODUCER, m[1], b.stage as EpisodeStage, b.note));
+  }],
+  ["POST", /^\/api\/producer\/episodes\/([\w-]+)\/tick$/, async (req, res, m) => {
+    requireProducer(req);
+    send(res, 201, await tick(room, llm, m[1], { includeUnassigned: m[1] === INTAKE }));
   }],
   ["GET", /^\/api\/producer\/scorecard$/, (req, res) => {
     requireProducer(req);
@@ -256,6 +311,8 @@ export const server = createServer(async (req, res) => {
 
 // Stream CLI-written events to watchers without waiting for a request.
 setInterval(() => room.store.sync(), 1500).unref();
+// The showrunner also makes rounds on its own.
+if (SHOWRUNNER_AUTO && SHOWRUNNER_EVERY > 0) setInterval(() => activeEpisodes().forEach(scheduleTick), SHOWRUNNER_EVERY * 1000).unref();
 
 server.listen(PORT, () => {
   console.log(`Future Radio writers' room on http://localhost:${PORT}  (${llm.offline ? "offline characters" : `model ${llm.model}`}; ${room.store.all().length} events)`);

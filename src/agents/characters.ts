@@ -7,10 +7,14 @@ import { join } from "node:path";
 import type { Room } from "../core/room.ts";
 import type { AgentRun, Character, RoomEvent } from "../core/types.ts";
 import { extractJson, type LLM } from "./llm.ts";
+import { dressingRoom, reposEnabled } from "../repos/dressing-room.ts";
 
 const CHAR_DIR = process.env.CHARACTERS_DIR ?? join(process.cwd(), "characters");
-const persona = (name: string) => readFileSync(join(CHAR_DIR, `${name}.md`), "utf8");
-const systemFor = (c: Character) => `${persona("show-bible")}\n\n---\n\n${persona(c)}`;
+const template = (name: string) => readFileSync(join(CHAR_DIR, `${name}.md`), "utf8");
+/** A character's persona comes from their dressing room once it exists; characters/ holds the templates. */
+export const persona = (c: Character) => (reposEnabled() ? dressingRoom(c).persona() : template(c));
+export const showBible = () => template("show-bible");
+export const systemFor = (c: Character) => `${showBible()}\n\n---\n\n${persona(c)}`;
 
 export const DEFAULT_CEILING = Number(process.env.DEFAULT_CASH_CEILING ?? 20);
 
@@ -22,7 +26,7 @@ export interface AskContext {
 }
 
 let runCounter = 0;
-const runId = (c: Character) => `R-${c[0].toUpperCase()}${Date.now().toString(36)}${(runCounter++).toString(36)}`;
+export const runId = (c: Character) => `R-${c[0].toUpperCase()}${Date.now().toString(36)}${(runCounter++).toString(36)}`;
 
 // ---------------------------------------------------------------- Borges
 
@@ -172,7 +176,7 @@ Reply with two or three sentences in Leonardo's voice, then a JSON block:
     if (!a.stoppingRule?.trim()) flags.push(`approach ${i + 1} has no stopping rule`);
     if (!(a.estCashUsd >= 0)) flags.push(`approach ${i + 1} has no cash estimate`);
   });
-  const run = record(ctx, "leonardo", { ideaId }, parsed, voice, c, [], flags);
+  const run = record(ctx, "leonardo", { ideaId, episodeId: idea.episodeId }, parsed, voice, c, [], flags);
   return { run, approaches: parsed.approaches, favorite: parsed.favorite ?? 0, text: voice };
 }
 
@@ -313,7 +317,7 @@ export async function ask(ctx: AskContext, character: Character, question: strin
   return agnolo(ctx, ideaId, approaches);
 }
 
-function record(
+export function record(
   ctx: AskContext,
   character: Character,
   ref: { ideaId?: string; episodeId?: string; question?: string },
@@ -339,5 +343,16 @@ function record(
     costUsd: c.costUsd,
     offline: c.offline,
   };
-  return ctx.room.recordRun(run, ctx.scope === "producer" && !ref.ideaId ? "producer" : "public") as RoomEvent<AgentRun>;
+  const ev = ctx.room.recordRun(run, ctx.scope === "producer" && !ref.ideaId ? "producer" : "public") as RoomEvent<AgentRun>;
+  if (reposEnabled()) {
+    // Every run is also a commit in the character's dressing room.
+    const { sha, file } = dressingRoom(character).recordRun(run, ev.ts, ev.id, ev.hash);
+    ctx.room.store.append(
+      "repo.commit",
+      character,
+      { repo: dressingRoom(character).repo.name, sha, message: `${run.runId}`, files: [file], runId: run.runId, ideaId: run.ideaId, episodeId: run.episodeId },
+      ev.visibility,
+    );
+  }
+  return ev;
 }
