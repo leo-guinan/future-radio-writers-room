@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Future Radio — Writers' Room</title>
+  <meta name="description" content="Watch Future Radio being made. Borges remembers, Leonardo creates, Agnolo keeps the score." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=IBM+Plex+Mono:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap masthead-row">
+      <div>
+        <p class="kicker"><span class="onair" id="onair">On air</span> The workshop is open</p>
+        <h1>Future Radio <em>— the writers' room</em></h1>
+        <p class="tagline"><b class="c-borges">Borges</b> remembers. <b class="c-leonardo">Leonardo</b> creates. <b class="c-agnolo">Agnolo</b> keeps the score.</p>
+      </div>
+      <div class="chain" title="Every event is hash-chained. This is the head of the chain.">
+        <span>record</span><code id="head">—</code><span id="seq"></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section aria-labelledby="season-h">
+      <div class="section-head">
+        <h2 id="season-h">The season</h2>
+        <p class="muted">Ten canonical episodes. The ending was released first; the middle is made here.</p>
+      </div>
+      <ol class="season" id="season"></ol>
+    </section>
+
+    <div class="grid">
+      <section class="feed-col" aria-labelledby="feed-h">
+        <div class="section-head">
+          <h2 id="feed-h">In the workshop</h2>
+          <p class="muted">Everything the room does, as it happens.</p>
+        </div>
+        <ol class="feed" id="feed" aria-live="polite"></ol>
+      </section>
+
+      <aside class="side-col">
+        <section class="screen" aria-labelledby="screen-h">
+          <h2 id="screen-h">Agnolo's screen</h2>
+          <div id="score"></div>
+        </section>
+
+        <section aria-labelledby="board-h">
+          <div class="section-head">
+            <h2 id="board-h">The idea board</h2>
+            <p class="muted">Three signals, never added together.</p>
+          </div>
+          <div class="legend"><span title="creative judgment, 0–3">judgment</span><span title="community votes">votes</span><span title="patron support received">support</span></div>
+          <div id="board"></div>
+        </section>
+
+        <section class="propose" aria-labelledby="prop-h">
+          <h2 id="prop-h">Bring an idea</h2>
+          <p class="muted">Every idea gets an identity, a source and an outcome. Declined ideas stay in the archive with their reasons.</p>
+          <form id="propose">
+            <label>Title<input name="title" required maxlength="120" placeholder="A song that doesn't exist yet" /></label>
+            <label>What question does it explore?<textarea name="question" required maxlength="400" rows="2" placeholder="Can the audience help create the next transmission?"></textarea></label>
+            <label>What inspired it?<textarea name="source" required maxlength="400" rows="2" placeholder="Episode 10's invitation, a dream, a news story…"></textarea></label>
+            <div class="row">
+              <label>It could become
+                <select name="output"><option>scene</option><option>song</option><option>episode</option><option>broadcast</option><option>trailer</option><option>capability</option><option>other</option></select>
+              </label>
+              <label>For episode<select name="episodeId" id="ep-select"><option value="">any</option></select></label>
+            </div>
+            <div class="row">
+              <label>Your name<input name="name" maxlength="60" placeholder="How to credit you" /></label>
+              <label>Contact (private)<input name="contact" maxlength="120" placeholder="optional" /></label>
+            </div>
+            <label>The show may
+              <select name="reuse">
+                <option value="show-only">use it in Future Radio only</option>
+                <option value="cc-by">reuse it freely with credit (CC BY)</option>
+                <option value="ask-first">ask me before using it</option>
+              </select>
+            </label>
+            <label class="check"><input type="checkbox" name="credit" checked /> Credit me by name</label>
+            <label class="check"><input type="checkbox" name="consent" required /> This idea is mine to share, on the terms above.</label>
+            <button type="submit">Send it to the room</button>
+            <p class="form-msg" id="propose-msg" role="status"></p>
+          </form>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <dialog id="drawer" aria-labelledby="drawer-title">
+    <form method="dialog" class="drawer-close"><button aria-label="Close">×</button></form>
+    <div id="drawer-body"></div>
+  </dialog>
+
+  <footer class="wrap foot">
+    <p>Forecasts aren't receipts. Founder hours aren't free. A released cut never changes. Every record here is part of the show.</p>
+  </footer>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
