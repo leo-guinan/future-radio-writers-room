@@ -51,7 +51,9 @@ test("Episode 1 imports as a released, accounted, locked episode — once", () =
   assert.ok(repo.git(["tag", "-l", "v1"]));
 
   // run it again: nothing new
+  const head = repo.head();
   const again = importEpisode(room, join(process.cwd(), "seed/episodes/e01"));
+  assert.equal(repo.head(), head, "a re-import leaves the episode repo alone");
   assert.equal(again.recorded, false);
   assert.equal(again.canonAdded, 0);
   assert.equal(dressingRoom("leonardo").bible().record.appearances.length, 1);

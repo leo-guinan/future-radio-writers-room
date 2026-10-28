@@ -6,8 +6,8 @@
 // Imports are idempotent: run again and nothing is recorded twice. The room log says
 // what was imported and from where; nothing pretends to have happened at an earlier time.
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, join } from "node:path";
 import { sha256 } from "../core/events.ts";
 import type { Room } from "../core/room.ts";
 import { CAST, type Character, type IdeaStatus, type LedgerEntry, type OutputKind } from "../core/types.ts";
@@ -155,8 +155,17 @@ export function importEpisode(room: Room, dir: string, opts: { actor?: string; m
   }
 
   // The episode repo: the show plan, the record, and the cast projected as of this release.
+  // Once written it is a fixed reference, like the release: a re-import leaves it alone.
   const repo = new EpisodeRepo(spec.episodeId);
   repo.ensure(ep);
+  if (!report.recorded && repo.repo.has("RELEASE.md")) {
+    report.repo = { name: repo.repo.name, sha: repo.repo.head(), files: 0 };
+    for (const m of spec.release.media ?? []) {
+      const src = opts.mediaDir ? join(opts.mediaDir, basename(m.file)) : null;
+      if (!src || !existsSync(src) || sha256(readFileSync(src)) !== m.sha256) report.missingMedia.push(m.file);
+    }
+    return report;
+  }
   const files: Record<string, string> = {
     "SCRIPT.md": script,
     "assets.json": readFileSync(join(dir, "assets.json"), "utf8"),
@@ -170,13 +179,10 @@ export function importEpisode(room: Room, dir: string, opts: { actor?: string; m
   const songsDir = join(dir, "songs");
   if (existsSync(songsDir)) for (const f of readdirSync(songsDir)) files[`songs/${f}`] = readFileSync(join(songsDir, f), "utf8");
   for (const [rel, content] of Object.entries(files)) repo.repo.write(rel, content);
+  // Binaries live in the GitHub release for this tag, not in git. Verify them if we have them.
   for (const m of spec.release.media ?? []) {
     const src = opts.mediaDir ? join(opts.mediaDir, basename(m.file)) : null;
-    if (src && existsSync(src) && sha256(readFileSync(src)) === m.sha256) {
-      mkdirSync(dirname(repo.repo.path(m.file)), { recursive: true });
-      copyFileSync(src, repo.repo.path(m.file));
-    }
-    else if (!repo.repo.has(m.file)) report.missingMedia.push(m.file);
+    if (!src || !existsSync(src) || sha256(readFileSync(src)) !== m.sha256) report.missingMedia.push(m.file);
   }
   const query = [spec.logline, ...spec.scenes.map((s) => `${s.title} ${s.summary}`)].join(" ");
   const projections = (["borges", "leonardo", "agnolo"] as const).map((c) => repo.project(c, query));
@@ -248,7 +254,9 @@ ${s.release.invitation}
 
 ## Media
 
-${(s.release.media ?? []).map((m) => `- \`${m.file}\` — sha256 \`${m.sha256}\``).join("\n") || "—"}
+Attached to the [\`${s.release.version}\` release](${releaseBase(s)}) alongside the episode file:
+
+${(s.release.media ?? []).map((m) => `- [${basename(m.file)}](${releaseBase(s)}/${basename(m.file)}) — sha256 \`${m.sha256}\``).join("\n") || "—"}
 
 ## In the room
 
@@ -307,10 +315,15 @@ ${a.reused.items.map((r: any) => `- ${r.label}${r.node ? ` (\`${r.node}\`)` : ""
 
 ## Images
 
-${a.images.map((i: any) => `- ${i.label}${i.node ? ` (\`${i.node}\`, ${i.model})` : ` — ${i.service}`}: ${i.files.map((f: string) => `\`${f}\``).join(", ")}`).join("\n")}
+Attached to the release (see RELEASE.md):
+
+${a.images.map((i: any) => `- ${i.label}${i.node ? ` (\`${i.node}\`, ${i.model})` : ` — ${i.service}`}: ${i.files.map((f: string) => `\`${basename(f)}\``).join(", ")}`).join("\n")}
 
 **Attributed generation cost:** about $${a.attributedCostUsd}.
 `;
 }
+
+/** The download URL base for a release's assets, derived from the episode file's own URI. */
+const releaseBase = (s: Imported) => s.release.uri.slice(0, s.release.uri.lastIndexOf("/"));
 
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;

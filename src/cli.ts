@@ -5,6 +5,8 @@
 // Run `npm run room -- help` for the full list.
 
 import { openRoom, LOG_PATH } from "./core/open.ts";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { RuleError } from "./core/room.ts";
 import { EPISODE_STAGES, IDEA_EXITS, IDEA_STAGES, type Character, type EpisodeStage, type IdeaStatus, type LedgerEntry, type OutputKind, type SignalKind } from "./core/types.ts";
 import { makeLLM } from "./agents/llm.ts";
@@ -51,7 +53,9 @@ const out = (x: unknown) => console.log(typeof x === "string" ? x : JSON.stringi
 const HELP = `Future Radio writers' room — producer console
 
 Setup
-  seed [--media dir]                     Seed an empty room from seed/season-1.json, then import seed/episodes/*
+  seed [--fresh] [--media dir]           Start an empty room from seed/room-log.jsonl (the published record),
+                                         or with --fresh from seed/season-1.json + seed/episodes/*
+  publish-log                            Copy the room's log to seed/room-log.jsonl (the public record)
   import <folder> [--media dir]          Import a released episode (idempotent)
   verify                                 Check the hash chain of the event log
   serve                                  Start the workshop server (same as npm start)
@@ -107,6 +111,20 @@ async function main() {
 
   switch (cmd) {
     case "seed": {
+      // A published room log is the room's record so far: start from it rather than re-seeding,
+      // so event ids and hashes match what dressing rooms and episode repos already cite.
+      const published = join(process.cwd(), "seed", "room-log.jsonl");
+      if (!room.store.all().length && existsSync(published) && !flags.fresh) {
+        mkdirSync(dirname(LOG_PATH), { recursive: true });
+        copyFileSync(published, LOG_PATH);
+        const restored = openRoom();
+        const v = restored.store.verify();
+        if (!v.ok) throw new RuleError("immutable", `seed/room-log.jsonl fails verification at ${v.at}: ${v.reason}`);
+        out(`Restored the published room log: ${v.count} events, head ${v.head.slice(0, 12)}.`);
+        for (const r of importAll(restored, undefined, { actor: PRODUCER, mediaDir: flags.media }))
+          out(`${r.episodeId}: ${r.recorded ? `imported, ${r.events} events` : "already in the log"}`);
+        return;
+      }
       const n = seed(room, PRODUCER);
       out(`Seeded ${n} events into ${LOG_PATH}. Episode 10 is at 'select' with ${[...room.mustEpisode("E10").scenes.values()].filter((s) => s.selected).length} scenes selected.`);
       for (const r of importAll(room, undefined, { actor: PRODUCER, mediaDir: flags.media }))
@@ -117,6 +135,12 @@ async function main() {
       const dir = need(pos[0], "episode folder (e.g. seed/episodes/e01)");
       const r = importEpisode(room, dir, { actor: PRODUCER, mediaDir: flags.media });
       return out(r);
+    }
+    case "publish-log": {
+      const v = room.store.verify();
+      if (!v.ok) throw new RuleError("immutable", `The log fails verification at ${v.at}; not publishing it.`);
+      copyFileSync(LOG_PATH, join(process.cwd(), "seed", "room-log.jsonl"));
+      return out(`seed/room-log.jsonl ← ${v.count} events, head ${v.head.slice(0, 12)}. Commit it to publish.`);
     }
     case "verify":
       return out(room.store.verify());

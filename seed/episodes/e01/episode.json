@@ -15,28 +15,170 @@
   "logline": "Florence, 1504. Leonardo builds a machine meant to translate his ideas. Instead it starts transmitting, and someone in the future is listening.",
   "tagline": "A message from the past, asking the future to help it happen.",
   "cast": [
-    { "character": "leonardo", "voice": { "provider": "elevenlabs", "name": "Leonardo — Infinite Overture", "id": "s5t7B6IvxVOp3Y7HQT6Q", "kind": "designed" } },
-    { "character": "borges", "voice": { "provider": "elevenlabs", "name": "Borges — Infinite Overture", "id": "TLugb594bskyzPlFSOkh", "kind": "designed" } },
-    { "character": "agnolo", "role": "Messer Agnolo, Leonardo's bookkeeper", "voice": { "provider": "elevenlabs", "name": "Old Italian Man angry and nostalgic", "id": "s2wvuS7SwITYg8dqsJdn", "kind": "library", "direction": "played dry; muffled whenever he speaks from the next room" } },
-    { "character": "yuria", "role": "the listener in the static", "voice": { "provider": "elevenlabs", "name": "Yuria - Expressive, Playful, Witty", "id": "vGfq3y2g8QTWjuUhrNYc", "kind": "library" } },
-    { "character": "the cat", "role": "sound design only" },
-    { "character": "the Unspoken Orchestra", "role": "music, D minor, 92 BPM; the machine's tenor voice sings" }
+    {
+      "character": "leonardo",
+      "voice": {
+        "provider": "elevenlabs",
+        "name": "Leonardo — Infinite Overture",
+        "id": "s5t7B6IvxVOp3Y7HQT6Q",
+        "kind": "designed"
+      }
+    },
+    {
+      "character": "borges",
+      "voice": {
+        "provider": "elevenlabs",
+        "name": "Borges — Infinite Overture",
+        "id": "TLugb594bskyzPlFSOkh",
+        "kind": "designed"
+      }
+    },
+    {
+      "character": "agnolo",
+      "role": "Messer Agnolo, Leonardo's bookkeeper",
+      "voice": {
+        "provider": "elevenlabs",
+        "name": "Old Italian Man angry and nostalgic",
+        "id": "s2wvuS7SwITYg8dqsJdn",
+        "kind": "library",
+        "direction": "played dry; muffled whenever he speaks from the next room"
+      }
+    },
+    {
+      "character": "yuria",
+      "role": "the listener in the static",
+      "voice": {
+        "provider": "elevenlabs",
+        "name": "Yuria - Expressive, Playful, Witty",
+        "id": "vGfq3y2g8QTWjuUhrNYc",
+        "kind": "library"
+      }
+    },
+    {
+      "character": "the cat",
+      "role": "sound design only"
+    },
+    {
+      "character": "the Unspoken Orchestra",
+      "role": "music, D minor, 92 BPM; the machine's tenor voice sings"
+    }
   ],
   "scenes": [
-    { "sceneId": "E01-01", "title": "The impossible expense", "role": "Opening", "start": "0:00", "minutes": [1.15, 1.15], "summary": "Leonardo totals forty-seven florins; Agnolo arrives with the ledger and books the plan under \"losses.\"", "question": "Who pays for a machine that talks to people who haven't been born yet?" },
-    { "sceneId": "E01-02", "title": "The Unspoken Orchestra", "role": "Song", "start": "1:09", "minutes": [1.57, 1.57], "summary": "The machine sings what Leonardo won't say: he is terrified of dying with a thousand unfinished ideas.", "question": "What is the inventor really afraid of?" },
-    { "sceneId": "E01-03", "title": "The first broadcast", "role": "Turn", "start": "2:43", "minutes": [0.65, 0.65], "summary": "The machine isn't translating, it's sending. A listener in the future: \"leave it on. I like this one.\"", "question": "Is anyone there?" },
-    { "sceneId": "E01-04", "title": "The pitch across centuries", "role": "Pitch", "start": "3:22", "minutes": [2.58, 2.58], "summary": "Leonardo asks the future for help; the machine turns his explanation into \"Make It With Me\" (3:56). The needle counts who is listening.", "question": "What if we could help one another finish them?" },
-    { "sceneId": "E01-05", "title": "A voice from the library", "role": "Meeting", "start": "5:57", "minutes": [1.3, 1.3], "summary": "Borges answers from the library, names the radio, and asks whether the future is already listening.", "question": "Has the future already been listening?" },
-    { "sceneId": "E01-06", "title": "The bill", "role": "Ending", "start": "7:15", "minutes": [1.75, 1.75], "summary": "Agnolo turns the month into a $3,000 bill and predicts the second transmission costs twenty (8:20). Leonardo asks the listener for help paying for the time it took to find them.", "question": "Does anyone value it enough to pay for the time it took to make?" }
+    {
+      "sceneId": "E01-01",
+      "title": "The impossible expense",
+      "role": "Opening",
+      "start": "0:00",
+      "minutes": [
+        1.15,
+        1.15
+      ],
+      "summary": "Leonardo totals forty-seven florins; Agnolo arrives with the ledger and books the plan under \"losses.\"",
+      "question": "Who pays for a machine that talks to people who haven't been born yet?"
+    },
+    {
+      "sceneId": "E01-02",
+      "title": "The Unspoken Orchestra",
+      "role": "Song",
+      "start": "1:09",
+      "minutes": [
+        1.57,
+        1.57
+      ],
+      "summary": "The machine sings what Leonardo won't say: he is terrified of dying with a thousand unfinished ideas.",
+      "question": "What is the inventor really afraid of?"
+    },
+    {
+      "sceneId": "E01-03",
+      "title": "The first broadcast",
+      "role": "Turn",
+      "start": "2:43",
+      "minutes": [
+        0.65,
+        0.65
+      ],
+      "summary": "The machine isn't translating, it's sending. A listener in the future: \"leave it on. I like this one.\"",
+      "question": "Is anyone there?"
+    },
+    {
+      "sceneId": "E01-04",
+      "title": "The pitch across centuries",
+      "role": "Pitch",
+      "start": "3:22",
+      "minutes": [
+        2.58,
+        2.58
+      ],
+      "summary": "Leonardo asks the future for help; the machine turns his explanation into \"Make It With Me\" (3:56). The needle counts who is listening.",
+      "question": "What if we could help one another finish them?"
+    },
+    {
+      "sceneId": "E01-05",
+      "title": "A voice from the library",
+      "role": "Meeting",
+      "start": "5:57",
+      "minutes": [
+        1.3,
+        1.3
+      ],
+      "summary": "Borges answers from the library, names the radio, and asks whether the future is already listening.",
+      "question": "Has the future already been listening?"
+    },
+    {
+      "sceneId": "E01-06",
+      "title": "The bill",
+      "role": "Ending",
+      "start": "7:15",
+      "minutes": [
+        1.75,
+        1.75
+      ],
+      "summary": "Agnolo turns the month into a $3,000 bill and predicts the second transmission costs twenty (8:20). Leonardo asks the listener for help paying for the time it took to find them.",
+      "question": "Does anyone value it enough to pay for the time it took to make?"
+    }
   ],
   "chaptersSource": "YouTube description drafted from the final mix (production chat)",
   "ideas": [
-    { "title": "Episode 001: The First Transmission", "question": "Can a complete eight-minute audio pilot prove the machine works, and ask the future for help without feeling like a donation request?", "output": "episode", "episodeId": "E01", "status": "produced", "reason": "The pilot: produce the audio first, release it, then see whether it raises enough to make the next one.", "result": "Released as a 9:00 audio-first episode with a robot-portrait video for YouTube. 76 scripted lines, verified by transcribing the final mix." },
-    { "title": "Agnolo's Ledger: the real numbers, spoken in the fiction", "question": "Can each episode report its real production cost inside the story?", "output": "scene", "status": "selected", "reason": "Cut into E01 scene 6 so the $3,000-versus-$20 prediction is public before Episode 002 is made; recurs from Episode 002 as a postscript reporting each episode's real cost against the prediction." },
-    { "title": "Robot-portrait video broadcast", "question": "Can a static design with waveforms in robot mouths carry an audio episode on YouTube, and become a running gag?", "output": "trailer", "episodeId": "E01", "status": "produced", "reason": "Chosen over plain colour-coded waveforms: funnier, and a callback for later episodes.", "result": "1920×1080 video of the episode with robot portraits of Leonardo, Agnolo and Borges; thumbnail made." },
-    { "title": "Orchestra escalation cues for scene 2", "question": "Should two new cues build the orchestra's escalation in scene 2?", "output": "song", "episodeId": "E01", "status": "declined", "reason": "The two new cues didn't build clearly; the escalation uses the Not Enough Time lute intro, the sad-violin stinger, then the chorus. Cost $0.28." },
-    { "title": "OpenHome ability: link delivery and subscriptions", "question": "Can the device send the contribution link and subscribe listeners to the next transmission?", "output": "capability", "status": "deferred", "reason": "OpenHome ability work deferred to later; the device outro is scripted but not built." }
+    {
+      "title": "Episode 001: The First Transmission",
+      "question": "Can a complete eight-minute audio pilot prove the machine works, and ask the future for help without feeling like a donation request?",
+      "output": "episode",
+      "episodeId": "E01",
+      "status": "produced",
+      "reason": "The pilot: produce the audio first, release it, then see whether it raises enough to make the next one.",
+      "result": "Released as a 9:00 audio-first episode with a robot-portrait video for YouTube. 76 scripted lines, verified by transcribing the final mix."
+    },
+    {
+      "title": "Agnolo's Ledger: the real numbers, spoken in the fiction",
+      "question": "Can each episode report its real production cost inside the story?",
+      "output": "scene",
+      "status": "selected",
+      "reason": "Cut into E01 scene 6 so the $3,000-versus-$20 prediction is public before Episode 002 is made; recurs from Episode 002 as a postscript reporting each episode's real cost against the prediction."
+    },
+    {
+      "title": "Robot-portrait video broadcast",
+      "question": "Can a static design with waveforms in robot mouths carry an audio episode on YouTube, and become a running gag?",
+      "output": "trailer",
+      "episodeId": "E01",
+      "status": "produced",
+      "reason": "Chosen over plain colour-coded waveforms: funnier, and a callback for later episodes.",
+      "result": "1920×1080 video of the episode with robot portraits of Leonardo, Agnolo and Borges; thumbnail made."
+    },
+    {
+      "title": "Orchestra escalation cues for scene 2",
+      "question": "Should two new cues build the orchestra's escalation in scene 2?",
+      "output": "song",
+      "episodeId": "E01",
+      "status": "declined",
+      "reason": "The two new cues didn't build clearly; the escalation uses the Not Enough Time lute intro, the sad-violin stinger, then the chorus. Cost $0.28."
+    },
+    {
+      "title": "OpenHome ability: link delivery and subscriptions",
+      "question": "Can the device send the contribution link and subscribe listeners to the next transmission?",
+      "output": "capability",
+      "status": "deferred",
+      "reason": "OpenHome ability work deferred to later; the device outro is scripted but not built."
+    }
   ],
   "decisions": [
     "Agnolo's voice is the stock \"Old Italian Man\" library voice, directed to sound dry, muffled whenever he speaks from the next room.",
@@ -79,22 +221,69 @@
     "uri": "https://github.com/leo-guinan/future-radio-episode-e01/releases/download/v1/Future_Radio_EP001_The_First_Transmission.mp4",
     "invitation": "The transmission is yours: hear it, share it, enjoy it. If you'd like there to be more of them, help pay back the time it took to find you. Contributions aren't refundable; progress is posted on Twitter.",
     "media": [
-      { "file": "media/Future_Radio_EP001_thumbnail.png", "sha256": "1d1fe608184f6d28c78dde09b641209b10e703ce5bfcf9e8cda694e6a458cb2d" },
-      { "file": "media/leo_a.png", "sha256": "76b67d8591b80ff998f642b39064dd4fd64ff1fb1b647d57b427dd58c187ba4a" },
-      { "file": "media/leo_b.png", "sha256": "a0049e941d5dfd7da8c7c405eb142ce21c54a9284218b671d1aa33d8b055a875" },
-      { "file": "media/agnolo_a.png", "sha256": "658d5fa7cfd6dc56fd71bbc106d07f6eb2136a1516fe352310323b6a2124a795" },
-      { "file": "media/agnolo_b.png", "sha256": "7b35392c4f0c59677821be2e4fe4704f14dcf0ba10e73f7da39265d7d139f426" },
-      { "file": "media/borges_steampunk_scholar.png", "sha256": "be60aa2c119c98b144b301c5a4d0203811f6dd7d6e0689af11f770c1b133972d" }
+      {
+        "file": "Future_Radio_EP001_thumbnail.png",
+        "sha256": "1d1fe608184f6d28c78dde09b641209b10e703ce5bfcf9e8cda694e6a458cb2d"
+      },
+      {
+        "file": "leo_a.png",
+        "sha256": "76b67d8591b80ff998f642b39064dd4fd64ff1fb1b647d57b427dd58c187ba4a"
+      },
+      {
+        "file": "leo_b.png",
+        "sha256": "a0049e941d5dfd7da8c7c405eb142ce21c54a9284218b671d1aa33d8b055a875"
+      },
+      {
+        "file": "agnolo_a.png",
+        "sha256": "658d5fa7cfd6dc56fd71bbc106d07f6eb2136a1516fe352310323b6a2124a795"
+      },
+      {
+        "file": "agnolo_b.png",
+        "sha256": "7b35392c4f0c59677821be2e4fe4704f14dcf0ba10e73f7da39265d7d139f426"
+      },
+      {
+        "file": "borges_steampunk_scholar.png",
+        "sha256": "be60aa2c119c98b144b301c5a4d0203811f6dd7d6e0689af11f770c1b133972d"
+      }
     ]
   },
   "ledger": [
-    { "ledger": "operations", "kind": "expense", "amount": 4.83, "unit": "usd", "status": "observed", "label": "E01 new audio generation — ElevenLabs grant credits, not cash (231 generations)", "evidence": "ElevenLabs receipts, flow XwKZNGj9IqEXyN8c2Yjw" },
-    { "ledger": "effort", "kind": "hours", "amount": 30, "unit": "days", "status": "observed", "label": "The month of discovery that made E01 (artist time)", "who": "leo" },
-    { "ledger": "effort", "kind": "obligation", "amount": 3000, "unit": "usd", "status": "observed", "label": "Unrecovered artist time for E01: 30 days valued at $100/day (self-assessed); $0 recovered" }
+    {
+      "ledger": "operations",
+      "kind": "expense",
+      "amount": 4.83,
+      "unit": "usd",
+      "status": "observed",
+      "label": "E01 new audio generation — ElevenLabs grant credits, not cash (231 generations)",
+      "evidence": "ElevenLabs receipts, flow XwKZNGj9IqEXyN8c2Yjw"
+    },
+    {
+      "ledger": "effort",
+      "kind": "hours",
+      "amount": 30,
+      "unit": "days",
+      "status": "observed",
+      "label": "The month of discovery that made E01 (artist time)",
+      "who": "leo"
+    },
+    {
+      "ledger": "effort",
+      "kind": "obligation",
+      "amount": 3000,
+      "unit": "usd",
+      "status": "observed",
+      "label": "Unrecovered artist time for E01: 30 days valued at $100/day (self-assessed); $0 recovered"
+    }
   ],
   "attribution": "About $1.95 of earlier assets were reused (estimate), for an attributed generation cost of about $6.80. Not booked: it is an allocation of earlier work, not a new expense.",
   "forecasts": [
-    { "claim": "Episode 002 will cost about $20 to make, because the hard part — finding the show — is done. (Agnolo, E01 scene 6: \"Twenty, if your calculations are correct.\")", "metric": "observed cash and credits for E02", "target": "≈ $20", "dueBy": "2026-11-07", "verbatim": false }
+    {
+      "claim": "Episode 002 will cost about $20 to make, because the hard part — finding the show — is done. (Agnolo, E01 scene 6: \"Twenty, if your calculations are correct.\")",
+      "metric": "observed cash and credits for E02",
+      "target": "≈ $20",
+      "dueBy": "2026-11-07",
+      "verbatim": false
+    }
   ],
   "open": [
     "Cash-paid line for the ledger (the $4.83 was grant credits).",
