@@ -18,6 +18,7 @@ import { join } from "node:path";
 import type { AgentRun } from "../core/types.ts";
 import { build as buildBible, initGithub, render as renderBible, type BibleModel } from "future-radio-character-bible";
 import { Repo, REPOS_DIR, SubRepo } from "./git.ts";
+import { ensureLicense } from "./license.ts";
 
 const TEMPLATE_DIR = () => process.env.CHARACTERS_DIR ?? join(process.cwd(), "characters");
 export const biblePackage = () =>
@@ -74,6 +75,7 @@ export class DressingRoom {
         `- \`voice/voice.json\` — production voice settings.\n\n` +
         `Episode repos never edit this repo. They project from it, pinned to a commit.\n`,
     );
+    ensureLicense(this.repo);
     this.repo.write("history.jsonl", "");
     this.repo.write("memory/notes.md", `# ${name}'s notes\n\n`);
     this.repo.write("voice/voice.json", JSON.stringify({ character: this.character, provider: null, voice: null }, null, 2) + "\n");

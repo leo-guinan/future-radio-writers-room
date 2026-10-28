@@ -21,6 +21,7 @@ import { addPrincipal, castFile, isPrincipal } from "../core/cast.ts";
 import type { Room } from "../core/room.ts";
 import { biblePackage, DressingRoom } from "./dressing-room.ts";
 import { Repo, REPOS_DIR, SubRepo } from "./git.ts";
+import { ensureLicense, licenseText } from "./license.ts";
 
 const TEMPLATE_DIR = () => process.env.CHARACTERS_DIR ?? join(process.cwd(), "characters");
 const SKETCH_DIR = () => process.env.EXTRAS_DIR ?? join(process.cwd(), "seed", "extras");
@@ -55,6 +56,7 @@ export class ExtrasRepo {
     const show = join(TEMPLATE_DIR(), "show-bible.md");
     if (existsSync(show)) this.repo.write("SHOW_BIBLE.md", readFileSync(show, "utf8"));
     initExtrasGithub(this.repo.dir, { pkg: biblePackage() });
+    ensureLicense(this.repo);
     this.repo.write("README.md", this.readme());
     this.repo.commit("Open the extras");
     return this;
@@ -219,7 +221,7 @@ about them that people vote for. The producer decides. Promotion moves their fol
 with its full git history, into a repo of their own, and leaves a forwarding note here.
 ${promoted.length ? `\n## Promoted\n\n${promoted.join("\n")}\n` : ""}
 Part of [Future Radio](https://github.com/${owner}/${PREFIX()}writers-room), made in public.
-`;
+${licenseText() ? "\nLicense: see [LICENSE](LICENSE).\n" : ""}`;
   }
 
   /**
@@ -246,6 +248,7 @@ Part of [Future Radio](https://github.com/${owner}/${PREFIX()}writers-room), mad
     const home = new DressingRoom(slug, target);
     const name = home.bible().name;
     const owner = process.env.GITHUB_OWNER ?? "OWNER";
+    ensureLicense(target);
     target.write(
       "README.md",
       `# ${name}'s dressing room\n\nPromoted from the Future Radio extras: ${reason}\n\n` +

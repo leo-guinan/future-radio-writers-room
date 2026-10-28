@@ -15,6 +15,7 @@ import { isPrincipal } from "../core/cast.ts";
 import { extrasRepo, slugify } from "../repos/extras.ts";
 import { dressingRoom, reposEnabled } from "../repos/dressing-room.ts";
 import { EpisodeRepo } from "../repos/episode-repo.ts";
+import { licenseText } from "../repos/license.ts";
 
 interface Imported {
   episodeId: string;
@@ -206,6 +207,8 @@ export function importEpisode(room: Room, dir: string, opts: { actor?: string; m
   };
   const songsDir = join(dir, "songs");
   if (existsSync(songsDir)) for (const f of readdirSync(songsDir)) files[`songs/${f}`] = readFileSync(join(songsDir, f), "utf8");
+  const license = licenseText();
+  if (license) files["LICENSE"] = license;
   for (const [rel, content] of Object.entries(files)) repo.repo.write(rel, content);
   // Binaries live in the GitHub release for this tag, not in git. Verify them if we have them.
   for (const m of spec.release.media ?? []) {
@@ -253,7 +256,7 @@ ${s.tagline ? `*${s.tagline}*\n\n` : ""}${s.logline}
 
 This episode was made before the writers' room existed and was imported from its production
 record. The release is locked: later episodes can answer it, never rewrite it.
-`;
+${licenseText() ? "\nLicense: see [LICENSE](LICENSE).\n" : ""}`;
 }
 
 function renderRelease(s: Imported, room: Room) {

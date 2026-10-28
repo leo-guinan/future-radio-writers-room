@@ -21,6 +21,7 @@ import { Repo } from "./git.ts";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { ensureLicense } from "./license.ts";
 
 /** On a fresh deploy, an episode repo that is already on GitHub is cloned, not recreated. */
 function cloneFromGithub(name: string, dir: string): boolean {
@@ -63,6 +64,7 @@ export class EpisodeRepo {
     this.repo.write("SHOW_PLAN.md", showPlan(ep));
     const gates = readFileSync(process.env.GATES_FILE ?? join(process.cwd(), "gates.json"), "utf8");
     this.repo.write("gates.json", gates);
+    ensureLicense(this.repo);
     return { created: true, sha: this.repo.commit(`Show plan for ${ep.episodeId}: ${ep.title}`) };
   }
 

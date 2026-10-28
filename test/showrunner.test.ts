@@ -63,7 +63,8 @@ test("an episode repo starts with only the show plan and the gates", async () =>
   const repo = new EpisodeRepo("E03").repo;
   assert.equal(t.load, 0);
   const files = readdirSync(repo.dir).filter((f) => f !== ".git").sort();
-  assert.deepEqual(files, ["GATES.md", "SHOW_PLAN.md", "gates.json"]);
+  assert.deepEqual(files, ["GATES.md", "LICENSE", "SHOW_PLAN.md", "gates.json"]);
+  assert.match(repo.read("LICENSE"), /CC0 1.0 Universal/);
   assert.equal(repo.log().at(-1)!.message, "Show plan for E03: Round 1 pick");
 });
 
