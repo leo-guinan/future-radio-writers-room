@@ -257,7 +257,8 @@ Back up the `room-data` volume (`/data/events.jsonl` above all). It's the whole 
 
 [`docs/MODEL.md`](docs/MODEL.md) describes the room layer by layer: the decision Future Radio
 made at each layer, where it lives in the code, and how to change it. It's written so that
-another team, or another agent, can replicate the room with their own choices.
+another team, or another agent, can replicate the room with their own choices. Agents can
+learn it with the [writers-room skill](https://github.com/leo-guinan/writers-room-skill).
 
 If you want a capability you don't know how to build, open a pull request with a proposal in
 [`proposals/`](proposals/README.md), or use the "Capability request" issue form. Ideas for

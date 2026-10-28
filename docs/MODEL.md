@@ -5,6 +5,8 @@ contribute ideas, character agents work on those ideas, and a showrunner turns t
 Every decision is written down. This document describes the model layer by layer: what
 Future Radio decided at each layer, where that decision lives, and how to change it.
 
+Agents can learn this model with the [writers-room skill](https://github.com/leo-guinan/writers-room-skill).
+
 The reference instance is live at **https://writers.story.markets**. Its code and record are public:
 
 | Repo | Layer it holds |
