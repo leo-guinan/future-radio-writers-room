@@ -253,6 +253,16 @@ A released file published elsewhere is recorded by checksum:
 
 Back up the `room-data` volume (`/data/events.jsonl` above all). It's the whole show.
 
+## Build your own, or ask for something
+
+[`docs/MODEL.md`](docs/MODEL.md) describes the room layer by layer: the decision Future Radio
+made at each layer, where it lives in the code, and how to change it. It's written so that
+another team, or another agent, can replicate the room with their own choices.
+
+If you want a capability you don't know how to build, open a pull request with a proposal in
+[`proposals/`](proposals/README.md), or use the "Capability request" issue form. Ideas for
+episodes can go straight to the live room: `POST https://writers.story.markets/api/ideas`.
+
 ## Layout
 
 ```
