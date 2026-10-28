@@ -1,0 +1,319 @@
+{
+  "source": {
+    "flow": "XwKZNGj9IqEXyN8c2Yjw",
+    "flowUrl": "https://elevenlabs.io/app/flows/XwKZNGj9IqEXyN8c2Yjw",
+    "note": "Node ids are ElevenLabs flow nodes. The flow also holds the earlier Infinite Overture film-opening work; only nodes below were made for or reused in Episode 001."
+  },
+  "newForEpisode": {
+    "dialogue": {
+      "model": "eleven_v4",
+      "lines": 91,
+      "takesPerLine": 2,
+      "generations": 182,
+      "costUsd": 1.49,
+      "nodes": {
+        "scenes1to5": [
+          "be3rgw9WFjQuPhsAevTr",
+          "RrvEvaKXqCfJnopFi1me",
+          "q2lRxSP8uWE2Pn39u1TM",
+          "qyaGo2HXzr3NmLOLEyZA",
+          "lYzS6kDwoA3JmrvucRGH",
+          "r1y1nZo413zKzJPw7pcB",
+          "lq2IpzHm3xTfLiYqCKXg",
+          "GxX9NMLU2nBSaPyibJoX",
+          "6uv9AKVUiVv1jiV5DeLN",
+          "O3vHQTCu9mxNCDkZhKfn",
+          "ki5gnrzOwdkOgckUrOtT",
+          "A8Q7k2P2pKQw4Dsyixbt",
+          "ECpvWMhcQ8tc1Ze2YGuM",
+          "1J3KFtffDJhWMhG4tIBr",
+          "Wv3eb6xqV5jf2uw5eXRH",
+          "dH5ofL5yJRQ7J1uDs7tl",
+          "PA3TdkBufGWi10ZOi8CQ",
+          "cbaK05Fxj31jZZGlLZ3a",
+          "x5SMO7MwSmo10CpfnaSz",
+          "1oVBmu0RRAfO2eBLb5i6",
+          "DUaWBs1mgWHhw5w2INb3",
+          "xaE8Q1k4DbbgfKn89pfD",
+          "imjRxwLg9ehiLR1eTKlk",
+          "oL6ZC1thatkFh6Iq8inp",
+          "PjJfq59yMLhAwIWRETbg",
+          "Wbvd9Jj2z8IkEPXs4KQM",
+          "3LH01ojxQhko46aWTfRc",
+          "jmgaocc0ZlGcKpX79MRA",
+          "AilkbD31anCyNmrWxHUX",
+          "T7xgXcu52vqjzgsgyyvA",
+          "VgkgiRtt9vF4A3R29mWK",
+          "TRacVatMB8MfpbIQki8B",
+          "Ku41TyYgdcfCWzWeEXoc",
+          "MyGzFQ9gyvg5ptS0lhsH",
+          "HQBK4UMGSPjDaw84fF4a",
+          "lx8hCuudH8EnW8agXxdk",
+          "fEyLGcn9WErrgbX8ViTk",
+          "cVhqeFrm1Tderx0R9LhQ",
+          "0BaA3vkES7lPvlI7hFOi",
+          "VgrW4w9NU89VHPXXVC4n",
+          "Tyb3zXYX2zx8XfRjrOeL",
+          "ji3u0gZ7rfbUATiHwjN8",
+          "LSxiurZHttpOKyP7BIKp",
+          "REtXNHJiUfrjieEq2U0p",
+          "78qDcJvnuh9mBYPmlL3O",
+          "T8vszBb6VApiW9plSwBh",
+          "NU9cxaDtR3J1yMrrpuEb",
+          "mG2ubuVgj6DAUwSvOSbS",
+          "5FL9dWQWusQY9Hiq6ElO",
+          "Wv6Rf5gzq8mI6kCECMZw",
+          "aLmqM969srYlFw15OkXf",
+          "HrMrTOik9L4O3fu4Xg9T",
+          "3XCLwxQeD6KvnKkVpxxm",
+          "n1JWNeaDC4OnHsgTEO1U",
+          "inG4Sg8PEDNMyWdfsKum",
+          "Z1AfVapLTfnd7tdnwTiX",
+          "F0gBCBlXv463Gdle7mBx",
+          "3KQce6KL2djGI1gsIZrB",
+          "TDrjOiARJnBzdIwp64Go",
+          "OQbplCABV9hpkOZ7rxkc",
+          "OXjb0vprCvxRQq7JZzAT",
+          "A0AM4p4vQPo995B8zXAV",
+          "Q3flY5KvbSkOou2apD5F",
+          "Pqgg9kQHd9esCw8Rs600",
+          "VVItLd3GtqHakOYP2DfH"
+        ],
+        "scene6": [
+          "MySiI0M5J55ZOG4dJnPY",
+          "ndmCMotW6J9HkzBjPX8t",
+          "Extdh5c8Y0hfNQ1LAFta",
+          "vYG1cdpB5NhqdmyQI5pr",
+          "RlsWCRMxiDICOlOO4oJE",
+          "OUcgjb7mZUbf3LURc512",
+          "DM7UOOyvMqv6lIzAw0XR",
+          "4IgPUrlsgvvgSQpwqmdc",
+          "XTDdZPISiWzr95MwqN5L",
+          "OFT8iKf0OWMbhHWT18n5",
+          "WvJiLXaf4QmnJFsGkJ1Y",
+          "IuAkDUbHRWvMylXCisNR",
+          "q3a2k914HnEiiNuS6A9W",
+          "Xn5RMTzaqUbPionJ8LhN",
+          "kZ0bSi5vpdWq0HN7PaYu",
+          "cM2ero9gfHv25cFEAMhZ",
+          "0haoXmJvici9TmTyknzF",
+          "TyGXfVcyYHU1tnDa46cD",
+          "pWavZUJDlTdPtadGYoWg",
+          "bOw0t9NXoMsondVjYVSW",
+          "aGg0iC0tZvEnlTEG1aSx",
+          "1Mk0zZRYiIbX536TDF40",
+          "GBe1p36hDVcaOWWJLxcP",
+          "DgWcr5SXNVnVdu6V84qv",
+          "sAVbmuUcbzveCvvpSedm",
+          "rZKE7zw6f2YnvojEIw9e"
+        ]
+      },
+      "note": "91 lines generated across script revisions; 76 lines are in the released mix."
+    },
+    "music": [
+      {
+        "node": "Ws1EODOvkAYPA0ceyOyQ",
+        "label": "Make It With Me",
+        "model": "eleven_music_v2_5",
+        "takes": [
+          {
+            "node": "HBr8dEoqTARYb6BC9LCH",
+            "take": 1,
+            "generation": "CZY4V9CXV4TbYCEobthG",
+            "used": false,
+            "note": "clean alternate"
+          },
+          {
+            "node": "dpm723kXLi68iA6ANGlp",
+            "take": 2,
+            "generation": "PKqKxyxy7ksyCBkEfL6L",
+            "used": true,
+            "note": "92.3 BPM, D minor, word-accurate"
+          },
+          {
+            "node": "OAkLkt1cNpvKZ1cQCnj9",
+            "take": 3,
+            "generation": "8BadC9cf7Ziub2B8oxco",
+            "used": false
+          }
+        ]
+      },
+      {
+        "node": "OuBji8QgJuXj6JjReqeH",
+        "label": "Orchestra escalation",
+        "model": "eleven_music_v2_5",
+        "used": false,
+        "costUsd": 0.28,
+        "note": "didn't build clearly; left out of the mix"
+      }
+    ],
+    "musicCostUsd": 2.2,
+    "sfx": [
+      {
+        "node": "AWvCJCW4ukVyRDoE0XHz",
+        "label": "sfx_dialhunt",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "ZRpVABNFEof11EIiWeME",
+        "label": "bed_workshop",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "enhwuAkkWkuIJ5QAKvvf",
+        "label": "bed_library",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "ahkJEZbMzL4ipnCc2kuY",
+        "label": "bed_signal",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "6B7vuzRahK4FKvGYrnYm",
+        "label": "sfx_cat_purr",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "TSkdBx76QJkgxGb8X94w",
+        "label": "sfx_cat_meow",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "VLfxSioWMSoCbGzyJ3Vx",
+        "label": "sfx_metal_rattle",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "qAmblaBP4pZR6Tq0usxn",
+        "label": "sfx_door_abacus",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "npUTV19ppLPBlFWY0T7k",
+        "label": "sfx_door_exit",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "9WtIusQ99tbR1AcCZZqW",
+        "label": "sfx_crank",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "7Gx0HRr8n2sWxSliuPPc",
+        "label": "sfx_click",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "pV2vUn2SXDzNy7VScY1p",
+        "label": "sfx_drawers",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "x2hy7ulGklPaTvImYuGE",
+        "label": "sfx_needle_bloom",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "bNeD2SpV4MmAOT7ShZ9M",
+        "label": "sfx_future_fragments",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "RcCnv0c6XVYV3hLmv1h0",
+        "label": "sfx_static_swallow",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "CsiGA5cuY6NmTqW2ymG4",
+        "label": "sfx_rising_tone",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "bsWURamnqpRFFbW7SMJO",
+        "label": "sfx_needle_tick",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "Tir5oi1FBIAwCbb8jyJo",
+        "label": "sfx_book_close",
+        "model": "eleven_text_to_sound_v2"
+      },
+      {
+        "node": "bpgzcozM7ZlYwdqSdJ6z",
+        "label": "sfx_signal_out",
+        "model": "eleven_text_to_sound_v2"
+      }
+    ],
+    "sfxGenerations": 38,
+    "sfxCostUsd": 0.36,
+    "checks": {
+      "transcriptions": 5,
+      "costUsd": 0.78,
+      "finalMixCheck": {
+        "node": "szmBaKjziZYyXhObbmtD",
+        "of": "3fwAD5VjC7ljnS0egzoo",
+        "result": "all 76 scripted lines present; 99% of words recognised"
+      }
+    },
+    "generations": 231,
+    "costUsd": 4.83,
+    "costKind": "ElevenLabs grant credits, not cash"
+  },
+  "reused": {
+    "costUsd": 1.95,
+    "costIsEstimate": true,
+    "items": [
+      {
+        "node": "pFKOKhu6ngkgi4aTdfNK",
+        "label": "Side A \u2014 Leonardo: Not Enough Time",
+        "use": "lute intro and chorus, scene 2; lute reprise, scene 4"
+      },
+      {
+        "node": "tleQT9VffsWDdrz0y3Ol",
+        "label": "SFX \u2014 dial and machine wakes",
+        "use": "the machine waking, scene 2"
+      },
+      {
+        "label": "Overture finale collision (last 20 seconds)",
+        "use": "Leonardo's and Borges's themes meet, end of scene 5",
+        "node": null,
+        "note": "from the overture work; exact node not recorded in the production doc"
+      },
+      {
+        "label": "two music cues and two effects from the overture",
+        "node": null,
+        "note": "itemised only as a share in the production doc"
+      }
+    ]
+  },
+  "images": [
+    {
+      "node": "BtN9MY5Ci8ahgkRJLf6y",
+      "label": "Leonardo robot portrait",
+      "model": "gemini-3-pro-image",
+      "files": [
+        "media/leo_a.png",
+        "media/leo_b.png"
+      ]
+    },
+    {
+      "node": "eD8OnOoiH4NivZXX6Aym",
+      "label": "Agnolo robot portrait",
+      "model": "gemini-3-pro-image",
+      "files": [
+        "media/agnolo_a.png",
+        "media/agnolo_b.png"
+      ]
+    },
+    {
+      "node": null,
+      "label": "Borges robot portrait",
+      "service": "not recorded (made outside ElevenLabs)",
+      "files": [
+        "media/borges_steampunk_scholar.png"
+      ]
+    }
+  ],
+  "attributedCostUsd": 6.8
+}

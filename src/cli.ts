@@ -11,6 +11,7 @@ import { makeLLM } from "./agents/llm.ts";
 import { ask, explore } from "./agents/characters.ts";
 import { account, checklist, fileSha, LOOP, nextStep } from "./production/loop.ts";
 import { seed } from "./seed.ts";
+import { importAll, importEpisode } from "./production/import.ts";
 import { tick } from "./showrunner/showrunner.ts";
 import { dressingRoom } from "./repos/dressing-room.ts";
 import { EpisodeRepo } from "./repos/episode-repo.ts";
@@ -50,7 +51,8 @@ const out = (x: unknown) => console.log(typeof x === "string" ? x : JSON.stringi
 const HELP = `Future Radio writers' room — producer console
 
 Setup
-  seed                                   Seed an empty room from seed/season-1.json
+  seed [--media dir]                     Seed an empty room from seed/season-1.json, then import seed/episodes/*
+  import <folder> [--media dir]          Import a released episode (idempotent)
   verify                                 Check the hash chain of the event log
   serve                                  Start the workshop server (same as npm start)
 
@@ -60,7 +62,7 @@ Season & episodes
   episode select EP SCENE yes|no --reason "..."
   episode asset EP <kind> <label> <path|url> [--private]   kind: script|audio|music|sfx|art|notes|other
   episode release EP <file> --invitation "..." [--version v1] [--script file] [--runtime min]
-  episode account EP --hours N --learned "..." [--cash USD --evidence ref] [--revisions N] [--who name]
+  episode account EP --hours N|--days N --learned "..." [--cash USD --evidence ref] [--revisions N] [--who name]
   budget EP <new-ceiling> --reason "..."
 
 Ideas
@@ -106,7 +108,15 @@ async function main() {
   switch (cmd) {
     case "seed": {
       const n = seed(room, PRODUCER);
-      return out(`Seeded ${n} events into ${LOG_PATH}. Episode 10 is at 'select' with ${[...room.mustEpisode("E10").scenes.values()].filter((s) => s.selected).length} scenes selected.`);
+      out(`Seeded ${n} events into ${LOG_PATH}. Episode 10 is at 'select' with ${[...room.mustEpisode("E10").scenes.values()].filter((s) => s.selected).length} scenes selected.`);
+      for (const r of importAll(room, undefined, { actor: PRODUCER, mediaDir: flags.media }))
+        out(`Imported ${r.episodeId}: ${r.events} events · ${r.appearances.map((a) => `${a.character} ${a.lines} lines`).join(", ")} · ${r.canonAdded} canon notes${r.repo ? ` · ${r.repo.name}@${r.repo.sha.slice(0, 7)}` : ""}${r.missingMedia.length ? ` · media not copied: ${r.missingMedia.length}` : ""}`);
+      return;
+    }
+    case "import": {
+      const dir = need(pos[0], "episode folder (e.g. seed/episodes/e01)");
+      const r = importEpisode(room, dir, { actor: PRODUCER, mediaDir: flags.media });
+      return out(r);
     }
     case "verify":
       return out(room.store.verify());
@@ -115,7 +125,7 @@ async function main() {
       if (pos[0]) {
         const ep = room.mustEpisode(pos[0]);
         const next = nextStep(room, ep.episodeId);
-        out(`${ep.episodeId} "${ep.title}" — stage: ${ep.stage} · cash $${room.episodeCash(ep.episodeId).toFixed(2)} / $${ep.ceiling.toFixed(2)} · hours ${room.episodeHours(ep.episodeId)}`);
+        out(`${ep.episodeId} "${ep.title}" — stage: ${ep.stage} · cash $${room.episodeCash(ep.episodeId).toFixed(2)} / $${ep.ceiling.toFixed(2)} · hours ${room.episodeHours(ep.episodeId)}${room.episodeDays(ep.episodeId) ? ` · days ${room.episodeDays(ep.episodeId)}` : ""}`);
         for (const c of checklist(room, ep.episodeId)) out(`  [${c.done ? "x" : " "}] ${c.task}${"detail" in c && c.detail ? `  (${c.detail})` : ""}`);
         if (next) out(`\nNext: ${next.stage} — ${next.does}`);
         for (const r of ep.releases) out(`Released ${r.version}: ${r.uri} sha256:${r.sha256.slice(0, 16)}… (locked)`);
@@ -156,7 +166,8 @@ async function main() {
           account(room, by, epId, {
             cashUsd: num(flags.cash),
             cashEvidence: flags.evidence,
-            hours: Number(need(flags.hours, "--hours")),
+            hours: num(flags.hours),
+            days: num(flags.days),
             who: flags.who,
             revisions: num(flags.revisions),
             learned: need(flags.learned, "--learned (what should improve next time)"),

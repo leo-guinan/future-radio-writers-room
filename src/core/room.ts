@@ -317,7 +317,7 @@ export class Room {
     if (input.amount < 0) throw new RuleError("ledger", "Amounts are non-negative; the kind says which direction money moved.");
     if (input.kind === "receipt" && input.status === "observed" && !input.evidence)
       throw new RuleError("receipts", "An observed receipt needs evidence (payment id, invoice, link).");
-    if (input.kind === "hours" && input.unit !== "hours") throw new RuleError("ledger", "Hours are recorded in hours.");
+    if (input.kind === "hours" && input.unit !== "hours" && input.unit !== "days") throw new RuleError("ledger", "Time is recorded in hours or days.");
     if (input.kind === "hours" && input.ledger !== "effort") throw new RuleError("ledger", "Hours belong to the effort ledger.");
     if (input.ledger === "operations" && input.kind === "expense" && input.unit === "usd" && input.status === "observed" && input.episodeId) {
       const ep = this.mustEpisode(input.episodeId);
@@ -400,7 +400,11 @@ export class Room {
   }
 
   episodeHours(episodeId: string): number {
-    return this.ledger.filter((l) => l.episodeId === episodeId && l.kind === "hours").reduce((s, l) => s + l.amount, 0);
+    return this.ledger.filter((l) => l.episodeId === episodeId && l.kind === "hours" && l.unit === "hours").reduce((s, l) => s + l.amount, 0);
+  }
+
+  episodeDays(episodeId: string): number {
+    return this.ledger.filter((l) => l.episodeId === episodeId && l.kind === "hours" && l.unit === "days").reduce((s, l) => s + l.amount, 0);
   }
 
   /** Agnolo's screen. Observed, projected, disputed and unknown never blend. */
@@ -413,7 +417,11 @@ export class Room {
     });
     const observed = byStatus("observed");
     const hoursBy: Record<string, number> = {};
-    for (const l of this.ledger.filter((l) => l.kind === "hours")) hoursBy[l.who ?? "unknown"] = (hoursBy[l.who ?? "unknown"] ?? 0) + l.amount;
+    const daysBy: Record<string, number> = {};
+    for (const l of this.ledger.filter((l) => l.kind === "hours")) {
+      const bucket = l.unit === "days" ? daysBy : hoursBy;
+      bucket[l.who ?? "unknown"] = (bucket[l.who ?? "unknown"] ?? 0) + l.amount;
+    }
     return {
       operations: {
         observed: { ...observed, contribution: observed.receipts - observed.expenses },
@@ -425,6 +433,7 @@ export class Room {
       historical: { expenses: sum((l) => l.ledger === "historical" && usd(l) && l.kind === "expense") },
       effort: {
         hoursBy,
+        daysBy,
         obligations: this.ledger.filter((l) => l.kind === "obligation").map((l) => ({ label: l.label, amount: l.amount, unit: l.unit, status: l.status })),
       },
       episodes: [...this.episodes.values()].map((e) => ({
@@ -434,6 +443,7 @@ export class Room {
         ceiling: e.ceiling,
         cash: this.episodeCash(e.episodeId),
         hours: this.episodeHours(e.episodeId),
+        days: this.episodeDays(e.episodeId),
         released: e.releases.map((r) => r.version),
       })),
       forecasts: [...this.forecasts.values()].map((f) => ({ id: f.forecastId, claim: f.claim, dueBy: f.dueBy, outcome: f.resolution?.outcome ?? "open" })),

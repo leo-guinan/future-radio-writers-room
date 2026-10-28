@@ -30,7 +30,7 @@ export function checklist(room: Room, episodeId: string) {
   const hasAsset = (k: string) => ep.assets.some((a) => a.kind === k);
   const release = ep.releases.at(-1);
   const hasCash = room.ledger.some((l) => l.episodeId === episodeId && l.unit === "usd" && l.kind === "expense");
-  const hasHours = room.episodeHours(episodeId) > 0;
+  const hasHours = room.episodeHours(episodeId) > 0 || room.episodeDays(episodeId) > 0;
   const scenesKnown = ep.scenes.size > 0;
   return [
     { task: "Choose one clear dramatic spine", done: reached("write") && (!scenesKnown || selected.length > 0) },
@@ -58,7 +58,7 @@ export function account(
   room: Room,
   actor: string,
   episodeId: string,
-  a: { cashUsd?: number; cashEvidence?: string; hours: number; who?: string; revisions?: number; learned: string },
+  a: { cashUsd?: number; cashEvidence?: string; hours?: number; days?: number; who?: string; revisions?: number; learned: string },
 ) {
   const ep = room.mustEpisode(episodeId);
   if (!ep.releases.length) throw new Error(`${episodeId} has no release to account for.`);
@@ -73,11 +73,12 @@ export function account(
       episodeId,
       evidence: a.cashEvidence,
     });
+  if (!(a.hours! > 0) && !(a.days! > 0)) throw new Error("Record the time it took, in hours or days. Founder hours aren't free.");
   room.addLedgerEntry(actor, {
     ledger: "effort",
     kind: "hours",
-    amount: a.hours,
-    unit: "hours",
+    amount: a.hours! > 0 ? a.hours! : a.days!,
+    unit: a.hours! > 0 ? "hours" : "days",
     status: "observed",
     label: `${episodeId} production time${a.revisions ? `, ${a.revisions} revisions` : ""}`,
     episodeId,

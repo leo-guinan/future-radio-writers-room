@@ -154,7 +154,7 @@ export interface LedgerEntry {
   ledger: LedgerName;
   kind: "expense" | "receipt" | "hours" | "obligation";
   amount: number;
-  unit: "usd" | "hours" | "tokens";
+  unit: "usd" | "hours" | "days" | "tokens";
   status: EvidenceStatus;
   label: string;
   episodeId?: string;
