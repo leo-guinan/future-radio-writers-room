@@ -232,6 +232,20 @@ ledger. Voice needs `ELEVENLABS_API_KEY` (and optionally `TTS_PRICE_PER_1K_CHARS
 `VOICE_PATRON_DAILY`, `VOICE_PER_IP`). Real lines need `ANTHROPIC_API_KEY`; offline, the
 director goes round the cast with placeholders, which are never voiced.
 
+### Abilities: designing a voice mid-scene
+
+Give a cast member `"abilities": ["design-voice"]` and they can describe a voice and have three
+candidates made while the scene plays. In Episode 10, Leonardo does it for the simulated Leo,
+who has no voice of his own, and Agnolo gets the bill. Outside a scene:
+
+```
+npm run room -- voice design leo-sim "A man in his forties from central Ohio, warm, unhurried"
+npm run room -- voice pick VD-0001 2 --scene S-0003
+```
+
+Each design is a real charge on the ElevenLabs account; set `VOICE_DESIGN_PRICE_USD` to book it
+in dollars.
+
 ## Models and blind tastings
 
 Characters run through OpenRouter (`OPENROUTER_API_KEY`), so each can be played by a different

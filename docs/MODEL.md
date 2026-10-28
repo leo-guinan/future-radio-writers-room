@@ -169,6 +169,15 @@ deterministic offline output, and every run is still recorded.
   earlier ones, and guests: characters who exist only in the card (`guests` with a name and a
   persona; no dressing room). Code:
   `src/scenes/scenes.ts`; example card: `scenes/cards/two-songs.json`.
+- **Abilities.** A cast member can be given things to do besides talk: `"abilities":
+  ["design-voice"]`. With it, a character can describe a voice mid-scene and have three
+  candidates made (ElevenLabs Voice Design). For a guest they can choose one on the spot, and
+  that guest speaks with it in this scene and the scenes after it; for a principal they can only
+  offer the three for review (`voice pick`). Once per character per scene. The cost arrives in
+  the scene as a bill addressed to whoever plays accounting, and the next line is theirs; it's
+  on the ledger, priced with `VOICE_DESIGN_PRICE_USD` or as previews of unknown cost. Things
+  that happen between lines (`scene.happening`: a bill, a voice, a notice) are part of the
+  transcript everyone sees. Code: `src/scenes/abilities.ts`.
 - **Voice, just in time.** Scenes are text. When someone asks to hear a line, it is generated
   once in the speaker's production voice (`voice/voice.json` in their dressing room), cached by
   a hash of voice, model and text, recorded as `scene.voiced`, and booked on the ledger (priced
@@ -326,6 +335,9 @@ Public:
 | GET | `/api/scenes` | Recent scenes (motivations only once closed) |
 | GET | `/api/scenes/:id` | One scene with its transcript |
 | GET | `/api/scenes/:id/lines/:n/audio` | One line as audio: cached, or generated now within the day's voice limits |
+| GET | `/api/voices/designs` | Designed voices: who ordered them, for whom, what was chosen |
+| GET | `/api/voices/designs/:id/:k.mp3` | One candidate voice |
+| POST | `/api/producer/voices/designs/:id/pick` | Producer: `{k, character?, sceneId?, name?}` make a candidate a voice |
 | GET | `/api/trials` | Blind tastings (line-ups only once revealed) |
 | GET | `/api/trials/:id` | One tasting |
 | POST | `/api/trials/:id/feedback` | `{favorite, mostThemselves: {character: label}, note?, name?}`; once per address, closed after reveal |

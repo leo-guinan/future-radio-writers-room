@@ -185,6 +185,9 @@ function line(e) {
     case "scene.opened": return [actor, `opened scene <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> <b>${esc(p.title)}</b> with ${p.cast.map((c) => esc(nameOf(c))).join(" and ")}. It ends when ${esc(lower(p.stoppingRule))}`];
     case "scene.closed": return [actor, `closed scene <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> after ${p.turns} lines: ${esc(p.reason)}${p.motivations ? ". What each of them wanted is now shown." : ""}`];
     case "scene.voiced": return [actor, `voiced line ${p.n} of <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> (${esc(nameOf(p.character))}, ${p.characters} characters)`];
+    case "scene.happening": return [actor, `${p.kind === "bill" ? "<b>billed the room</b>" : p.kind === "voice" ? "made a voice" : "—"} in <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a>: ${esc(p.text)}`];
+    case "voice.designed": return [actor, `designed three candidate voices for ${esc(nameOf(p.forCharacter))} (${esc(p.designId)}): <i>${esc(p.description)}</i>`];
+    case "voice.selected": return [actor, `gave ${esc(nameOf(p.character))} candidate ${p.k} of ${esc(p.designId)}${p.sceneId ? ` in ${esc(p.sceneId)}` : ""}`];
     case "trial.opened": return [actor, `opened a blind tasting <a class="link" data-trial="${esc(p.trialId)}">${esc(p.trialId)}</a> <b>${esc(p.title)}</b>: ${p.entries.length} versions, labelled ${p.entries.map((e) => esc(e.label)).join(", ")}`];
     case "trial.feedback": return [actor, `tasted <a class="link" data-trial="${esc(p.trialId)}">${esc(p.trialId)}</a> and liked ${esc(p.favorite)}${p.note ? `: <i>${esc(p.note)}</i>` : ""}`];
     case "trial.revealed": return [actor, `<b>revealed</b> <a class="link" data-trial="${esc(p.trialId)}">${esc(p.trialId)}</a> after ${p.responses} responses`];
@@ -352,6 +355,14 @@ drawer.addEventListener("click", (ev) => { if (ev.target === drawer) drawer.clos
 
 // ------------------------------------------------------------ scenes
 
+const HAPPENING = { bill: "Bill", voice: "Voice", notice: "Meanwhile" };
+/** Something that happened between lines; a voice design shows its three candidates. */
+function happeningHtml(h) {
+  const previews = h.kind === "voice" && h.ref ? `<div class="previews" data-design="${esc(h.ref)}">${[1, 2, 3].map((k) => `<span class="preview"><span class="muted small">${k}</span><audio controls preload="none" src="/api/voices/designs/${esc(h.ref)}/${k}.mp3"></audio></span>`).join("")}</div>` : "";
+  return `<li class="happening ${esc(h.kind)}"><b>${HAPPENING[h.kind] || "Meanwhile"}.</b> ${esc(h.text)}${previews}</li>`;
+}
+const happeningsAfter = (s, n) => (s.happenings || []).filter((h) => h.afterTurn === n).map(happeningHtml).join("");
+
 const lower = (s) => String(s || "").replace(/^./, (c) => c.toLowerCase());
 let openScene = null;
 
@@ -377,15 +388,18 @@ async function renderScenes() {
 async function showScene(id) {
   const s = await api(`/api/scenes/${id}`);
   openScene = id;
-  const lines = s.turns
-    .map(
-      (t) => `${t.cue ? `<li class="cue">${esc(t.cue)}</li>` : ""}<li class="${esc(t.character)} ${esc(roleOf(t.character) || "")}">
-        <div class="who">${esc(nameOf(t.character))}</div>
+  const nameIn = (c) => s.cast.find((x) => x.character === c)?.name || nameOf(c);
+  const lines =
+    happeningsAfter(s, 0) +
+    s.turns
+      .map(
+        (t) => `${t.cue ? `<li class="cue">${esc(t.cue)}</li>` : ""}<li class="${esc(t.character)} ${esc(roleOf(t.character) || "")}">
+        <div class="who">${esc(nameIn(t.character))}</div>
         <p>${esc(t.line)}</p>
         ${/^\(offline/.test(t.line) ? "" : `<button class="play ghost" data-play="${esc(s.sceneId)}/${t.n}" aria-label="Hear line ${t.n}">${t.voiced ? "▶" : "▷"} hear</button>`}
-      </li>`,
-    )
-    .join("");
+      </li>${happeningsAfter(s, t.n)}`,
+      )
+      .join("");
   const wanted = s.motivations
     ? `<h3>What each of them wanted</h3><ul class="wanted">${s.cast.map((c) => `<li><b>${esc(c.name)}:</b> ${esc(s.motivations[c.character])}</li>`).join("")}</ul>`
     : s.closed
@@ -459,7 +473,7 @@ async function showTrial(id) {
       ? `<div class="lineup">${l.name ? `<b>${esc(l.name)}</b><br>` : ""}${Object.entries(l.models).map(([k, m]) => `${esc(k)}: <code>${esc(m)}</code>`).join("<br>")}<div class="muted small">favourite of ${r.favorite} · ${r.lines} lines · ${r.costUsd === null ? "cost unknown" : usd(r.costUsd)}${Object.keys(r.mostThemselves).length ? ` · most themselves: ${Object.entries(r.mostThemselves).map(([c, n]) => `${esc(nameOf(c))} ×${n}`).join(", ")}` : ""}</div></div>`
       : "";
     const scenes = e.scenes
-      .map((s) => `<h4>${esc(s.title)}</h4><ol class="script">${s.turns.map((x) => `${x.cue ? `<li class="cue">${esc(x.cue)}</li>` : ""}<li class="${esc(x.character)} ${esc(roleOf(x.character) || "")}"><div class="who">${esc(x.name)}</div><p>${esc(x.line)}</p></li>`).join("") || `<li class="muted">Still playing…</li>`}</ol>`)
+      .map((s) => `<h4>${esc(s.title)}</h4><ol class="script">${happeningsAfter(s, 0)}${s.turns.map((x) => `${x.cue ? `<li class="cue">${esc(x.cue)}</li>` : ""}<li class="${esc(x.character)} ${esc(roleOf(x.character) || "")}"><div class="who">${esc(x.name)}</div><p>${esc(x.line)}</p></li>${happeningsAfter(s, x.n)}`).join("") || `<li class="muted">Still playing…</li>`}</ol>`)
       .join("");
     return `<section class="version"><h3>Version ${esc(e.label)}</h3>${head}${scenes}</section>`;
   };

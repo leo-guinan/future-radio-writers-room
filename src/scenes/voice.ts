@@ -66,7 +66,8 @@ export async function lineAudio(room: Room, sceneId: string, n: number, opts: Vo
   if (!turn) throw new RuleError("scene", `${sceneId} has no line ${n}.`);
   const text = spokenText(turn.line);
   if (!text || /^\(offline/.test(turn.line)) throw new RuleError("scene", `Line ${n} of ${sceneId} was improvised offline; there is nothing to voice.`);
-  const voice = voiceFor(turn.character);
+  const designed = room.designedVoiceIn(sceneId, turn.character);
+  const voice = designed ? { provider: "elevenlabs", id: designed.voiceId } : voiceFor(turn.character);
   if (voice.provider !== "elevenlabs" || !voice.id) throw new RuleError("scene", `${nameOf(turn.character)} has no ElevenLabs voice in voice/voice.json.`);
   const model = TTS_MODEL();
   const key = cacheKey(voice.id, model, text);

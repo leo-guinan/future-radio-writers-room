@@ -188,7 +188,17 @@ export function trialMarkdown(room: Room, trialId: string): string {
       out.push(`${l.name ? `**${l.name}.** ` : ""}${Object.entries(l.models).map(([k, m]) => `${k}: \`${m}\``).join(" · ")}`, "");
       out.push(`Favourite of ${r.favorite} · ${Object.entries(r.mostThemselves).map(([c, n]) => `${c} most themselves ×${n}`).join(", ") || "no character votes"} · ${r.lines} lines · ${r.costUsd === null ? "cost unknown" : `$${r.costUsd.toFixed(4)}`}`, "");
     }
-    for (const s of scenesOf(e.label)) out.push(`### ${s.title}`, "", ...s.turns.flatMap((x) => [...(x.cue ? [x.cue, ""] : []), `**${nameIn(s, x.character).toUpperCase()}:** ${x.line}`, ""]));
+    for (const s of scenesOf(e.label))
+      out.push(
+        `### ${s.title}`,
+        "",
+        ...s.turns.flatMap((x) => [
+          ...(x.cue ? [x.cue, ""] : []),
+          `**${nameIn(s, x.character).toUpperCase()}:** ${x.line}`,
+          "",
+          ...s.happenings.filter((h) => h.afterTurn === x.n).flatMap((h) => [`> **${h.kind === "bill" ? "Bill" : h.kind === "voice" ? "Voice" : "Meanwhile"}.** ${h.text}`, ""]),
+        ]),
+      );
   }
   if (t.feedback.length) {
     out.push("## What people said", "");
@@ -212,7 +222,12 @@ export function publicTrial(room: Room, t: Trial) {
       label: e.label,
       scenes: e.sceneIds.map((id) => {
         const s = room.mustScene(id);
-        return { title: s.title, closed: !!s.closed, turns: s.turns.map((x) => ({ n: x.n, character: x.character, name: nameIn(s, x.character), line: x.line, cue: x.cue })) };
+        return {
+          title: s.title,
+          closed: !!s.closed,
+          turns: s.turns.map((x) => ({ n: x.n, character: x.character, name: nameIn(s, x.character), line: x.line, cue: x.cue })),
+          happenings: s.happenings.map((h) => ({ afterTurn: h.afterTurn, kind: h.kind, text: h.text, ref: h.ref ?? null })),
+        };
       }),
     })),
     responses: t.feedback.length,

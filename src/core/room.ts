@@ -38,6 +38,9 @@ import {
   type TrialFeedback,
   type TrialRevealed,
   type DailyRecorded,
+  type SceneHappening,
+  type VoiceDesigned,
+  type VoiceSelected,
   type IdeaTransitioned,
   type LedgerEntry,
   type RoomEvent,
@@ -100,6 +103,7 @@ export interface Scene extends SceneOpened {
   closed: (SceneClosed & { at: string }) | null;
   /** Producer-only: model per character slug, and "director". */
   models: Record<string, string>;
+  happenings: Array<SceneHappening & { at: string }>;
 }
 
 export interface Trial extends TrialOpened {
@@ -109,9 +113,14 @@ export interface Trial extends TrialOpened {
   revealed: (TrialRevealed & { at: string }) | null;
 }
 
+/** What characters can do in a scene besides talk. */
+export const SCENE_ABILITIES = ["design-voice"];
+
 export class Room {
   ideas = new Map<string, Idea>();
   trials = new Map<string, Trial>();
+  voiceDesigns = new Map<string, VoiceDesigned & { at: string; selected: Array<VoiceSelected & { at: string }> }>();
+  voiceSelections: Array<VoiceSelected & { at: string }> = [];
   dailies: Array<DailyRecorded & { at: string }> = [];
   episodes = new Map<string, Episode>();
   ledger: Array<LedgerEntry & { at: string; by: string; eventId: string }> = [];
@@ -230,7 +239,7 @@ export class Room {
         this.ticks.push({ ...(p as ShowrunnerTick), at: e.ts, eventId: e.id });
         break;
       case "scene.opened":
-        this.scenes.set(p.sceneId, { ...(p as SceneOpened), openedAt: e.ts, openedBy: e.actor, motivations: {}, turns: [], voiced: {}, closed: null, models: {} });
+        this.scenes.set(p.sceneId, { ...(p as SceneOpened), openedAt: e.ts, openedBy: e.actor, motivations: {}, turns: [], voiced: {}, closed: null, models: {}, happenings: [] });
         break;
       case "scene.casting":
         this.scenes.get(p.sceneId)!.models = { ...(p as SceneCasting).models };
@@ -261,6 +270,16 @@ export class Room {
         break;
       case "scene.voiced":
         this.scenes.get(p.sceneId)!.voiced[p.n] = { ...(p as SceneVoiced), at: e.ts };
+        break;
+      case "scene.happening":
+        this.scenes.get(p.sceneId)!.happenings.push({ ...(p as SceneHappening), at: e.ts });
+        break;
+      case "voice.designed":
+        this.voiceDesigns.set(p.designId, { ...(p as VoiceDesigned), at: e.ts, selected: [] });
+        break;
+      case "voice.selected":
+        this.voiceDesigns.get(p.designId)?.selected.push({ ...(p as VoiceSelected), at: e.ts });
+        this.voiceSelections.push({ ...(p as VoiceSelected), at: e.ts });
         break;
     }
   }
@@ -537,7 +556,7 @@ export class Room {
   openScene(
     actor: string,
     card: Omit<SceneOpened, "sceneId" | "maxTurns" | "revealMotivations" | "cast" | "guests"> & { maxTurns?: number; revealMotivations?: boolean; directorModel?: string },
-    cast: Array<{ character: string; motivation: string; model?: string; name?: string; persona?: string }>,
+    cast: Array<{ character: string; motivation: string; model?: string; name?: string; persona?: string; abilities?: string[] }>,
   ) {
     for (const k of ["title", "setting", "situation", "stakes", "stoppingRule"] as const)
       if (!String(card[k] ?? "").trim()) throw new RuleError("scene", `A scene needs a ${k === "stoppingRule" ? "stopping rule: when is it over?" : k}.`);
@@ -553,6 +572,8 @@ export class Room {
     const guests = Object.fromEntries(
       cast.filter((c) => c.persona?.trim()).map((c) => [c.character, { name: c.name?.trim() || c.character, persona: c.persona!.trim() }]),
     );
+    const abilities = Object.fromEntries(cast.filter((c) => c.abilities?.length).map((c) => [c.character, [...new Set(c.abilities!)]]));
+    for (const [c, as] of Object.entries(abilities)) for (const a of as) if (!SCENE_ABILITIES.includes(a)) throw new RuleError("scene", `${c} can't '${a}'. Abilities: ${SCENE_ABILITIES.join(", ")}.`);
     const sceneId = `S-${String(this.scenes.size + 1).padStart(4, "0")}`;
     const opened: SceneOpened = {
       sceneId,
@@ -569,6 +590,7 @@ export class Room {
       ...(Object.keys(guests).length ? { guests } : {}),
       ...(card.after?.length ? { after: card.after } : {}),
       ...(card.trialId ? { trialId: card.trialId } : {}),
+      ...(Object.keys(abilities).length ? { abilities } : {}),
     };
     const ev = this.store.append("scene.opened", actor, opened, "public");
     for (const c of cast) this.store.append("scene.motivation", actor, { sceneId, character: c.character, motivation: c.motivation.trim() }, "producer");
@@ -661,6 +683,39 @@ export class Room {
       for (const [c, l] of Object.entries(f.mostThemselves ?? {})) tally[l].mostThemselves[c] = (tally[l].mostThemselves[c] ?? 0) + 1;
     }
     return this.store.append("trial.revealed", actor, { trialId, lineups: t.lineups, tally, responses: t.feedback.length } satisfies TrialRevealed, "public");
+  }
+
+  // ---------------------------------------------------------------- happenings and voices
+
+  recordHappening(actor: string, h: SceneHappening) {
+    const s = this.mustScene(h.sceneId);
+    if (s.closed) throw new RuleError("scene", `${h.sceneId} is closed.`);
+    if (h.addressee && !s.cast.includes(h.addressee)) delete h.addressee;
+    return this.store.append("scene.happening", actor, h, "public");
+  }
+
+  nextDesignId() {
+    return `VD-${String(this.voiceDesigns.size + 1).padStart(4, "0")}`;
+  }
+
+  recordVoiceDesign(actor: string, d: VoiceDesigned) {
+    if (this.voiceDesigns.has(d.designId)) throw new RuleError("voice", `${d.designId} already exists.`);
+    if (d.previews.length < 1) throw new RuleError("voice", "A design needs at least one preview.");
+    return this.store.append("voice.designed", actor, d, "public");
+  }
+
+  selectVoice(actor: string, v: VoiceSelected) {
+    const d = this.voiceDesigns.get(v.designId);
+    if (!d) throw new RuleError("voice", `No voice design ${v.designId}.`);
+    if (!d.previews.some((p) => p.k === v.k)) throw new RuleError("voice", `${v.designId} has no preview ${v.k}.`);
+    return this.store.append("voice.selected", actor, v, "public");
+  }
+
+  /** The designed voice a character speaks with in a scene: chosen in this scene or one it follows, else room-wide. */
+  designedVoiceIn(sceneId: string | null, character: string): (VoiceSelected & { at: string }) | undefined {
+    const lineage = sceneId ? [sceneId, ...(this.scenes.get(sceneId)?.after ?? [])] : [];
+    const mine = this.voiceSelections.filter((v) => v.character === character);
+    return mine.filter((v) => v.sceneId && lineage.includes(v.sceneId)).at(-1) ?? mine.filter((v) => !v.sceneId).at(-1);
   }
 
   recordDaily(actor: string, d: DailyRecorded) {

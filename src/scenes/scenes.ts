@@ -16,6 +16,7 @@ import type { SceneTurn } from "../core/types.ts";
 import { extractJson, type LLM } from "../agents/llm.ts";
 import { nameOf, persona, record, showBible, systemFor } from "../agents/characters.ts";
 import { modelFor } from "../core/cast.ts";
+import { abilityNote, parseAction, performAction, can, type ServiceOptions } from "./abilities.ts";
 import { EpisodeRepo } from "../repos/episode-repo.ts";
 import { reposEnabled } from "../repos/dressing-room.ts";
 
@@ -23,6 +24,8 @@ export interface SceneContext {
   room: Room;
   llm: LLM;
   askedBy: string; // who started the scene: "leo", "patron:ada", ...
+  /** Outside services characters can use (keys, and a fetch to fake them in tests). */
+  services?: ServiceOptions;
 }
 
 export interface CastMember {
@@ -46,10 +49,14 @@ export const modelIn = (s: Scene, who: string) => s.models[who] ?? modelFor(who)
 const directorModel = (s: Scene) => s.models.director ?? modelFor("showrunner");
 
 export function transcript(s: Scene, upTo = s.turns.length): string {
-  return s.turns
-    .slice(0, upTo)
-    .map((t) => `${t.cue ? `${t.cue}\n` : ""}${speaker(s, t.character)}: ${t.line}`)
-    .join("\n");
+  const out: string[] = [];
+  const happened = (n: number) => s.happenings.filter((h) => h.afterTurn === n).map((h) => `[${h.kind === "bill" ? "BILL" : h.kind === "voice" ? "VOICE" : "MEANWHILE"}] ${h.text}`);
+  out.push(...happened(0));
+  for (const t of s.turns.slice(0, upTo)) {
+    out.push(`${t.cue ? `${t.cue}\n` : ""}${speaker(s, t.character)}: ${t.line}`);
+    out.push(...happened(t.n));
+  }
+  return out.join("\n");
 }
 
 /** What happened in the earlier scenes of this episode, for everyone to have in mind. */
@@ -141,11 +148,12 @@ ${s.motivations[who]}
 ${d.beat ? `The director's note for this line: ${d.beat}\n\n` : ""}Transcript so far:
 ${transcript(s) || "(you speak first)"}
 
-Say ${nameIn(s, who)}'s next line. One to three spoken sentences, in your own voice. Only the words spoken: no name, no quotation marks, no stage directions.`,
-    maxTokens: 220,
+Say ${nameIn(s, who)}'s next line. One to three spoken sentences, in your own voice. Only the words spoken: no name, no quotation marks, no stage directions.${abilityNote(ctx.room, s, who, nameIn)}`,
+    maxTokens: 300,
   });
   const flags: string[] = [];
-  let line = clean(c.text, who, nameIn(s, who));
+  const { text: said, action } = can(s, who, "design-voice") ? parseAction(c.text) : { text: c.text, action: null };
+  let line = clean(said, who, nameIn(s, who));
   if (!line) {
     if (!c.offline) flags.push("no line returned; used a placeholder");
     line = d.beat ? `(offline — ${nameIn(s, who)}: ${d.beat})` : `(offline — ${nameIn(s, who)} takes line ${s.turns.length + 1})`;
@@ -163,7 +171,15 @@ Say ${nameIn(s, who)}'s next line. One to three spoken sentences, in your own vo
     flags,
   );
   const turn: Omit<SceneTurn, "n"> = { sceneId: s.sceneId, character: who, line, beat: d.beat, cue: d.cue, runId: (run.payload as { runId: string }).runId };
-  return ctx.room.recordSceneTurn(ctx.askedBy, turn);
+  const ev = ctx.room.recordSceneTurn(ctx.askedBy, turn);
+  if (action && abilityNote(ctx.room, s, who, nameIn)) await performAction(ctx.room, ctx.room.mustScene(s.sceneId), who, action, nameIn, ctx.services);
+  return ev;
+}
+
+/** When something just landed on someone (a bill), the next line is theirs. */
+function pendingAddressee(s: Scene): { who: string; text: string } | null {
+  const h = s.happenings.filter((x) => x.afterTurn === s.turns.length && x.addressee).at(-1);
+  return h ? { who: h.addressee!, text: h.text } : null;
 }
 
 /** Strip what models add around a spoken line: a name prefix, quotes, stage directions. */
@@ -190,7 +206,8 @@ export async function runScene(ctx: SceneContext, sceneId: string, { maxSteps = 
     const s = ctx.room.mustScene(sceneId);
     if (s.closed) return s;
     if (steps >= maxSteps) return s;
-    const d = await direct(ctx, s);
+    const landed = s.turns.length < s.maxTurns ? pendingAddressee(s) : null;
+    const d = landed ? { next: landed.who, beat: `This just landed in front of you: ${landed.text} React to it now.` } : await direct(ctx, s);
     if (d.end) {
       closeScene(ctx, s, d.reason ?? "the stopping rule was met");
       return ctx.room.mustScene(sceneId);
@@ -228,7 +245,13 @@ export function sceneMarkdown(s: Scene, reason?: string): string {
     "",
     "## The scene",
     "",
-    ...s.turns.flatMap((t) => [...(t.cue ? [`${t.cue}`, ""] : []), `**${speaker(s, t.character)}:** ${t.line}`, ""]),
+    ...s.happenings.filter((h) => h.afterTurn === 0).flatMap((h) => [`> **${h.kind === "bill" ? "Bill" : h.kind === "voice" ? "Voice" : "Meanwhile"}.** ${h.text}`, ""]),
+    ...s.turns.flatMap((t) => [
+      ...(t.cue ? [`${t.cue}`, ""] : []),
+      `**${speaker(s, t.character)}:** ${t.line}`,
+      "",
+      ...s.happenings.filter((h) => h.afterTurn === t.n).flatMap((h) => [`> **${h.kind === "bill" ? "Bill" : h.kind === "voice" ? "Voice" : "Meanwhile"}.** ${h.text}`, ""]),
+    ]),
     ...(s.revealMotivations
       ? ["## What each of them wanted", "", ...s.cast.map((c) => `- **${nameIn(s, c)}:** ${s.motivations[c]}`), ""]
       : []),
@@ -251,6 +274,8 @@ export function publicScene(s: Scene) {
     guests: s.guests ?? null,
     after: s.after ?? [],
     trialId: s.trialId ?? null,
+    abilities: s.abilities ?? null,
+    happenings: s.happenings.map((h) => ({ afterTurn: h.afterTurn, kind: h.kind, text: h.text, addressee: h.addressee ?? null, ref: h.ref ?? null })),
     episodeId: s.episodeId,
     ideaId: s.ideaId,
     openedAt: s.openedAt,

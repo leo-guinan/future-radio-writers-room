@@ -19,6 +19,7 @@ import { syncAll } from "./repos/sync.ts";
 import { castFile, playedBy, principals, roleCharacters, roleOf } from "./core/cast.ts";
 import { extrasRepo } from "./repos/extras.ts";
 import { openScene, publicScene, runScene, sceneOrThrow } from "./scenes/scenes.ts";
+import { designDir, selectDesignedVoice } from "./scenes/abilities.ts";
 import { modelReport, publicTrial, revealTrial, runTrial, type EpisodeCards } from "./scenes/trials.ts";
 import { cacheKey, cachedPath, lineAudio, patronVoicesToday, spokenText, TTS_MODEL, voiceFor } from "./scenes/voice.ts";
 
@@ -157,6 +158,21 @@ const ipOf = (req: IncomingMessage) => (String(req.headers["x-forwarded-for"] ??
 const today = () => new Date().toISOString().slice(0, 10);
 
 const tasted = new Set<string>();
+function publicDesign(d: NonNullable<ReturnType<typeof room.voiceDesigns.get>>) {
+  return {
+    designId: d.designId,
+    by: d.by,
+    forCharacter: d.forCharacter,
+    description: d.description,
+    sample: d.sample,
+    mode: d.mode,
+    sceneId: d.sceneId ?? null,
+    at: d.at,
+    costUsd: d.costUsd,
+    previews: d.previews.map((p) => ({ k: p.k, url: `/api/voices/designs/${d.designId}/${p.k}.mp3`, durationSecs: p.durationSecs })),
+    selected: d.selected.map((v) => ({ k: v.k, character: v.character, name: v.name, sceneId: v.sceneId ?? null, by: v.by })),
+  };
+}
 function bump(kind: string, ip: string, limit: number) {
   const key = `${today()}|${kind}|${ip}`;
   const n = (ipCounts.get(key) ?? 0) + 1;
@@ -353,7 +369,8 @@ const routes: Array<[string, RegExp, Handler]> = [
     const turn = s.turns.find((t) => t.n === n);
     if (!turn) throw new RuleError("scene", `${s.sceneId} has no line ${n}.`);
     // Cached audio is free to serve; only a new generation counts against the limits.
-    const voice = voiceFor(turn.character);
+    const designed = room.designedVoiceIn(s.sceneId, turn.character);
+    const voice = designed ? { id: designed.voiceId } : voiceFor(turn.character);
     const hit = voice.id ? cachedPath(cacheKey(voice.id, TTS_MODEL(), spokenText(turn.line))) : null;
     let path = hit;
     if (!path) {
@@ -374,6 +391,25 @@ const routes: Array<[string, RegExp, Handler]> = [
     const s = openScene({ room, llm, askedBy: PRODUCER }, b, Array.isArray(b.cast) ? b.cast : []);
     if (b.run !== false) void runScene({ room, llm, askedBy: PRODUCER }, s.sceneId).catch((e) => console.error(`scene ${s.sceneId}:`, e.message));
     send(res, 201, publicScene(s));
+  }],
+  ["GET", /^\/api\/voices\/designs$/, (_q, res) => send(res, 200, [...room.voiceDesigns.values()].reverse().slice(0, 30).map(publicDesign))],
+  ["GET", /^\/api\/voices\/designs\/(VD-\d{4})$/, (_q, res, m) => {
+    const d = room.voiceDesigns.get(m[1]);
+    if (!d) throw new RuleError("voice", `No voice design ${m[1]}.`);
+    send(res, 200, publicDesign(d));
+  }],
+  ["GET", /^\/api\/voices\/designs\/(VD-\d{4})\/(\d)\.mp3$/, (_q, res, m) => {
+    const d = room.voiceDesigns.get(m[1]);
+    const p = d?.previews.find((x) => x.k === Number(m[2]));
+    if (!p) throw new RuleError("voice", `No preview ${m[2]} of ${m[1]}.`);
+    const bytes = readFileSync(join(designDir(), p.file));
+    res.writeHead(200, { "content-type": "audio/mpeg", "content-length": bytes.length, "cache-control": "public, max-age=31536000, immutable" });
+    res.end(bytes);
+  }],
+  ["POST", /^\/api\/producer\/voices\/designs\/(VD-\d{4})\/pick$/, async (req, res, m) => {
+    requireProducer(req);
+    const b = await body(req);
+    send(res, 201, await selectDesignedVoice(room, m[1], Number(b.k), { by: PRODUCER, character: b.character, name: b.name, sceneId: b.sceneId }));
   }],
   ["GET", /^\/api\/trials$/, (_q, res) => send(res, 200, [...room.trials.values()].reverse().slice(0, 20).map((t) => publicTrial(room, t)))],
   ["GET", /^\/api\/trials\/report$/, (_q, res) => send(res, 200, modelReport(room))],

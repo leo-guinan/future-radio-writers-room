@@ -239,3 +239,13 @@ h3 { margin-top: 18px; margin-bottom: 6px; }
 .taste legend { font-size: .9rem; padding: 0 4px; }
 .pick { display: inline-flex; align-items: center; gap: 4px; margin-right: 14px; font-weight: 600; }
 dialog.wide { max-width: min(1120px, calc(100vw - 24px)); }
+
+/* happenings: a bill, a voice */
+.script li.happening { border-top: 0; margin: 6px 0; padding: 8px 12px; border-left: 3px solid var(--muted); background: var(--paper-2); font-size: .92rem; }
+.script li.happening.bill { border-left-color: var(--accounting); }
+.script li.happening.bill b { color: var(--accounting); }
+.script li.happening.voice { border-left-color: var(--making); }
+.script li.happening.voice b { color: var(--making); }
+.previews { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; }
+.preview { display: inline-flex; align-items: center; gap: 6px; }
+.preview audio { height: 32px; max-width: 220px; }
