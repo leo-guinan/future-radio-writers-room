@@ -40,7 +40,13 @@ export type EventType =
   | "scene.motivation"
   | "scene.turn"
   | "scene.closed"
-  | "scene.voiced";
+  | "scene.voiced"
+  | "scene.casting"
+  | "trial.opened"
+  | "trial.lineups"
+  | "trial.feedback"
+  | "trial.revealed"
+  | "daily.recorded";
 
 // ---------- Ideas: the central unit of the room ----------
 
@@ -271,6 +277,60 @@ export interface SceneOpened {
   episodeId?: string;
   ideaId?: string;
   revealMotivations: boolean; // publish the motivations when the scene closes
+  /** Characters who exist only in this scene (no dressing room): who they are, in the card. */
+  guests?: Record<string, { name: string; persona: string }>;
+  /** Earlier scenes whose transcripts everyone in this one has in mind. */
+  after?: string[];
+  /** Part of a blind tasting: the runs stay producer-only until the tasting is revealed. */
+  trialId?: string;
+}
+
+/** Producer-only: which model plays whom in a scene. */
+export interface SceneCasting {
+  sceneId: string;
+  models: Record<string, string>; // character slug or "director" → model id
+}
+
+/** A blind tasting: the same card(s) played by different model line-ups, shown as A, B, C… */
+export interface TrialOpened {
+  trialId: string;
+  title: string;
+  question: string;
+  entries: Array<{ label: string; sceneIds: string[] }>;
+  characters: string[];
+}
+
+/** Producer-only until revealed: which line-up each label is. */
+export interface TrialLineups {
+  trialId: string;
+  lineups: Record<string, { name?: string; models: Record<string, string> }>;
+}
+
+export interface TrialFeedback {
+  trialId: string;
+  name: string;
+  favorite: string; // a label
+  /** For each character, the label where they sounded most like themselves. */
+  mostThemselves?: Record<string, string>;
+  note?: string;
+}
+
+export interface TrialRevealed {
+  trialId: string;
+  lineups: TrialLineups["lineups"];
+  tally: Record<string, { favorite: number; mostThemselves: Record<string, number>; costUsd: number | null; lines: number }>;
+  responses: number;
+}
+
+/** A daily episode: the room looking over what came in from humans since yesterday. */
+export interface DailyRecorded {
+  day: string; // YYYY-MM-DD
+  number: number; // 1-based count of daily episodes
+  phase: string;
+  sceneId: string;
+  changes: number;
+  goals: number;
+  file?: string;
 }
 
 export interface SceneMotivation {

@@ -16,6 +16,11 @@ express, instrumental is what they don't yet have words for.
 
 Yuria is the announcer. Milliways is where the press conferences happen.
 
+What the room can see changes over the season. In Episode 10 the characters can see only what
+happens inside the room: they find Leo's plans, can't reach him to ask what he meant, and do
+what the plans say. Later the room gains a morning view of what people did since the day
+before. The first mornings astonish them; by the end of the season it's ordinary.
+
 The production is the experiment. Two questions hold it together:
 
 - Can an artist use a month of bounded experimentation to build a profitable system for

@@ -42,6 +42,7 @@ async function refresh() {
   renderCast();
   renderExtras();
   renderScenes();
+  renderTastings();
   const sel = $("#ep-select");
   if (sel.options.length === 1)
     for (const e of snap.episodes) if (!e.releases.length) sel.add(new Option(`${e.number}. ${e.title}`, e.episodeId));
@@ -184,6 +185,10 @@ function line(e) {
     case "scene.opened": return [actor, `opened scene <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> <b>${esc(p.title)}</b> with ${p.cast.map((c) => esc(nameOf(c))).join(" and ")}. It ends when ${esc(lower(p.stoppingRule))}`];
     case "scene.closed": return [actor, `closed scene <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> after ${p.turns} lines: ${esc(p.reason)}${p.motivations ? ". What each of them wanted is now shown." : ""}`];
     case "scene.voiced": return [actor, `voiced line ${p.n} of <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> (${esc(nameOf(p.character))}, ${p.characters} characters)`];
+    case "trial.opened": return [actor, `opened a blind tasting <a class="link" data-trial="${esc(p.trialId)}">${esc(p.trialId)}</a> <b>${esc(p.title)}</b>: ${p.entries.length} versions, labelled ${p.entries.map((e) => esc(e.label)).join(", ")}`];
+    case "trial.feedback": return [actor, `tasted <a class="link" data-trial="${esc(p.trialId)}">${esc(p.trialId)}</a> and liked ${esc(p.favorite)}${p.note ? `: <i>${esc(p.note)}</i>` : ""}`];
+    case "trial.revealed": return [actor, `<b>revealed</b> <a class="link" data-trial="${esc(p.trialId)}">${esc(p.trialId)}</a> after ${p.responses} responses`];
+    case "daily.recorded": return [actor, `recorded daily episode ${p.number} (${esc(p.day)}): looked over ${p.changes} things that came in and ${p.goals} goals — <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a>`];
     case "conference.held": return [actor, `held the <b>${esc(p.kind)}</b> press conference "${esc(p.title)}"`];
     default: return [actor, esc(e.type)];
   }
@@ -242,8 +247,9 @@ function connect() {
 // ------------------------------------------------------------ drawers
 
 const drawer = $("#drawer");
-const open = (html) => {
+const open = (html, { wide = false } = {}) => {
   $("#drawer-body").innerHTML = html;
+  drawer.classList.toggle("wide", wide);
   if (!drawer.open) drawer.showModal();
 };
 
@@ -421,6 +427,82 @@ document.addEventListener("click", async (ev) => {
   }
 });
 const alertIn = (m) => open(`<p class="form-msg err">${esc(m)}</p>`);
+
+// ------------------------------------------------------------ blind tastings
+
+async function renderTastings() {
+  const list = await api("/api/trials").catch(() => []);
+  const el = $("#tastings");
+  if (!list.length) {
+    el.innerHTML = `<p class="muted empty">No tastings yet.</p>`;
+    return;
+  }
+  el.innerHTML = list
+    .slice(0, 6)
+    .map(
+      (t) => `<button class="scene-card ghost" data-trial="${esc(t.trialId)}">
+        <span class="scene-id">${esc(t.trialId)} · ${t.revealed ? "revealed" : "blind"} · ${t.entries.length} versions · ${t.responses} ${t.responses === 1 ? "response" : "responses"}</span>
+        <b>${esc(t.title)}</b>
+        <span class="muted">${esc(t.question)}</span>
+      </button>`,
+    )
+    .join("");
+}
+
+async function showTrial(id) {
+  const t = await api(`/api/trials/${id}`);
+  const version = (e) => {
+    const rev = t.revealed;
+    const l = rev?.lineups[e.label];
+    const r = rev?.tally[e.label];
+    const head = rev
+      ? `<div class="lineup">${l.name ? `<b>${esc(l.name)}</b><br>` : ""}${Object.entries(l.models).map(([k, m]) => `${esc(k)}: <code>${esc(m)}</code>`).join("<br>")}<div class="muted small">favourite of ${r.favorite} · ${r.lines} lines · ${r.costUsd === null ? "cost unknown" : usd(r.costUsd)}${Object.keys(r.mostThemselves).length ? ` · most themselves: ${Object.entries(r.mostThemselves).map(([c, n]) => `${esc(nameOf(c))} ×${n}`).join(", ")}` : ""}</div></div>`
+      : "";
+    const scenes = e.scenes
+      .map((s) => `<h4>${esc(s.title)}</h4><ol class="script">${s.turns.map((x) => `${x.cue ? `<li class="cue">${esc(x.cue)}</li>` : ""}<li class="${esc(x.character)} ${esc(roleOf(x.character) || "")}"><div class="who">${esc(x.name)}</div><p>${esc(x.line)}</p></li>`).join("") || `<li class="muted">Still playing…</li>`}</ol>`)
+      .join("");
+    return `<section class="version"><h3>Version ${esc(e.label)}</h3>${head}${scenes}</section>`;
+  };
+  const labels = t.entries.map((e) => e.label);
+  const pick = (name, extra = "") => labels.map((l) => `<label class="pick"><input type="radio" name="${esc(name)}" value="${esc(l)}" ${extra}/> ${esc(l)}</label>`).join("");
+  const form = t.revealed
+    ? `<p class="muted">Revealed. ${t.responses} ${t.responses === 1 ? "person" : "people"} tasted it blind.</p>`
+    : `<form id="taste" data-trial="${esc(t.trialId)}" class="taste">
+        <fieldset><legend>Which version would you put on air?</legend>${pick("favorite", "required")}</fieldset>
+        ${t.characters.map((c) => `<fieldset><legend>Where does ${esc(c.name)} sound most like ${esc(c.name.replace(/ \(.*\)$/, ""))}?</legend>${pick(`mt:${c.character}`)}</fieldset>`).join("")}
+        <label>Why? (optional)<textarea name="note" rows="2" maxlength="1000"></textarea></label>
+        <label>Your name (optional)<input name="name" maxlength="60" placeholder="a listener" /></label>
+        <button type="submit">Send</button>
+        <p class="form-msg" id="taste-msg"></p>
+      </form>`;
+  open(`<h2>${esc(t.trialId)} — ${esc(t.title)}</h2>
+    <p>${esc(t.question)}</p>
+    <div class="versions">${t.entries.map(version).join("")}</div>
+    ${form}
+    ${t.feedback.length ? `<h3>What people said</h3><ul class="wanted">${t.feedback.map((f) => `<li><b>${esc(f.name)}</b> liked ${esc(f.favorite)}${f.note ? `: ${esc(f.note)}` : ""}</li>`).join("")}</ul>` : ""}`, { wide: true });
+}
+
+document.addEventListener("click", (ev) => {
+  const tr = ev.target.closest("[data-trial]");
+  if (tr && tr.tagName !== "FORM") showTrial(tr.dataset.trial).catch((e) => alertIn(e.message));
+});
+document.addEventListener("submit", async (ev) => {
+  if (ev.target.id !== "taste") return;
+  ev.preventDefault();
+  const f = new FormData(ev.target);
+  const mostThemselves = {};
+  for (const [k, v] of f.entries()) if (k.startsWith("mt:")) mostThemselves[k.slice(3)] = v;
+  const msg = $("#taste-msg");
+  try {
+    await api(`/api/trials/${ev.target.dataset.trial}/feedback`, { method: "POST", body: JSON.stringify({ favorite: f.get("favorite"), mostThemselves, note: f.get("note"), name: f.get("name") }) });
+    msg.className = "form-msg";
+    msg.textContent = "Thank you. It stays blind until the tasting is revealed.";
+    ev.target.querySelector("button").disabled = true;
+  } catch (e) {
+    msg.className = "form-msg err";
+    msg.textContent = e.message;
+  }
+});
 
 // ------------------------------------------------------------ propose
 

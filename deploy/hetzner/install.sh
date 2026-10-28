@@ -49,8 +49,12 @@ fi
 
 # Keys are asked for whenever they're missing, so a re-run can switch things on later.
 has() { grep -q "^$1=." .env; }
-if ! has ANTHROPIC_API_KEY; then
-  KEY="$(ask 'Anthropic API key (Enter to keep the characters offline): ')"
+if ! has OPENROUTER_API_KEY; then
+  KEY="$(ask 'OpenRouter API key, so each character can run on its own model (Enter to skip): ')"
+  [ -n "$KEY" ] && set_env OPENROUTER_API_KEY "$KEY"
+fi
+if ! has OPENROUTER_API_KEY && ! has ANTHROPIC_API_KEY; then
+  KEY="$(ask 'Anthropic API key instead (Enter to keep the characters offline): ')"
   [ -n "$KEY" ] && set_env ANTHROPIC_API_KEY "$KEY"
 fi
 if ! has ELEVENLABS_API_KEY; then

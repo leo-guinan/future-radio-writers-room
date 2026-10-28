@@ -1,0 +1,44 @@
+# The morning episode: what people did since yesterday, today's goals, and the room talking it over.
+name: Daily episode
+on:
+  schedule:
+    - cron: "17 11 * * *" # UTC
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "Record for this day (YYYY-MM-DD); default today"
+        required: false
+permissions:
+  contents: write
+concurrency: daily-episode
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ROOM_MODE: remote
+      ROOM_URL: ${{ vars.ROOM_URL }}
+      PRODUCER_TOKEN: ${{ secrets.PRODUCER_TOKEN }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      DATA_DIR: room
+      REPOS_DISABLED: "1"
+      DAY: ${{ inputs.day }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Record today's episode
+        env:
+          ASSET_CACHE: ${{ runner.temp }}/assets
+        run: node scripts/daily-action.mjs
+      - name: Commit the episode
+        run: |
+          git add -A room episodes 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Nothing to commit."; exit 0; fi
+          git -c user.name="Writers' room" -c user.email="writers-room@users.noreply.github.com" commit -m "Daily episode ${DAY:-$(date -u +%F)}"
+          git push

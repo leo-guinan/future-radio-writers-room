@@ -12,6 +12,7 @@ COPY public ./public
 COPY src ./src
 COPY cast.json ./cast.json
 COPY scenes ./scenes
+COPY assets.json GOALS.md ./
 COPY LICENSE ./LICENSE
 COPY deploy/entrypoint.sh /usr/local/bin/room-entrypoint
 VOLUME ["/data"]

@@ -232,6 +232,36 @@ ledger. Voice needs `ELEVENLABS_API_KEY` (and optionally `TTS_PRICE_PER_1K_CHARS
 `VOICE_PATRON_DAILY`, `VOICE_PER_IP`). Real lines need `ANTHROPIC_API_KEY`; offline, the
 director goes round the cast with placeholders, which are never voiced.
 
+## Models and blind tastings
+
+Characters run through OpenRouter (`OPENROUTER_API_KEY`), so each can be played by a different
+model: `cast.json` `models` maps a character, a role, `showrunner` or `default` to a model id.
+To decide who plays whom, taste blind:
+
+```
+npm run room -- trial run scenes/cards/e10-two-and-ten.json   # every line-up in the file, labelled A, B, C
+npm run room -- trial feedback T-0001 --favorite B --themselves borges=A,leonardo=C
+npm run room -- trial reveal T-0001 --out tastings/T-0001.md
+npm run room -- trial report                                   # all revealed tastings, per character and model
+```
+
+Patrons taste on the workshop page. Nothing names a model until the reveal.
+
+## A room for any idea, and its morning episode
+
+```
+npm run room -- spawn "A lute that only plays songs nobody has written yet" --name lute-room
+npm run room -- assets list          # the creative asset repos a new room gets attached
+npm run room -- daily                # today's episode: what people did since yesterday, and today's goals
+```
+
+`spawn` makes a new repo with this engine, the idea as its season, the known creative asset
+repos attached and a daily GitHub Action. Each morning the Action collects people's changes
+since the day before (in the room and every asset repo), reads `GOALS.md`, and the room records
+an episode about it in `episodes/daily/`. At first they're astonished they can see it; by the
+end of the season it's ordinary. Future Radio's own repo runs the same Action against the live
+room once `ROOM_URL` (variable) and `PRODUCER_TOKEN` and `OPENROUTER_API_KEY` (secrets) are set.
+
 ## Roles and characters
 
 The room runs on three roles: **memory** (remembers, cites, never invents), **making**

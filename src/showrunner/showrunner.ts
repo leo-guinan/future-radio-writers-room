@@ -15,7 +15,7 @@ import type { LLM } from "../agents/llm.ts";
 import { EpisodeRepo, type Projection } from "../repos/episode-repo.ts";
 import { extrasRepo } from "../repos/extras.ts";
 import { activeGates, evaluate, type Candidate, type GatesFile } from "./gates.ts";
-import { castFile, playedBy, roleCharacters, type Role } from "../core/cast.ts";
+import { castFile, modelFor, playedBy, roleCharacters, type Role } from "../core/cast.ts";
 
 const OPEN = new Set(["proposed", "explored", "compared", "selected"]);
 const MIN_CUT_BUDGET = Number(process.env.SHOWRUNNER_MIN_BUDGET ?? 0.5);
@@ -140,6 +140,7 @@ async function assembleCut(room: Room, llm: LLM, repo: EpisodeRepo, episodeId: s
   const canSpend = c.remaining - a.estCashUsd >= MIN_CUT_BUDGET || llm.offline;
   if (!llm.offline && canSpend) {
     const res = await llm.complete({
+      model: modelFor("showrunner"),
       system: `${showBible()}\n\n---\n\n${persona("showrunner")}`,
       user: `Episode ${episodeId} "${ep.title}": ${ep.logline}
 Runtime target for this cut: ${a.runtimeMinutes} minutes. Stopping rule: ${a.stoppingRule}

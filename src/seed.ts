@@ -22,12 +22,12 @@ export function seed(room: Room, actor = "leo", file = join(process.cwd(), "seed
   const ts = s.ts;
   room.lockRules(actor, ts);
   for (const ep of s.episodes) room.planEpisode(actor, ep, ts);
-  for (const sc of s.scenes) {
+  for (const sc of s.scenes ?? []) {
     const { selected: _s, ...scene } = sc;
     room.addScene(actor, { ...scene, episodeId: "E10" }, ts);
   }
-  room.advanceEpisode(actor, "E10", "select", "Scene selection from the plan's selection board.", ts);
-  for (const sc of s.scenes)
+  if (s.scenes?.length) room.advanceEpisode(actor, "E10", "select", "Scene selection from the plan's selection board.", ts);
+  for (const sc of s.scenes ?? [])
     room.selectScene(
       actor,
       {
@@ -40,7 +40,7 @@ export function seed(room: Room, actor = "leo", file = join(process.cwd(), "seed
       },
       ts,
     );
-  for (const i of s.ideas) {
+  for (const i of s.ideas ?? []) {
     const ev = room.proposeIdea(
       actor,
       {
@@ -61,7 +61,7 @@ export function seed(room: Room, actor = "leo", file = join(process.cwd(), "seed
     }
     if (i.note) room.note(actor, ideaId, i.note);
   }
-  for (const f of s.forecasts) {
+  for (const f of s.forecasts ?? []) {
     const { visibility, ...rest } = f;
     room.recordForecast(actor, { ...rest, source: s.source }, visibility, ts);
   }

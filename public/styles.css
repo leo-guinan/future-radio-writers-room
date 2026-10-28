@@ -227,3 +227,15 @@ h3 { margin-top: 18px; margin-bottom: 6px; }
 .wanted { padding-left: 1.1rem; }
 .small { font-size: .82rem; }
 .play + .form-msg { margin-left: 8px; }
+
+/* blind tastings */
+.tastings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.versions { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin: 12px 0 20px; }
+.version { border-top: 3px solid var(--ink); padding-top: 6px; min-width: 0; }
+.version h3 { margin: 0 0 6px; }
+.version h4 { margin: 14px 0 4px; font-size: .9rem; color: var(--muted); }
+.lineup { font-size: .85rem; background: var(--paper-2); padding: 8px 10px; border-radius: 3px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.taste fieldset { border: 1px solid var(--rule); border-radius: 3px; margin: 0 0 10px; padding: 8px 12px; }
+.taste legend { font-size: .9rem; padding: 0 4px; }
+.pick { display: inline-flex; align-items: center; gap: 4px; margin-right: 14px; font-weight: 600; }
+dialog.wide { max-width: min(1120px, calc(100vw - 24px)); }

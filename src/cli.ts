@@ -27,6 +27,9 @@ import { extrasRepo, slugify } from "./repos/extras.ts";
 import { readFileSync } from "node:fs";
 import { closeScene, openScene, runScene, sceneMarkdown, transcript } from "./scenes/scenes.ts";
 import { lineAudio } from "./scenes/voice.ts";
+import { collect, defaultSince, readAssets, recordDaily, today, writeAssets, type Digest } from "./daily/daily.ts";
+import { spawnRoom } from "./spawn/spawn.ts";
+import { castingFor, loadCards, modelReport, playEpisode, revealTrial, runTrial, trialMarkdown, type Lineup } from "./scenes/trials.ts";
 
 /** A character's home: their dressing room, or their folder in the extras. */
 function homeFor(slug: string) {
@@ -100,6 +103,23 @@ Scenes (characters playing a scene together; text unless someone asks to hear it
   scene show S-0001 [--md]               The transcript (motivations once closed; the producer sees them always)
   scene list                             Every scene and where it stands
   scene voice S-0001 <n> [--out f.mp3]   Voice one line just in time (cached; needs ELEVENLABS_API_KEY)
+  scene play <cards.json> [--lineup N]   Play an episode of cards in order (each scene remembers the earlier ones)
+
+New rooms and the morning episode
+  spawn "<idea>" --name slug [--show "Title"] [--dir path] [--cast memory=x,making=y,accounting=z]
+        [--assets none|a/b,c/d] [--publish --owner GH [--private]]
+                                         A new writers' room for an idea, with known asset repos attached
+  assets list | assets add owner/repo [--kind k] [--about "..."] | assets remove owner/repo
+  daily [--day YYYY-MM-DD] [--since ISO]  Look over what people did since yesterday and today's goals; record an episode
+        [--collect-only] [--digest-json '{...}'] [--md-only] [--no-write]
+
+Blind tastings (the same cards under different models, judged without knowing which is which)
+  trial run <cards.json> [--lineups l.json] [--sequential]   Play every line-up, open tasting T-0001 as A, B, C…
+  trial list | trial show T-0001 [--md]  The versions, blind until revealed
+  trial feedback T-0001 --favorite B [--themselves leonardo=A,agnolo=C] [--note "..."]
+  trial reveal T-0001 [--out file.md]    Unblind: line-ups, tally and cost; runs go to the dressing rooms
+  trial report                           Every revealed tasting, per character and model
+  Models are OpenRouter ids (OPENROUTER_API_KEY); defaults per character live in cast.json "models".
 
 Showrunner & repos
   showrunner tick EP [--no-explore] [--assigned-only]   Explore, gate, and assemble first cuts into the episode repo
@@ -327,6 +347,16 @@ async function main() {
         out(`\nMotivations:\n${s.cast.map((c) => `  ${c}: ${s.motivations[c]}`).join("\n")}`);
         return;
       }
+      if (sub === "play") {
+        const ep = loadCards(need(pos[1], "cards.json"));
+        const lineup: Lineup | undefined = flags.lineup ? ep.lineups?.[Number(flags.lineup) - 1] : undefined;
+        if (flags.lineup && !lineup) throw new RuleError("usage", `No line-up ${flags.lineup} in that file.`);
+        if (lineup) out(`Casting: ${Object.entries(castingFor(ep, lineup)).map(([k, m]) => `${k}=${m}`).join(" ")}`);
+        const ids = await playEpisode(ctx, ep, { lineup });
+        for (const id of ids) out(`\n## ${room.mustScene(id).title} (${id})\n${transcript(room.mustScene(id))}`);
+        if (llm.offline) out("\n(offline: set OPENROUTER_API_KEY for the characters' own lines)");
+        return;
+      }
       if (sub === "list" || !sub) {
         for (const s of room.scenes.values()) out(`${s.sceneId} ${(s.closed ? "closed" : "open").padEnd(6)} ${String(s.turns.length).padStart(2)}/${s.maxTurns} lines  ${s.title}`);
         return;
@@ -337,6 +367,111 @@ async function main() {
         return out(`${r.generated ? "generated" : "from cache"}: ${flags.out ?? r.path}`);
       }
       throw new RuleError("usage", "scene open|run|close|show|list|voice");
+    }
+
+    case "spawn": {
+      const cast = Object.fromEntries((flags.cast ?? "").split(",").filter(Boolean).map((kv) => kv.split("=").map((x) => x.trim())));
+      const known = readAssets();
+      const assets =
+        flags.assets === "none" ? [] : flags.assets ? flags.assets.split(",").map((r) => known.find((a) => a.repo === r.trim()) ?? { repo: r.trim() }) : undefined;
+      const r = spawnRoom({
+        idea: need(pos[0], "an idea, in quotes"),
+        name: need(flags.name, "--name"),
+        show: flags.show,
+        dir: flags.dir,
+        question: flags.question,
+        cast,
+        assets,
+        owner: flags.owner,
+        publish: !!flags.publish,
+        visibility: flags.private ? "private" : "public",
+      });
+      out(`Spawned ${r.dir}: ${r.files} engine files, ${r.assets.length} asset repo${r.assets.length === 1 ? "" : "s"} attached${r.repo ? `, pushed to github.com/${r.repo}` : ""}.`);
+      for (const a of r.assets) out(`  + ${a.repo}${a.about ? ` — ${a.about}` : ""}`);
+      out(`\nNext: cd ${r.dir} && npm install && npm run room -- daily`);
+      if (r.repo) out(`Add an OPENROUTER_API_KEY secret to ${r.repo} so the morning episode has the characters' own lines.`);
+      return;
+    }
+    case "assets": {
+      const list = readAssets();
+      if (pos[0] === "add") {
+        const repo = need(pos[1], "owner/repo");
+        if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new RuleError("usage", "owner/repo");
+        writeAssets([...list.filter((a) => a.repo !== repo), { repo, ...(flags.kind ? { kind: flags.kind } : {}), ...(flags.about ? { about: flags.about } : {}) }]);
+        return out(`Attached ${repo}.`);
+      }
+      if (pos[0] === "remove") {
+        writeAssets(list.filter((a) => a.repo !== pos[1]));
+        return out(`Detached ${pos[1]}.`);
+      }
+      for (const a of list) out(`${a.repo.padEnd(48)} ${(a.kind ?? "").padEnd(11)} ${a.about ?? ""}`);
+      return;
+    }
+    case "daily": {
+      const day = flags.day ?? today();
+      const since = flags.since ?? (flags.day ? new Date(new Date(`${day}T00:00:00Z`).getTime() - 24 * 3600 * 1000).toISOString() : defaultSince());
+      const roomRepo = { dir: process.cwd(), name: (() => { try { return JSON.parse(readFileSync("package.json", "utf8")).name; } catch { return "this room"; } })() };
+      let digest: Digest;
+      if (flags["digest-json"]) digest = JSON.parse(flags["digest-json"]);
+      else if (flags.digest) digest = JSON.parse(readFileSync(flags.digest, "utf8"));
+      else digest = collect({ day, since, roomRepo });
+      if (flags["collect-only"]) return out(JSON.stringify({ ...digest, commits: digest.commits.slice(-200) }));
+      if (!room.store.all().length && existsSync(join(process.cwd(), "seed", "season-1.json"))) seed(room, by);
+      const llm = makeLLM();
+      const r = await recordDaily({ room, llm, askedBy: by }, digest, { write: !flags["no-write"] });
+      if (flags["md-only"]) return out(r.markdown);
+      out(r.markdown);
+      out(`\nDaily episode ${r.number} (${r.phase}) → ${r.file ?? "not written"}${llm.offline ? "\n(offline: set OPENROUTER_API_KEY for the characters' own lines)" : ""}`);
+      return;
+    }
+
+    case "trial": {
+      const llm = makeLLM();
+      const ctx = { room, llm, askedBy: by };
+      const sub = pos[0];
+      if (sub === "run") {
+        const ep = loadCards(need(pos[1], "cards.json"));
+        const lineups: Lineup[] = flags.lineups ? JSON.parse(readFileSync(flags.lineups, "utf8")) : ep.lineups ?? [];
+        if (llm.offline) out("(offline: every version will be placeholders; set OPENROUTER_API_KEY)");
+        const t = await runTrial(ctx, ep, lineups, { parallel: !flags.sequential });
+        return out(`${t.trialId} open: ${t.entries.map((e) => e.label).join(", ")} — ${t.title}. Blind until \`trial reveal ${t.trialId}\`.`);
+      }
+      if (sub === "list" || !sub) {
+        for (const t of room.trials.values()) out(`${t.trialId} ${t.revealed ? "revealed" : "blind   "} ${t.entries.length} versions · ${t.feedback.length} responses  ${t.title}`);
+        return;
+      }
+      if (sub === "show") {
+        const id = need(pos[1], "tasting id");
+        if (flags.md) return out(trialMarkdown(room, id));
+        const t = room.mustTrial(id);
+        out(`${t.trialId} — ${t.title}\n${t.question}\n`);
+        for (const e of t.entries) out(`${e.label}: ${e.sceneIds.join(", ")}${t.revealed ? `  ${Object.values(t.revealed.lineups[e.label].models).join(", ")}` : ""}`);
+        for (const f of t.feedback) out(`  ${f.by}: ${f.favorite}${f.note ? ` — ${f.note}` : ""}`);
+        return;
+      }
+      if (sub === "feedback") {
+        const id = need(pos[1], "tasting id");
+        const mostThemselves = Object.fromEntries((flags.themselves ?? "").split(",").filter(Boolean).map((kv) => kv.split("=").map((x) => x.trim())));
+        room.addTrialFeedback(by, { trialId: id, name: by, favorite: need(flags.favorite, "--favorite"), mostThemselves, note: flags.note });
+        return out(`Noted on ${id}.`);
+      }
+      if (sub === "reveal") {
+        const id = need(pos[1], "tasting id");
+        revealTrial(ctx, id);
+        const md = trialMarkdown(room, id);
+        if (flags.out) {
+          mkdirSync(dirname(flags.out), { recursive: true });
+          (await import("node:fs")).writeFileSync(flags.out, md);
+        }
+        return out(md);
+      }
+      if (sub === "report") {
+        const rows = modelReport(room);
+        if (!rows.length) return out("No revealed tastings yet.");
+        for (const r of rows) out(`${r.character.padEnd(14)} ${r.model.padEnd(36)} most themselves ${r.mostThemselves}/${r.votes} · ${r.tastings} tasting${r.tastings === 1 ? "" : "s"}, ${r.versions} version${r.versions === 1 ? "" : "s"} · favourite share ${(r.favoriteShare * 100).toFixed(0)}%`);
+        return;
+      }
+      throw new RuleError("usage", "trial run|list|show|feedback|reveal|report");
     }
 
     case "scorecard":

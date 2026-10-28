@@ -19,6 +19,7 @@ import { syncAll } from "./repos/sync.ts";
 import { castFile, playedBy, principals, roleCharacters, roleOf } from "./core/cast.ts";
 import { extrasRepo } from "./repos/extras.ts";
 import { openScene, publicScene, runScene, sceneOrThrow } from "./scenes/scenes.ts";
+import { modelReport, publicTrial, revealTrial, runTrial, type EpisodeCards } from "./scenes/trials.ts";
 import { cacheKey, cachedPath, lineAudio, patronVoicesToday, spokenText, TTS_MODEL, voiceFor } from "./scenes/voice.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -29,6 +30,7 @@ const PATRON_RUNS_PER_IP = Number(process.env.PATRON_RUNS_PER_IP ?? 5);
 const IDEAS_PER_IP = Number(process.env.IDEAS_PER_IP ?? 5);
 const VOICE_PATRON_DAILY = Number(process.env.VOICE_PATRON_DAILY ?? 30); // new voice generations patrons may trigger per UTC day
 const VOICE_PER_IP = Number(process.env.VOICE_PER_IP ?? 10);
+const TASTINGS_PER_IP = Number(process.env.TASTINGS_PER_IP ?? 10); // feedback on blind tastings, per address per day
 const PUBLIC_DIR = join(process.cwd(), "public");
 
 const INTAKE = process.env.INTAKE_EPISODE ?? "E02";
@@ -134,12 +136,12 @@ const send = (res: ServerResponse, status: number, body: unknown) => {
   res.end(JSON.stringify(body));
 };
 
-async function body(req: IncomingMessage): Promise<any> {
+async function body(req: IncomingMessage, max = 16_000): Promise<any> {
   let size = 0;
   const chunks: Buffer[] = [];
   for await (const c of req) {
     size += c.length;
-    if (size > 16_000) throw new RuleError("request", "Request too large.");
+    if (size > max) throw new RuleError("request", "Request too large.");
     chunks.push(c as Buffer);
   }
   if (!chunks.length) return {};
@@ -154,6 +156,7 @@ const clip = (v: unknown, n: number) => (typeof v === "string" ? v.trim().slice(
 const ipOf = (req: IncomingMessage) => (String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() || req.socket.remoteAddress || "unknown");
 const today = () => new Date().toISOString().slice(0, 10);
 
+const tasted = new Set<string>();
 function bump(kind: string, ip: string, limit: number) {
   const key = `${today()}|${kind}|${ip}`;
   const n = (ipCounts.get(key) ?? 0) + 1;
@@ -335,14 +338,14 @@ const routes: Array<[string, RegExp, Handler]> = [
   }],
   ["POST", /^\/api\/producer\/console$/, async (req, res) => {
     requireProducer(req);
-    const b = await body(req);
+    const b = await body(req, 512_000);
     send(res, 200, await runConsole(b.args));
   }],
   ["GET", /^\/api\/producer\/scorecard$/, (req, res) => {
     requireProducer(req);
     send(res, 200, room.scorecard());
   }],
-  ["GET", /^\/api\/scenes$/, (_q, res) => send(res, 200, [...room.scenes.values()].reverse().slice(0, 30).map(publicScene))],
+  ["GET", /^\/api\/scenes$/, (_q, res) => send(res, 200, [...room.scenes.values()].filter((s) => !s.trialId).reverse().slice(0, 30).map(publicScene))],
   ["GET", /^\/api\/scenes\/(S-\d{4})$/, (_q, res, m) => send(res, 200, publicScene(sceneOrThrow(room, m[1])))],
   ["GET", /^\/api\/scenes\/(S-\d{4})\/lines\/(\d+)\/audio$/, async (req, res, m) => {
     const s = sceneOrThrow(room, m[1]);
@@ -367,10 +370,40 @@ const routes: Array<[string, RegExp, Handler]> = [
   }],
   ["POST", /^\/api\/producer\/scenes$/, async (req, res) => {
     requireProducer(req);
-    const b = await body(req);
+    const b = await body(req, 128_000);
     const s = openScene({ room, llm, askedBy: PRODUCER }, b, Array.isArray(b.cast) ? b.cast : []);
     if (b.run !== false) void runScene({ room, llm, askedBy: PRODUCER }, s.sceneId).catch((e) => console.error(`scene ${s.sceneId}:`, e.message));
     send(res, 201, publicScene(s));
+  }],
+  ["GET", /^\/api\/trials$/, (_q, res) => send(res, 200, [...room.trials.values()].reverse().slice(0, 20).map((t) => publicTrial(room, t)))],
+  ["GET", /^\/api\/trials\/report$/, (_q, res) => send(res, 200, modelReport(room))],
+  ["GET", /^\/api\/trials\/(T-\d{4})$/, (_q, res, m) => send(res, 200, publicTrial(room, room.mustTrial(m[1])))],
+  ["POST", /^\/api\/trials\/(T-\d{4})\/feedback$/, async (req, res, m) => {
+    const b = await body(req);
+    const t = room.mustTrial(m[1]);
+    const key = `${ipOf(req)}|${t.trialId}`;
+    if (!isProducer(req)) {
+      if (tasted.has(key)) throw new RuleError("limits", "You've already given feedback on this tasting.");
+      bump("tastings", ipOf(req), TASTINGS_PER_IP);
+    }
+    const name = clip(b.name, 60) || "a listener";
+    const mostThemselves = Object.fromEntries(Object.entries(b.mostThemselves ?? {}).filter(([, v]) => typeof v === "string" && v)) as Record<string, string>;
+    const ev = room.addTrialFeedback(isProducer(req) ? PRODUCER : `patron:${name}`, { trialId: t.trialId, name, favorite: String(b.favorite ?? ""), mostThemselves, note: clip(b.note, 1000) || undefined });
+    tasted.add(key);
+    send(res, 201, { ok: true, id: ev.id });
+  }],
+  ["POST", /^\/api\/producer\/trials$/, async (req, res) => {
+    requireProducer(req);
+    const ep = (await body(req, 512_000)) as EpisodeCards;
+    if (!Array.isArray(ep.scenes) || !ep.scenes.length) throw new RuleError("request", "scenes: an array of scene cards.");
+    const trialId = room.nextTrialId();
+    void runTrial({ room, llm, askedBy: PRODUCER }, ep).catch((e) => console.error(`tasting ${trialId}:`, e.message));
+    send(res, 202, { trialId, playing: true });
+  }],
+  ["POST", /^\/api\/producer\/trials\/(T-\d{4})\/reveal$/, (req, res, m) => {
+    requireProducer(req);
+    revealTrial({ room, llm, askedBy: PRODUCER }, m[1]);
+    send(res, 200, publicTrial(room, room.mustTrial(m[1])));
   }],
   ["GET", /^\/healthz$/, (_q, res) => send(res, 200, { ok: true, chain: room.store.verify() })],
 ];

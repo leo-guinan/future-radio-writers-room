@@ -7,11 +7,19 @@
     "making": "leonardo",
     "accounting": "agnolo"
   },
-  "principals": ["borges", "leonardo", "agnolo"],
+  "principals": [
+    "borges",
+    "leonardo",
+    "agnolo"
+  ],
   "promotion": {
-    "$comment": "Suggestions only — the producer decides. An extra is worth considering when they have this many released appearances AND either enough merged viewer notes or enough community votes on ideas about them.",
+    "$comment": "Suggestions only \u2014 the producer decides. An extra is worth considering when they have this many released appearances AND either enough merged viewer notes or enough community votes on ideas about them.",
     "appearances": 2,
     "viewerNotes": 3,
     "votes": 5
+  },
+  "models": {
+    "$comment": "OpenRouter ids per character, role, \"showrunner\" or \"default\". Change them on the strength of blind tastings (`trial report`), not by taste.",
+    "default": "anthropic/claude-sonnet-5.5"
   }
 }

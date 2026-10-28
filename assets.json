@@ -1,0 +1,12 @@
+{
+  "$comment": "Creative asset repos this room knows about. `spawn` attaches them to a new room by default; the daily episode reads what humans changed in each since yesterday. Add a repo with `npm run room -- assets add owner/repo --kind ... --about ...`.",
+  "assets": [
+    { "repo": "leo-guinan/future-radio-episode-e01", "kind": "episode", "about": "Episode 1, The First Transmission: script, show plan, released audio" },
+    { "repo": "leo-guinan/future-radio-episode-e10", "kind": "episode", "about": "Episode 10, The People vs. The Future: show plan, first cuts" },
+    { "repo": "leo-guinan/future-radio-dressing-room-borges", "kind": "character", "about": "Borges's dressing room: character, canon, voice, bible, viewer notes" },
+    { "repo": "leo-guinan/future-radio-dressing-room-leonardo", "kind": "character", "about": "Leonardo's dressing room" },
+    { "repo": "leo-guinan/future-radio-dressing-room-agnolo", "kind": "character", "about": "Agnolo's dressing room" },
+    { "repo": "leo-guinan/future-radio-extras", "kind": "characters", "about": "Characters without a story of their own yet: Yuria, the cat, the Unspoken Orchestra" },
+    { "repo": "leo-guinan/future-radio-character-bible", "kind": "tool", "about": "Builds loadable character bibles and voice agents from a dressing room" }
+  ]
+}

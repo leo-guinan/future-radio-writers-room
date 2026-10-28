@@ -9,7 +9,7 @@ import type { Room } from "../core/room.ts";
 import type { AgentRun, Character, RoomEvent } from "../core/types.ts";
 import { extractJson, type LLM } from "./llm.ts";
 import { dressingRoom, reposEnabled } from "../repos/dressing-room.ts";
-import { displayName, playedBy, roleOf, type Role } from "../core/cast.ts";
+import { displayName, modelFor, playedBy, roleOf, type Role } from "../core/cast.ts";
 
 const CHAR_DIR = process.env.CHARACTERS_DIR ?? join(process.cwd(), "characters");
 const template = (name: string) => readFileSync(join(CHAR_DIR, `${name}.md`), "utf8");
@@ -36,6 +36,8 @@ export interface AskContext {
   llm: LLM;
   askedBy: string;
   scope: "public" | "producer"; // what the memory role may read
+  /** false: don't commit this run to a dressing room (guests, and blind tastings until revealed). */
+  commit?: boolean;
 }
 
 let runCounter = 0;
@@ -127,6 +129,7 @@ export async function remember(ctx: AskContext, question: string, ref: { ideaId?
   const flags: string[] = [];
   const records = passages.map((p) => p.text).join("\n");
   const c = await ctx.llm.complete({
+    model: modelFor(who),
     system: systemFor(who),
     user: `Question from ${ctx.askedBy}: ${question}\n\nRecords you may use (and only these):\n${records || "(none)"}\n\nAnswer in ${nameOf(who)}'s voice, citing record ids in [brackets].`,
     maxTokens: 700,
@@ -166,6 +169,7 @@ export async function make(ctx: AskContext, ideaId: string, memory?: string) {
   const idea = ctx.room.mustIdea(ideaId);
   const who = playedBy("making");
   const c = await ctx.llm.complete({
+    model: modelFor(who),
     system: systemFor(who),
     user: `Idea ${idea.ideaId} from ${idea.contributor.credit ? idea.contributor.name : "a patron"}: "${idea.title}"
 Creative question: ${idea.question}
@@ -256,6 +260,7 @@ export async function account(ctx: AskContext, ideaId: string, approaches: Appro
   }));
   const s = idea.signals;
   const c = await ctx.llm.complete({
+    model: modelFor(who),
     system: systemFor(who),
     user: `On the screen: idea ${idea.ideaId} "${idea.title}" (${idea.output}), proposed by ${idea.contributor.credit ? idea.contributor.name : "a patron"}.
 Question: ${idea.question}
@@ -376,7 +381,7 @@ export function record(
     offline: c.offline,
   };
   const ev = ctx.room.recordRun(run, ctx.scope === "producer" && !ref.ideaId ? "producer" : "public") as RoomEvent<AgentRun>;
-  if (reposEnabled()) {
+  if (reposEnabled() && ctx.commit !== false) {
     // Every run is also a commit in the character's dressing room.
     const { sha, file } = dressingRoom(character).recordRun(run, ev.ts, ev.id, ev.hash);
     ctx.room.store.append(

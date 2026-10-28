@@ -15,6 +15,7 @@ import { RuleError } from "../core/room.ts";
 import type { SceneTurn } from "../core/types.ts";
 import { extractJson, type LLM } from "../agents/llm.ts";
 import { nameOf, persona, record, showBible, systemFor } from "../agents/characters.ts";
+import { modelFor } from "../core/cast.ts";
 import { EpisodeRepo } from "../repos/episode-repo.ts";
 import { reposEnabled } from "../repos/dressing-room.ts";
 
@@ -29,22 +30,47 @@ export interface CastMember {
   motivation: string;
 }
 
-const speaker = (slug: string) => nameOf(slug).toUpperCase();
+/** A character's name in this scene: a guest's name from the card, otherwise their own. */
+export const nameIn = (s: Scene, slug: string) => s.guests?.[slug]?.name ?? nameOf(slug);
+const speaker = (s: Scene, slug: string) => nameIn(s, slug).toUpperCase();
+const isGuest = (s: Scene, slug: string) => !!s.guests?.[slug];
+
+/** Who a character is, for the model: their bible, or a guest's persona from the card. */
+function systemIn(s: Scene, who: string): string {
+  const g = s.guests?.[who];
+  return g ? [showBible(), "---", `# ${g.name}\n\n${g.persona}`].join("\n\n") : systemFor(who);
+}
+
+/** The model that plays `who` here: the scene's casting, then cast.json, then the room default. */
+export const modelIn = (s: Scene, who: string) => s.models[who] ?? modelFor(who);
+const directorModel = (s: Scene) => s.models.director ?? modelFor("showrunner");
 
 export function transcript(s: Scene, upTo = s.turns.length): string {
   return s.turns
     .slice(0, upTo)
-    .map((t) => `${t.cue ? `${t.cue}\n` : ""}${speaker(t.character)}: ${t.line}`)
+    .map((t) => `${t.cue ? `${t.cue}\n` : ""}${speaker(s, t.character)}: ${t.line}`)
     .join("\n");
+}
+
+/** What happened in the earlier scenes of this episode, for everyone to have in mind. */
+function earlier(ctx: SceneContext, s: Scene, limit = 9000): string {
+  if (!s.after?.length) return "";
+  const parts = s.after.map((id) => {
+    const p = ctx.room.mustScene(id);
+    return `## Earlier: ${p.title}\n${transcript(p)}`;
+  });
+  let text = parts.join("\n\n");
+  if (text.length > limit) text = `…${text.slice(-limit)}`;
+  return `${text}\n\n---\n\n`;
 }
 
 function card(s: Scene): string {
   return [
-    `SCENE ${s.sceneId}: ${s.title}`,
+    `SCENE: ${s.title}`,
     `Setting: ${s.setting}`,
     `Situation: ${s.situation}`,
     `What's at stake: ${s.stakes}`,
-    `In the scene: ${s.cast.map(nameOf).join(", ")}`,
+    `In the scene: ${s.cast.map((c) => nameIn(s, c)).join(", ")}`,
     `The scene ends when: ${s.stoppingRule}`,
   ].join("\n");
 }
@@ -69,10 +95,11 @@ export async function direct(ctx: SceneContext, s: Scene): Promise<Direction> {
   if (s.turns.length >= s.maxTurns) return { next: "", end: true, reason: `all ${s.maxTurns} turns used` };
   // The director knows every motivation; that's how it shapes the scene. It never reveals them.
   // Its runs stay producer-only (no ideaId, which would make them public): its reasons can name what people want.
-  const motivations = s.cast.map((c) => `- ${nameOf(c)} (${c}) privately wants: ${s.motivations[c]}`).join("\n");
+  const motivations = s.cast.map((c) => `- ${nameIn(s, c)} (${c}) privately wants: ${s.motivations[c]}`).join("\n");
   const c = await ctx.llm.complete({
+    model: directorModel(s),
     system: `${showBible()}\n\n---\n\n${persona("showrunner")}\n\nRight now you are directing a scene, not assembling a cut.`,
-    user: `${card(s)}
+    user: `${earlier(ctx, s)}${card(s)}
 
 Private motivations (only you see all of them; never put them in a beat verbatim):
 ${motivations}
@@ -96,7 +123,7 @@ Reply with only a JSON block:
     out = fallbackDirection(s);
   } else out = { next: d.next, beat: d.beat?.trim() || undefined, cue: d.cue?.trim() || undefined, end: !!d.end, reason: d.reason?.trim() || undefined };
   if (!c.offline || flags.length)
-    record({ room: ctx.room, llm: ctx.llm, askedBy: ctx.askedBy, scope: "producer" }, "showrunner", { episodeId: s.episodeId, question: `direct ${s.sceneId} line ${s.turns.length + 1}` }, out, out.end ? `End ${s.sceneId}: ${out.reason ?? "stopping rule met"}.` : `${nameOf(out.next)} next.`, c, [], flags);
+    record({ room: ctx.room, llm: ctx.llm, askedBy: ctx.askedBy, scope: "producer", commit: !s.trialId }, "showrunner", { episodeId: s.episodeId, question: `direct ${s.sceneId} line ${s.turns.length + 1}` }, out, out.end ? `End ${s.sceneId}: ${out.reason ?? "stopping rule met"}.` : `${nameIn(s, out.next)} next.`, c, [], flags);
   return out;
 }
 
@@ -104,8 +131,9 @@ Reply with only a JSON block:
 
 export async function speak(ctx: SceneContext, s: Scene, who: string, d: Direction) {
   const c = await ctx.llm.complete({
-    system: systemFor(who),
-    user: `${card(s)}
+    model: modelIn(s, who),
+    system: systemIn(s, who),
+    user: `${earlier(ctx, s)}${card(s)}
 
 Your private motivation in this scene (no one else knows it; pursue it, don't announce it):
 ${s.motivations[who]}
@@ -113,19 +141,21 @@ ${s.motivations[who]}
 ${d.beat ? `The director's note for this line: ${d.beat}\n\n` : ""}Transcript so far:
 ${transcript(s) || "(you speak first)"}
 
-Say ${nameOf(who)}'s next line. One to three spoken sentences, in your own voice. Only the words spoken: no name, no quotation marks, no stage directions.`,
+Say ${nameIn(s, who)}'s next line. One to three spoken sentences, in your own voice. Only the words spoken: no name, no quotation marks, no stage directions.`,
     maxTokens: 220,
   });
   const flags: string[] = [];
-  let line = clean(c.text, who);
+  let line = clean(c.text, who, nameIn(s, who));
   if (!line) {
     if (!c.offline) flags.push("no line returned; used a placeholder");
-    line = d.beat ? `(offline — ${nameOf(who)}: ${d.beat})` : `(offline — ${nameOf(who)} takes line ${s.turns.length + 1})`;
+    line = d.beat ? `(offline — ${nameIn(s, who)}: ${d.beat})` : `(offline — ${nameIn(s, who)} takes line ${s.turns.length + 1})`;
   }
+  // Blind tastings keep their runs (which name the model) producer-only until revealed.
+  const blind = !!s.trialId;
   const run = record(
-    { room: ctx.room, llm: ctx.llm, askedBy: `scene:${s.sceneId}`, scope: "public" },
+    { room: ctx.room, llm: ctx.llm, askedBy: `scene:${s.sceneId}`, scope: blind ? "producer" : "public", commit: !blind && !isGuest(s, who) },
     who,
-    { ideaId: s.ideaId, episodeId: s.episodeId, question: `${s.sceneId} line ${s.turns.length + 1}` },
+    { ideaId: blind ? undefined : s.ideaId, episodeId: s.episodeId, question: `${s.sceneId} line ${s.turns.length + 1}` },
     { sceneId: s.sceneId, beat: d.beat ?? null },
     line,
     c,
@@ -137,10 +167,10 @@ Say ${nameOf(who)}'s next line. One to three spoken sentences, in your own voice
 }
 
 /** Strip what models add around a spoken line: a name prefix, quotes, stage directions. */
-export function clean(text: string, who: string): string {
+export function clean(text: string, who: string, name = nameOf(who)): string {
   let t = (text ?? "").trim().split(/\n{2,}/)[0].trim();
-  const name = nameOf(who);
-  t = t.replace(new RegExp(`^\\**(${name}|${who})\\**\\s*:\\s*`, "i"), "");
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  t = t.replace(new RegExp(`^\\**(${esc(name)}|${esc(who)})\\**\\s*:\\s*`, "i"), "");
   t = t.replace(/^["“](.*)["”]$/s, "$1");
   t = t.replace(/\*[^*]+\*/g, "").replace(/\((?:[^)]*?\b(?:pauses?|sighs?|smiles?|laughs?|beat)\b[^)]*)\)/gi, "");
   return t.replace(/\s+/g, " ").trim();
@@ -172,7 +202,7 @@ export async function runScene(ctx: SceneContext, sceneId: string, { maxSteps = 
 
 export function closeScene(ctx: SceneContext, s: Scene, reason: string) {
   let repo: { name: string; sha: string; file: string } | undefined;
-  if (s.episodeId && reposEnabled()) {
+  if (s.episodeId && reposEnabled() && !s.trialId) {
     const ep = new EpisodeRepo(s.episodeId);
     ep.ensure(ctx.room.mustEpisode(s.episodeId));
     const file = `scenes/${s.sceneId}.md`;
@@ -192,15 +222,15 @@ export function sceneMarkdown(s: Scene, reason?: string): string {
     `| Situation | ${s.situation} |`,
     `| Stakes | ${s.stakes} |`,
     `| Ends when | ${s.stoppingRule} |`,
-    `| Cast | ${s.cast.map(nameOf).join(", ")} |`,
+    `| Cast | ${s.cast.map((c) => nameIn(s, c)).join(", ")} |`,
     `| Lines | ${s.turns.length} of at most ${s.maxTurns} |`,
     ...(reason ? [`| Closed | ${reason} |`] : []),
     "",
     "## The scene",
     "",
-    ...s.turns.flatMap((t) => [...(t.cue ? [`${t.cue}`, ""] : []), `**${speaker(t.character)}:** ${t.line}`, ""]),
+    ...s.turns.flatMap((t) => [...(t.cue ? [`${t.cue}`, ""] : []), `**${speaker(s, t.character)}:** ${t.line}`, ""]),
     ...(s.revealMotivations
-      ? ["## What each of them wanted", "", ...s.cast.map((c) => `- **${nameOf(c)}:** ${s.motivations[c]}`), ""]
+      ? ["## What each of them wanted", "", ...s.cast.map((c) => `- **${nameIn(s, c)}:** ${s.motivations[c]}`), ""]
       : []),
     "_Improvised in the writers' room. Nothing here is canon until it is in a released episode._",
     "",
@@ -217,7 +247,10 @@ export function publicScene(s: Scene) {
     stakes: s.stakes,
     stoppingRule: s.stoppingRule,
     maxTurns: s.maxTurns,
-    cast: s.cast.map((c) => ({ character: c, name: nameOf(c) })),
+    cast: s.cast.map((c) => ({ character: c, name: nameIn(s, c), guest: isGuest(s, c) })),
+    guests: s.guests ?? null,
+    after: s.after ?? [],
+    trialId: s.trialId ?? null,
     episodeId: s.episodeId,
     ideaId: s.ideaId,
     openedAt: s.openedAt,

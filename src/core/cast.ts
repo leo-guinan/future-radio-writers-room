@@ -30,6 +30,11 @@ export interface CastFile {
   roles: Record<Role, string>;
   principals: string[];
   promotion: { appearances: number; viewerNotes: number; votes: number };
+  /**
+   * Which model each character runs on (OpenRouter ids, "vendor/model"). Keys are a character
+   * slug, a role, "showrunner", or "default". Unlisted characters use ROOM_MODEL.
+   */
+  models: Record<string, string>;
 }
 
 const castPath = () => process.env.CAST_FILE ?? join(process.cwd(), "cast.json");
@@ -47,6 +52,7 @@ export function castFile(): CastFile {
     roles,
     principals: [...new Set([...ROLES.map((r) => roles[r]), ...(f.principals ?? [])])],
     promotion: { appearances: 2, viewerNotes: 3, votes: 5, ...(f.promotion ?? {}) },
+    models: Object.fromEntries(Object.entries((f as any).models ?? {}).filter(([k, v]) => !k.startsWith("$") && typeof v === "string")) as Record<string, string>,
   };
 }
 
@@ -58,6 +64,13 @@ export const roleOf = (slug: string): Role | undefined => ROLES.find((r) => cast
 export const roleCharacters = () => ROLES.map(playedBy);
 /** A display name from a slug: "the-cat" → "The cat". */
 export const displayName = (slug: string) => (slug[0]?.toUpperCase() ?? "") + slug.slice(1).replace(/-/g, " ");
+
+/** The model a character (or the showrunner) runs on, from cast.json; undefined means the room's default. */
+export function modelFor(slug: string): string | undefined {
+  const m = castFile().models;
+  const role = slug === "showrunner" ? "assembly" : roleOf(slug);
+  return m[slug] ?? (role ? m[role] : undefined) ?? m.default;
+}
 
 /** Characters with a dressing room of their own. */
 export const principals = () => castFile().principals;

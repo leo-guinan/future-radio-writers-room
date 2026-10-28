@@ -32,6 +32,12 @@ import {
   type SceneTurn,
   type SceneClosed,
   type SceneVoiced,
+  type SceneCasting,
+  type TrialOpened,
+  type TrialLineups,
+  type TrialFeedback,
+  type TrialRevealed,
+  type DailyRecorded,
   type IdeaTransitioned,
   type LedgerEntry,
   type RoomEvent,
@@ -92,10 +98,21 @@ export interface Scene extends SceneOpened {
   turns: Array<SceneTurn & { at: string; eventId: string }>;
   voiced: Record<number, SceneVoiced & { at: string }>;
   closed: (SceneClosed & { at: string }) | null;
+  /** Producer-only: model per character slug, and "director". */
+  models: Record<string, string>;
+}
+
+export interface Trial extends TrialOpened {
+  openedAt: string;
+  lineups: TrialLineups["lineups"];
+  feedback: Array<TrialFeedback & { at: string; by: string }>;
+  revealed: (TrialRevealed & { at: string }) | null;
 }
 
 export class Room {
   ideas = new Map<string, Idea>();
+  trials = new Map<string, Trial>();
+  dailies: Array<DailyRecorded & { at: string }> = [];
   episodes = new Map<string, Episode>();
   ledger: Array<LedgerEntry & { at: string; by: string; eventId: string }> = [];
   forecasts = new Map<string, Forecast>();
@@ -213,7 +230,25 @@ export class Room {
         this.ticks.push({ ...(p as ShowrunnerTick), at: e.ts, eventId: e.id });
         break;
       case "scene.opened":
-        this.scenes.set(p.sceneId, { ...(p as SceneOpened), openedAt: e.ts, openedBy: e.actor, motivations: {}, turns: [], voiced: {}, closed: null });
+        this.scenes.set(p.sceneId, { ...(p as SceneOpened), openedAt: e.ts, openedBy: e.actor, motivations: {}, turns: [], voiced: {}, closed: null, models: {} });
+        break;
+      case "scene.casting":
+        this.scenes.get(p.sceneId)!.models = { ...(p as SceneCasting).models };
+        break;
+      case "trial.opened":
+        this.trials.set(p.trialId, { ...(p as TrialOpened), openedAt: e.ts, lineups: {}, feedback: [], revealed: null });
+        break;
+      case "trial.lineups":
+        this.trials.get(p.trialId)!.lineups = (p as TrialLineups).lineups;
+        break;
+      case "trial.feedback":
+        this.trials.get(p.trialId)!.feedback.push({ ...(p as TrialFeedback), at: e.ts, by: e.actor });
+        break;
+      case "trial.revealed":
+        this.trials.get(p.trialId)!.revealed = { ...(p as TrialRevealed), at: e.ts };
+        break;
+      case "daily.recorded":
+        this.dailies.push({ ...(p as DailyRecorded), at: e.ts });
         break;
       case "scene.motivation":
         this.scenes.get(p.sceneId)!.motivations[p.character] = p.motivation;
@@ -499,7 +534,11 @@ export class Room {
   // ---------------- scenes ----------------
 
   /** Open a scene. Each character's motivation is recorded privately; the card is public. */
-  openScene(actor: string, card: Omit<SceneOpened, "sceneId" | "maxTurns" | "revealMotivations" | "cast"> & { maxTurns?: number; revealMotivations?: boolean }, cast: Array<{ character: string; motivation: string }>) {
+  openScene(
+    actor: string,
+    card: Omit<SceneOpened, "sceneId" | "maxTurns" | "revealMotivations" | "cast" | "guests"> & { maxTurns?: number; revealMotivations?: boolean; directorModel?: string },
+    cast: Array<{ character: string; motivation: string; model?: string; name?: string; persona?: string }>,
+  ) {
     for (const k of ["title", "setting", "situation", "stakes", "stoppingRule"] as const)
       if (!String(card[k] ?? "").trim()) throw new RuleError("scene", `A scene needs a ${k === "stoppingRule" ? "stopping rule: when is it over?" : k}.`);
     if (cast.length < 2) throw new RuleError("scene", "A scene needs at least two characters.");
@@ -509,6 +548,11 @@ export class Room {
     if (!(maxTurns >= 2 && maxTurns <= 40)) throw new RuleError("scene", "maxTurns is between 2 and 40.");
     if (card.episodeId && !this.episodes.has(card.episodeId)) throw new RuleError("episode", `Unknown episode ${card.episodeId}.`);
     if (card.ideaId && !this.ideas.has(card.ideaId)) throw new RuleError("idea", `Unknown idea ${card.ideaId}.`);
+    for (const c of cast) if (!/^[a-z0-9][a-z0-9-]*$/.test(c.character)) throw new RuleError("scene", `'${c.character}' isn't a character slug (lowercase, digits, dashes).`);
+    for (const a of card.after ?? []) if (!this.scenes.has(a)) throw new RuleError("scene", `Unknown earlier scene ${a}.`);
+    const guests = Object.fromEntries(
+      cast.filter((c) => c.persona?.trim()).map((c) => [c.character, { name: c.name?.trim() || c.character, persona: c.persona!.trim() }]),
+    );
     const sceneId = `S-${String(this.scenes.size + 1).padStart(4, "0")}`;
     const opened: SceneOpened = {
       sceneId,
@@ -522,9 +566,15 @@ export class Room {
       episodeId: card.episodeId,
       ideaId: card.ideaId,
       revealMotivations: card.revealMotivations ?? true,
+      ...(Object.keys(guests).length ? { guests } : {}),
+      ...(card.after?.length ? { after: card.after } : {}),
+      ...(card.trialId ? { trialId: card.trialId } : {}),
     };
     const ev = this.store.append("scene.opened", actor, opened, "public");
     for (const c of cast) this.store.append("scene.motivation", actor, { sceneId, character: c.character, motivation: c.motivation.trim() }, "producer");
+    const models: Record<string, string> = Object.fromEntries(cast.filter((c) => c.model).map((c) => [c.character, c.model!]));
+    if (card.directorModel) models.director = card.directorModel;
+    if (Object.keys(models).length) this.store.append("scene.casting", actor, { sceneId, models } satisfies SceneCasting, "producer");
     return ev;
   }
 
@@ -547,6 +597,75 @@ export class Room {
     if (s.closed) throw new RuleError("scene", `${sceneId} is already closed.`);
     const closed: SceneClosed = { sceneId, reason, turns: s.turns.length, repo, ...(s.revealMotivations ? { motivations: { ...s.motivations } } : {}) };
     return this.store.append("scene.closed", actor, closed, "public");
+  }
+
+  // ---------------------------------------------------------------- blind tastings
+
+  /** The id the next tasting will get, so its scenes can carry it before it opens. */
+  nextTrialId() {
+    return `T-${String(this.trials.size + 1).padStart(4, "0")}`;
+  }
+
+  openTrial(actor: string, t: Omit<TrialOpened, "trialId"> & { trialId?: string }, lineups: TrialLineups["lineups"]) {
+    if (t.entries.length < 2) throw new RuleError("trial", "A tasting needs at least two line-ups.");
+    const labels = t.entries.map((e) => e.label);
+    if (new Set(labels).size !== labels.length || labels.some((l) => !lineups[l])) throw new RuleError("trial", "Every entry needs its own label and line-up.");
+    for (const e of t.entries) for (const id of e.sceneIds) this.mustScene(id);
+    const trialId = this.nextTrialId();
+    if (t.trialId && t.trialId !== trialId) throw new RuleError("trial", `Expected ${trialId}, got ${t.trialId}; another tasting opened meanwhile.`);
+    const ev = this.store.append("trial.opened", actor, { ...t, trialId } satisfies TrialOpened, "public");
+    this.store.append("trial.lineups", actor, { trialId, lineups } satisfies TrialLineups, "producer");
+    return ev;
+  }
+
+  mustTrial(trialId: string): Trial {
+    const t = this.trials.get(trialId);
+    if (!t) throw new RuleError("trial", `No tasting ${trialId}.`);
+    return t;
+  }
+
+  addTrialFeedback(actor: string, f: TrialFeedback) {
+    const t = this.mustTrial(f.trialId);
+    if (t.revealed) throw new RuleError("trial", `${f.trialId} has been revealed; feedback is closed so it stays blind.`);
+    const labels = t.entries.map((e) => e.label);
+    if (!labels.includes(f.favorite)) throw new RuleError("trial", `Pick one of ${labels.join(", ")}.`);
+    for (const [c, l] of Object.entries(f.mostThemselves ?? {}))
+      if (!t.characters.includes(c) || !labels.includes(l)) throw new RuleError("trial", `For ${c}, pick one of ${labels.join(", ")}.`);
+    // Patrons are limited per address by the server; named people get one say each here.
+    if (!actor.startsWith("patron:") && t.feedback.some((x) => x.by === actor)) throw new RuleError("trial", "You've already given feedback on this tasting.");
+    const note = f.note?.trim().slice(0, 1000);
+    return this.store.append("trial.feedback", actor, { ...f, ...(note ? { note } : { note: undefined }) }, "public");
+  }
+
+  /** Unblind: publish the line-ups with what the feedback said about each. */
+  revealTrial(actor: string, trialId: string) {
+    const t = this.mustTrial(trialId);
+    if (t.revealed) throw new RuleError("trial", `${trialId} is already revealed.`);
+    const tally: TrialRevealed["tally"] = {};
+    for (const e of t.entries) {
+      let cost: number | null = 0;
+      let lines = 0;
+      for (const id of e.sceneIds) {
+        const s = this.mustScene(id);
+        lines += s.turns.length;
+        for (const turn of s.turns) {
+          const run = this.runs.get(turn.runId);
+          if (!run || run.costUsd === null || cost === null) cost = run?.offline ? cost : null;
+          else cost += run.costUsd;
+        }
+      }
+      tally[e.label] = { favorite: 0, mostThemselves: {}, costUsd: cost === null ? null : Math.round(cost * 10000) / 10000, lines };
+    }
+    for (const f of t.feedback) {
+      tally[f.favorite].favorite++;
+      for (const [c, l] of Object.entries(f.mostThemselves ?? {})) tally[l].mostThemselves[c] = (tally[l].mostThemselves[c] ?? 0) + 1;
+    }
+    return this.store.append("trial.revealed", actor, { trialId, lineups: t.lineups, tally, responses: t.feedback.length } satisfies TrialRevealed, "public");
+  }
+
+  recordDaily(actor: string, d: DailyRecorded) {
+    if (this.dailies.some((x) => x.day === d.day)) throw new RuleError("daily", `There's already a daily episode for ${d.day}.`);
+    return this.store.append("daily.recorded", actor, d, "public");
   }
 
   recordSceneVoice(actor: string, v: SceneVoiced) {

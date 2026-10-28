@@ -139,8 +139,21 @@ deterministic offline output, and every run is still recorded.
   the slug in `cast.json`. Or start them as an extra and let the audience promote them.
 - **Change what a role does:** change its function in `characters.ts`, keeping the outputs
   the showrunner reads (approaches, stopping rule, estimate, evaluation).
-- **Another model:** set `ROOM_MODEL` and `CHARACTER_MODEL`. For another provider, implement
-  the `LLM` interface (`complete(system, user) → {text, usage}`).
+- **Models, per character.** The room calls models through OpenRouter (`OPENROUTER_API_KEY`),
+  so each character can run on a different one; Anthropic directly (`ANTHROPIC_API_KEY`) is the
+  fallback, and with neither the room runs offline. `cast.json` `models` maps a character slug,
+  a role, `showrunner` or `default` to an OpenRouter id (`vendor/model`); `ROOM_MODEL` is the
+  default's default. OpenRouter reports each call's cost, so compute is booked as observed USD.
+  For another provider, implement the `LLM` interface (`complete({system, user, model}) →
+  {text, usage, costUsd}`).
+- **Blind tastings decide the casting.** `trial run <cards.json>` plays the same scene cards
+  under several model line-ups (shuffled, labelled A, B, C) and opens a tasting. Until it is
+  revealed, the runs (which name their models) stay producer-only and out of the dressing
+  rooms. People pick the version they'd put on air and, per character, where that character
+  sounds most like themselves. `trial reveal` publishes the line-ups with the tally and cost;
+  `trial report` adds every revealed tasting up per character and model. Change `models` in
+  `cast.json` on that evidence. Code: `src/scenes/trials.ts`; example: the three line-ups in
+  `scenes/cards/e10-two-and-ten.json`.
 - **Costs:** set `PRICE_INPUT_PER_MTOK` and `PRICE_OUTPUT_PER_MTOK`, and compute becomes
   observed USD on the accounting role's ledger. Unpriced tokens are booked as "unknown", never
   as free.
@@ -151,7 +164,10 @@ deterministic offline output, and every run is still recorded.
   the transcript, never anyone else's motivation. Every line is a recorded run (committed to the
   speaker's dressing room, compute on the ledger). Motivations are producer-only events until
   the scene closes, then revealed unless the card says `"revealMotivations": false`. With an
-  `episodeId`, the transcript lands in the episode repo as `scenes/S-xxxx.md`. Code:
+  `episodeId`, the transcript lands in the episode repo as `scenes/S-xxxx.md`. A card file can
+  hold a whole episode (`scenes: [...]`), played in order with each scene remembering the
+  earlier ones, and guests: characters who exist only in the card (`guests` with a name and a
+  persona; no dressing room). Code:
   `src/scenes/scenes.ts`; example card: `scenes/cards/two-songs.json`.
 - **Voice, just in time.** Scenes are text. When someone asks to hear a line, it is generated
   once in the speaker's production voice (`voice/voice.json` in their dressing room), cached by
@@ -232,6 +248,23 @@ repo's `RELEASE.md`, `LEDGER.md` and `assets.json` show the shape.
   (`episode release EP --sha256 … --uri …`);
 - the real cost and hours.
 
+### The morning episode
+
+Every day a GitHub Action (`.github/workflows/daily.yml`) collects what people did since the
+day before: their commits to the room's repo and to every attached creative asset repo
+(`assets.json`; commits by characters and bots are left out), plus the ideas, votes, notes and
+tasting feedback in the room itself, and the day's goals from `GOALS.md` (`## YYYY-MM-DD` plus
+`## Standing`). The room plays a scene about it with its three roles and saves the transcript
+in `episodes/daily/`. The phase of the season sets the characters' attitude, not the facts:
+on the first mornings they can hardly believe they can see the people's work; by the end
+(`DAILY_SEASON`, default 8) it's ordinary. In Future Radio's own story, Episode 10 happens
+before the room has this sense at all.
+
+Two modes. `local`: the room's log lives in the repo (`room/`), and the Action runs it and
+commits. `remote`: the room runs on a server; the Action collects, asks the live room to record
+through the producer console (`ROOM_URL` variable, `PRODUCER_TOKEN` secret), and commits the
+transcript. Code: `src/daily/daily.ts`, `scripts/daily-action.mjs`.
+
 ## Layer 8. Participation
 
 **Decision.**
@@ -265,6 +298,14 @@ remotely.
 
 ---
 
+### Spawning a room
+
+`npm run room -- spawn "<idea>" --name <slug>` makes a new writers' room for a creative idea:
+this engine (without Future Radio's history, episodes or tests), the idea as its show bible and
+first season, the casting (`--cast memory=…`), every creative asset repo in `assets.json`
+attached (`--assets none` or a list to choose), the daily Action in local mode, CC0, and a first
+commit. `--publish --owner <you>` creates the GitHub repo with `gh`. Code: `src/spawn/spawn.ts`.
+
 ## API (reference instance)
 
 Public:
@@ -285,6 +326,12 @@ Public:
 | GET | `/api/scenes` | Recent scenes (motivations only once closed) |
 | GET | `/api/scenes/:id` | One scene with its transcript |
 | GET | `/api/scenes/:id/lines/:n/audio` | One line as audio: cached, or generated now within the day's voice limits |
+| GET | `/api/trials` | Blind tastings (line-ups only once revealed) |
+| GET | `/api/trials/:id` | One tasting |
+| POST | `/api/trials/:id/feedback` | `{favorite, mostThemselves: {character: label}, note?, name?}`; once per address, closed after reveal |
+| GET | `/api/trials/report` | Revealed tastings per character and model |
+| POST | `/api/producer/trials` | Producer: play a card file's line-ups and open a tasting (runs in the background) |
+| POST | `/api/producer/trials/:id/reveal` | Producer: unblind |
 | POST | `/api/producer/scenes` | Producer: open a scene `{title, setting, situation, stakes, stoppingRule, maxTurns?, episodeId?, ideaId?, revealMotivations?, cast: [{character, motivation}], run?}` and play it |
 
 Producer only (`Authorization: Bearer $PRODUCER_TOKEN`): explore, move, signal, advance, tick,
