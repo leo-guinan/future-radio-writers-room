@@ -280,3 +280,7 @@ src/cli.ts            producer console
 public/               the workshop page (no build step)
 test/                 rule tests
 ```
+
+## License
+
+[CC0 1.0](LICENSE): dedicated to the public domain. Use it, change it, ship it; no permission or credit required.
