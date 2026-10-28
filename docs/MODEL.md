@@ -1,7 +1,7 @@
 # The writers' room model
 
 A writers' room is a public workshop where a show is made in the open. Patrons watch and
-contribute ideas, character agents work on those ideas, and a showrunner turns them into cuts.
+contribute ideas, agents in three roles (memory, making, accounting) work on those ideas, and a showrunner (the fourth role, assembly) turns them into cuts.
 Every decision is written down. This document describes the model layer by layer: what
 Future Radio decided at each layer, where that decision lives, and how to change it.
 
@@ -95,33 +95,54 @@ configuration. Say so in your README, because the rules are the show's promise t
 - **New output kinds:** extend `OutputKind`. `capability` already exists, for ideas that are
   tools rather than scenes.
 
-## Layer 4. The characters (agents)
+## Layer 4. Roles and characters (agents)
 
-**Decision.** Three principal agents, each with one job:
-- **Borges remembers.** He retrieves from the log and his dressing room, never inventing history.
-- **Leonardo creates.** He proposes approaches, each with a stopping rule and a cost estimate.
-- **Agnolo keeps the score.** He scores story, business and participation (0–3 each), separates
-  observed from projected, and recommends `pursue`, `compare`, `defer` or `decline`.
+**Separate the role from the character.** A role is a job the system needs done, a separation
+of concerns that makes the room run. A character is the person who plays that role in a
+particular show. The roles are the model. The characters are Future Radio's.
 
-The voice comes from the show bible, the character's persona and the canon in their dressing
-room. The model is `claude-sonnet-5-5`. With no key the room falls back to deterministic
-offline output, and every run is still recorded.
+| Role | What the system needs from it | Future Radio's character |
+|---|---|---|
+| **Memory** | Retrieve what the record holds and cite it; never invent history | Borges, the librarian who has nothing but time |
+| **Making** | Turn an idea into approaches, each with a stopping rule and a cost estimate | Leonardo, who can't stop imagining and is learning to finish |
+| **Accounting** | Score story, business and participation (0–3 each); keep observed apart from projected; recommend `pursue`, `compare`, `defer` or `decline` | Agnolo, the bookkeeper who wants receipts |
+| **Assembly** | Gate ideas and assemble first cuts into the episode repo | The showrunner (no persona) |
+
+The order is part of the model: memory → making → accounting → assembly.
+
+The characters fit Future Radio's story: a Renaissance inventor funding his work from the
+future. You can use them, since everything here is CC0. But you'll have a better room if you
+find characters of your own to put on top of the roles. A character you chose is one whose
+shape you understand: you'll know how they'd answer, where they'd push back, and what
+contributors are likely to notice about them. That's what makes the work, and the viewer
+notes, feel true.
+
+Each character's voice comes from three places: the show bible, their persona, and the canon
+in their dressing room. The model is `claude-sonnet-5-5`. With no key the room falls back to
+deterministic offline output, and every run is still recorded.
 
 **Where it lives.**
 - `characters/*.md`: personas and the show bible.
-- `src/agents/characters.ts`: `systemFor`, `explore` and `ask`.
+- `src/agents/characters.ts`: `systemFor`, `explore` and `ask`, the role pipeline.
 - `src/agents/llm.ts`: `AnthropicLLM`, `OfflineLLM` and `makeLLM`.
 - `cast.json`: who the principals are, and the promotion thresholds.
 
 **How to change it.**
-- **Another model:** set `ROOM_MODEL` and `CHARACTER_MODEL`. For another provider, implement the
-  `LLM` interface (`complete(system, user) → {text, usage}`).
-- **Other characters or jobs:** add `characters/<slug>.md` and a dressing room, then add the slug
-  to `cast.json`.
-- **A different job for an agent:** change the job inside `explore()`. The pipeline order
-  (remember → create → evaluate) is the model; the names are Future Radio's.
-- **Costs:** set `PRICE_INPUT_PER_MTOK` and `PRICE_OUTPUT_PER_MTOK`, and compute becomes observed
-  USD on Agnolo's ledger. Unpriced tokens are booked as "unknown", never as free.
+- **Recast a role:** today the roles are bound to the slugs `borges`, `leonardo` and `agnolo` in
+  code. These live in `CAST` and `Character` in `src/core/types.ts`, `AGENTS` in
+  `src/core/cast.ts`, the role functions in `src/agents/characters.ts`,
+  `src/showrunner/showrunner.ts`, `src/production/import.ts`, and the `ask` route in
+  `src/server.ts`. To recast, write your character into `characters/<slug>.md` and either keep
+  the slug or rename it at those sites. Run `npm test` after.
+- **Add a character with no role:** add `characters/<slug>.md` and a dressing room, and list
+  the slug in `cast.json`. Or start them as an extra and let the audience promote them.
+- **Change what a role does:** change its function in `characters.ts`, keeping the outputs
+  the showrunner reads (approaches, stopping rule, estimate, evaluation).
+- **Another model:** set `ROOM_MODEL` and `CHARACTER_MODEL`. For another provider, implement
+  the `LLM` interface (`complete(system, user) → {text, usage}`).
+- **Costs:** set `PRICE_INPUT_PER_MTOK` and `PRICE_OUTPUT_PER_MTOK`, and compute becomes
+  observed USD on the accounting role's ledger. Unpriced tokens are booked as "unknown", never
+  as free.
 
 ## Layer 5. Memory: dressing rooms, bibles and extras
 
