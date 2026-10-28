@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Install or update the Future Radio writers' room on this server.
 #   curl -fsSL https://raw.githubusercontent.com/leo-guinan/future-radio-writers-room/main/deploy/hetzner/install.sh | sudo bash
+# Your own room: ROOM_REPO=<your fork's git URL> GITHUB_OWNER=<you> DOMAIN=<your domain> bash install.sh
 # Re-running it updates the code and keeps the room's log, repos and .env.
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-writers.story.markets}"
 DIR="${ROOM_DIR:-/opt/future-radio-writers-room}"
-REPO="https://github.com/leo-guinan/future-radio-writers-room.git"
+REPO="${ROOM_REPO:-https://github.com/leo-guinan/future-radio-writers-room.git}"
+OWNER="${GITHUB_OWNER:-leo-guinan}"
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 
 [ "$(id -u)" = 0 ] || { echo "Run as root (sudo)."; exit 1; }
@@ -35,7 +37,7 @@ if [ ! -f .env ]; then
   set_env() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi; }
   TOKEN="$(openssl rand -hex 32)"
   set_env PRODUCER_TOKEN "$TOKEN"
-  set_env GITHUB_OWNER leo-guinan
+  set_env GITHUB_OWNER "$OWNER"
   set_env DOMAIN "$DOMAIN"
   set_env INTAKE_EPISODE E10
   KEY="$(ask 'Anthropic API key (Enter to run the characters offline): ')"
