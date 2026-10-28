@@ -31,25 +31,37 @@ cd "$DIR/deploy/hetzner"
 # Read from the terminal even when this script arrives through a pipe.
 ask() { local v=""; if [ -r /dev/tty ]; then read -r -s -p "$1" v </dev/tty; echo >/dev/tty; fi; printf '%s' "$v"; }
 
+set_env() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi; }
 if [ ! -f .env ]; then
   say "Writing .env (kept on this server only)"
   cp ../../.env.example .env
-  set_env() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi; }
   TOKEN="$(openssl rand -hex 32)"
   set_env PRODUCER_TOKEN "$TOKEN"
   set_env GITHUB_OWNER "$OWNER"
   set_env DOMAIN "$DOMAIN"
   set_env INTAKE_EPISODE E10
-  KEY="$(ask 'Anthropic API key (Enter to run the characters offline): ')"
-  [ -n "$KEY" ] && set_env ANTHROPIC_API_KEY "$KEY"
-  GH="$(ask 'GitHub token with push to leo-guinan/future-radio-* (Enter to skip pushes): ')"
-  [ -n "$GH" ] && set_env GITHUB_TOKEN "$GH"
   # Empty settings would override the image's defaults (REPOS_DIR, say); drop them.
   sed -i -E '/^[A-Z_]+=[[:space:]]*(#.*)?$/d' .env
   chmod 600 .env
   echo "Producer token: $TOKEN"
   echo "(also in $DIR/deploy/hetzner/.env — keep it secret)"
 fi
+
+# Keys are asked for whenever they're missing, so a re-run can switch things on later.
+has() { grep -q "^$1=." .env; }
+if ! has ANTHROPIC_API_KEY; then
+  KEY="$(ask 'Anthropic API key (Enter to keep the characters offline): ')"
+  [ -n "$KEY" ] && set_env ANTHROPIC_API_KEY "$KEY"
+fi
+if ! has ELEVENLABS_API_KEY; then
+  KEY="$(ask 'ElevenLabs API key, for hearing scene lines (Enter to keep scenes text-only): ')"
+  [ -n "$KEY" ] && set_env ELEVENLABS_API_KEY "$KEY"
+fi
+if ! has GITHUB_TOKEN; then
+  KEY="$(ask 'GitHub token with push to the future-radio-* repos (Enter to skip pushes): ')"
+  [ -n "$KEY" ] && set_env GITHUB_TOKEN "$KEY"
+fi
+chmod 600 .env
 
 # Caddy takes 80/443 unless something on this server already does.
 PROFILE="--profile caddy"

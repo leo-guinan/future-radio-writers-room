@@ -1,0 +1,12 @@
+{
+  "title": "Two songs",
+  "setting": "The writers' room after hours. One lamp. The lute is out of its case.",
+  "situation": "There is room in the episode for one song, and Leonardo has brought two. Both are finished. He loves them both.",
+  "stakes": "Whichever song is cut goes back in the drawer, and Leonardo's drawer is where things go to be perfect forever.",
+  "stoppingRule": "Leonardo names one song, or refuses outright and says why.",
+  "maxTurns": 12,
+  "cast": [
+    { "character": "agnolo", "motivation": "Get Leonardo to choose tonight. The episode can afford one song, and every night he doesn't choose is another night of studio time on the ledger. You will not choose for him." },
+    { "character": "leonardo", "motivation": "Keep both songs. You believe each one is unfinished without the other, and you suspect choosing means admitting neither was the masterpiece." }
+  ]
+}

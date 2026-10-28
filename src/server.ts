@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // The workshop: patrons watch the room work, propose ideas, vote, and put questions
 // to the characters. The producer drives production with a bearer token (or the CLI).
 
@@ -17,6 +18,8 @@ import { dressingRoom, reposEnabled } from "./repos/dressing-room.ts";
 import { syncAll } from "./repos/sync.ts";
 import { castFile, playedBy, principals, roleCharacters, roleOf } from "./core/cast.ts";
 import { extrasRepo } from "./repos/extras.ts";
+import { openScene, publicScene, runScene, sceneOrThrow } from "./scenes/scenes.ts";
+import { cacheKey, cachedPath, lineAudio, patronVoicesToday, spokenText, TTS_MODEL, voiceFor } from "./scenes/voice.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TOKEN = process.env.PRODUCER_TOKEN ?? "";
@@ -24,6 +27,8 @@ const PRODUCER = process.env.PRODUCER_NAME ?? "leo";
 const PATRON_DAILY_RUNS = Number(process.env.PATRON_DAILY_RUNS ?? 40); // whole room, per UTC day
 const PATRON_RUNS_PER_IP = Number(process.env.PATRON_RUNS_PER_IP ?? 5);
 const IDEAS_PER_IP = Number(process.env.IDEAS_PER_IP ?? 5);
+const VOICE_PATRON_DAILY = Number(process.env.VOICE_PATRON_DAILY ?? 30); // new voice generations patrons may trigger per UTC day
+const VOICE_PER_IP = Number(process.env.VOICE_PER_IP ?? 10);
 const PUBLIC_DIR = join(process.cwd(), "public");
 
 const INTAKE = process.env.INTAKE_EPISODE ?? "E02";
@@ -336,6 +341,36 @@ const routes: Array<[string, RegExp, Handler]> = [
   ["GET", /^\/api\/producer\/scorecard$/, (req, res) => {
     requireProducer(req);
     send(res, 200, room.scorecard());
+  }],
+  ["GET", /^\/api\/scenes$/, (_q, res) => send(res, 200, [...room.scenes.values()].reverse().slice(0, 30).map(publicScene))],
+  ["GET", /^\/api\/scenes\/(S-\d{4})$/, (_q, res, m) => send(res, 200, publicScene(sceneOrThrow(room, m[1])))],
+  ["GET", /^\/api\/scenes\/(S-\d{4})\/lines\/(\d+)\/audio$/, async (req, res, m) => {
+    const s = sceneOrThrow(room, m[1]);
+    const n = Number(m[2]);
+    const turn = s.turns.find((t) => t.n === n);
+    if (!turn) throw new RuleError("scene", `${s.sceneId} has no line ${n}.`);
+    // Cached audio is free to serve; only a new generation counts against the limits.
+    const voice = voiceFor(turn.character);
+    const hit = voice.id ? cachedPath(cacheKey(voice.id, TTS_MODEL(), spokenText(turn.line))) : null;
+    let path = hit;
+    if (!path) {
+      const producer = isProducer(req);
+      if (!producer) {
+        if (patronVoicesToday(room) >= VOICE_PATRON_DAILY) throw new RuleError("limits", "Today's voice budget is spent. The scene is still here to read; voices come back tomorrow.");
+        bump("voices", ipOf(req), VOICE_PER_IP);
+      }
+      path = (await lineAudio(room, s.sceneId, n, { requestedBy: producer ? PRODUCER : `patron:${createHash("sha256").update(ipOf(req)).digest("hex").slice(0, 8)}` })).path;
+    }
+    const bytes = readFileSync(path);
+    res.writeHead(200, { "content-type": "audio/mpeg", "content-length": bytes.length, "cache-control": "public, max-age=31536000, immutable" });
+    res.end(bytes);
+  }],
+  ["POST", /^\/api\/producer\/scenes$/, async (req, res) => {
+    requireProducer(req);
+    const b = await body(req);
+    const s = openScene({ room, llm, askedBy: PRODUCER }, b, Array.isArray(b.cast) ? b.cast : []);
+    if (b.run !== false) void runScene({ room, llm, askedBy: PRODUCER }, s.sceneId).catch((e) => console.error(`scene ${s.sceneId}:`, e.message));
+    send(res, 201, publicScene(s));
   }],
   ["GET", /^\/healthz$/, (_q, res) => send(res, 200, { ok: true, chain: room.store.verify() })],
 ];

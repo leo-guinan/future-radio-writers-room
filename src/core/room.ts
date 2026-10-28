@@ -28,6 +28,10 @@ import {
   type IdeaCut,
   type IdeaStatus,
   type ShowrunnerTick,
+  type SceneOpened,
+  type SceneTurn,
+  type SceneClosed,
+  type SceneVoiced,
   type IdeaTransitioned,
   type LedgerEntry,
   type RoomEvent,
@@ -81,6 +85,15 @@ export interface Forecast extends ForecastRecorded {
 const nextIdeaStage = (s: IdeaStatus): number => IDEA_STAGES.indexOf(s as (typeof IDEA_STAGES)[number]);
 const isExit = (s: IdeaStatus) => (IDEA_EXITS as readonly string[]).includes(s);
 
+export interface Scene extends SceneOpened {
+  openedAt: string;
+  openedBy: string;
+  motivations: Record<string, string>;
+  turns: Array<SceneTurn & { at: string; eventId: string }>;
+  voiced: Record<number, SceneVoiced & { at: string }>;
+  closed: (SceneClosed & { at: string }) | null;
+}
+
 export class Room {
   ideas = new Map<string, Idea>();
   episodes = new Map<string, Episode>();
@@ -90,6 +103,7 @@ export class Room {
   conferences: Array<ConferenceHeld & { at: string }> = [];
   cuts: Array<IdeaCut & { at: string; eventId: string }> = [];
   ticks: Array<ShowrunnerTick & { at: string; eventId: string }> = [];
+  scenes = new Map<string, Scene>();
   rulesLocked = false;
 
   constructor(readonly store: EventStore) {
@@ -197,6 +211,21 @@ export class Room {
         break;
       case "showrunner.tick":
         this.ticks.push({ ...(p as ShowrunnerTick), at: e.ts, eventId: e.id });
+        break;
+      case "scene.opened":
+        this.scenes.set(p.sceneId, { ...(p as SceneOpened), openedAt: e.ts, openedBy: e.actor, motivations: {}, turns: [], voiced: {}, closed: null });
+        break;
+      case "scene.motivation":
+        this.scenes.get(p.sceneId)!.motivations[p.character] = p.motivation;
+        break;
+      case "scene.turn":
+        this.scenes.get(p.sceneId)!.turns.push({ ...(p as SceneTurn), at: e.ts, eventId: e.id });
+        break;
+      case "scene.closed":
+        this.scenes.get(p.sceneId)!.closed = { ...(p as SceneClosed), at: e.ts };
+        break;
+      case "scene.voiced":
+        this.scenes.get(p.sceneId)!.voiced[p.n] = { ...(p as SceneVoiced), at: e.ts };
         break;
     }
   }
@@ -467,6 +496,65 @@ export class Room {
   }
 
   /** What patrons see: public events only, contact details removed. */
+  // ---------------- scenes ----------------
+
+  /** Open a scene. Each character's motivation is recorded privately; the card is public. */
+  openScene(actor: string, card: Omit<SceneOpened, "sceneId" | "maxTurns" | "revealMotivations" | "cast"> & { maxTurns?: number; revealMotivations?: boolean }, cast: Array<{ character: string; motivation: string }>) {
+    for (const k of ["title", "setting", "situation", "stakes", "stoppingRule"] as const)
+      if (!String(card[k] ?? "").trim()) throw new RuleError("scene", `A scene needs a ${k === "stoppingRule" ? "stopping rule: when is it over?" : k}.`);
+    if (cast.length < 2) throw new RuleError("scene", "A scene needs at least two characters.");
+    if (new Set(cast.map((c) => c.character)).size !== cast.length) throw new RuleError("scene", "Each character appears once in the cast.");
+    for (const c of cast) if (!c.motivation?.trim()) throw new RuleError("scene", `${c.character} needs a motivation: what do they want in this scene?`);
+    const maxTurns = card.maxTurns ?? 12;
+    if (!(maxTurns >= 2 && maxTurns <= 40)) throw new RuleError("scene", "maxTurns is between 2 and 40.");
+    if (card.episodeId && !this.episodes.has(card.episodeId)) throw new RuleError("episode", `Unknown episode ${card.episodeId}.`);
+    if (card.ideaId && !this.ideas.has(card.ideaId)) throw new RuleError("idea", `Unknown idea ${card.ideaId}.`);
+    const sceneId = `S-${String(this.scenes.size + 1).padStart(4, "0")}`;
+    const opened: SceneOpened = {
+      sceneId,
+      title: card.title.trim(),
+      setting: card.setting.trim(),
+      situation: card.situation.trim(),
+      stakes: card.stakes.trim(),
+      stoppingRule: card.stoppingRule.trim(),
+      maxTurns,
+      cast: cast.map((c) => c.character),
+      episodeId: card.episodeId,
+      ideaId: card.ideaId,
+      revealMotivations: card.revealMotivations ?? true,
+    };
+    const ev = this.store.append("scene.opened", actor, opened, "public");
+    for (const c of cast) this.store.append("scene.motivation", actor, { sceneId, character: c.character, motivation: c.motivation.trim() }, "producer");
+    return ev;
+  }
+
+  mustScene(sceneId: string): Scene {
+    const s = this.scenes.get(sceneId);
+    if (!s) throw new RuleError("scene", `No scene ${sceneId}.`);
+    return s;
+  }
+
+  recordSceneTurn(actor: string, t: Omit<SceneTurn, "n">) {
+    const s = this.mustScene(t.sceneId);
+    if (s.closed) throw new RuleError("scene", `${s.sceneId} is closed. Open a new scene to play it again.`);
+    if (!s.cast.includes(t.character)) throw new RuleError("scene", `${t.character} isn't in ${s.sceneId}.`);
+    if (s.turns.length >= s.maxTurns) throw new RuleError("scene", `${s.sceneId} has used all ${s.maxTurns} turns.`);
+    return this.store.append("scene.turn", actor, { ...t, n: s.turns.length + 1 }, "public");
+  }
+
+  closeScene(actor: string, sceneId: string, reason: string, repo?: SceneClosed["repo"]) {
+    const s = this.mustScene(sceneId);
+    if (s.closed) throw new RuleError("scene", `${sceneId} is already closed.`);
+    const closed: SceneClosed = { sceneId, reason, turns: s.turns.length, repo, ...(s.revealMotivations ? { motivations: { ...s.motivations } } : {}) };
+    return this.store.append("scene.closed", actor, closed, "public");
+  }
+
+  recordSceneVoice(actor: string, v: SceneVoiced) {
+    const s = this.mustScene(v.sceneId);
+    if (!s.turns.some((t) => t.n === v.n)) throw new RuleError("scene", `${v.sceneId} has no line ${v.n}.`);
+    return this.store.append("scene.voiced", actor, v, "public");
+  }
+
   publicEvents(sinceSeq = 0): RoomEvent[] {
     return this.store
       .all()

@@ -1,6 +1,6 @@
 ---
 title: A short name for the capability
-layer: showrunner            # record | rules | work | roles | characters | memory | showrunner | production | participation | deploy
+layer: showrunner            # record | rules | work | roles | characters | scenes | memory | showrunner | production | participation | deploy
 kind: capability             # capability | change | output | question
 from: your name or handle    # "anonymous" is fine; agents: "<agent> for <person or org>"
 agent: false                 # true if an agent wrote this proposal

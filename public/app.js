@@ -41,6 +41,7 @@ async function refresh() {
   renderBoard();
   renderCast();
   renderExtras();
+  renderScenes();
   const sel = $("#ep-select");
   if (sel.options.length === 1)
     for (const e of snap.episodes) if (!e.releases.length) sel.add(new Option(`${e.number}. ${e.title}`, e.episodeId));
@@ -180,6 +181,9 @@ function line(e) {
     }
     case "idea.cut": return [actor, `assembled a <b>first cut</b> of ${ideaLink(p.ideaId)} in <code>${esc(p.repo)}@${esc(p.sha.slice(0, 7))}</code> — ${esc(p.approach)}`];
     case "repo.commit": return [actor, `committed to <code>${esc(p.repo)}@${esc(p.sha.slice(0, 7))}</code>: ${esc(p.message)}`];
+    case "scene.opened": return [actor, `opened scene <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> <b>${esc(p.title)}</b> with ${p.cast.map((c) => esc(nameOf(c))).join(" and ")}. It ends when ${esc(lower(p.stoppingRule))}`];
+    case "scene.closed": return [actor, `closed scene <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> after ${p.turns} lines: ${esc(p.reason)}${p.motivations ? ". What each of them wanted is now shown." : ""}`];
+    case "scene.voiced": return [actor, `voiced line ${p.n} of <a class="link" data-scene="${esc(p.sceneId)}">${esc(p.sceneId)}</a> (${esc(nameOf(p.character))}, ${p.characters} characters)`];
     case "conference.held": return [actor, `held the <b>${esc(p.kind)}</b> press conference "${esc(p.title)}"`];
     default: return [actor, esc(e.type)];
   }
@@ -204,8 +208,9 @@ function feedItem(e) {
   const time = `${t.toLocaleDateString([], { month: "short", day: "numeric" })} <br>${t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
   if (e.type === "agent.run") {
     const p = e.payload;
-    const asked = p.askedBy.startsWith("patron:") ? `asked by ${esc(p.askedBy.slice(7))}` : `for ${esc(p.askedBy)}`;
-    const target = p.ideaId ? ` on <a class="link" data-idea="${esc(p.ideaId)}">${esc(p.ideaId)}</a>` : "";
+    const asked = p.askedBy.startsWith("scene:") ? "in a scene" : p.askedBy.startsWith("patron:") ? `asked by ${esc(p.askedBy.slice(7))}` : `for ${esc(p.askedBy)}`;
+    const sceneOf = /^scene:(S-\d{4})$/.exec(p.askedBy || "");
+    const target = sceneOf ? ` in <a class="link" data-scene="${esc(sceneOf[1])}">${esc(sceneOf[1])}</a>` : p.ideaId ? ` on <a class="link" data-idea="${esc(p.ideaId)}">${esc(p.ideaId)}</a>` : "";
     return `<li class="${esc(p.character)} ${esc(p.role || roleOf(p.character) || "")}"><time>${time}</time><div><div class="who">${esc(nameOf(p.character))} · ${asked}${target}${p.offline ? " · offline" : ""}</div>${runBody(p)}</div></li>`;
   }
   const [actor, what] = line(e);
@@ -214,7 +219,7 @@ function feedItem(e) {
 
 function addToFeed(events, prepend = true) {
   const feed = $("#feed");
-  const fresh = events.filter((e) => e && !seen.has(e.id) && !(e.type === "repo.commit" && e.actor !== "showrunner") && !(e.type === "repo.commit" && /^First cut/.test(e.payload.message)));
+  const fresh = events.filter((e) => e && !seen.has(e.id) && !(e.type === "repo.commit" && e.actor !== "showrunner") && !(e.type === "repo.commit" && /^First cut/.test(e.payload.message)) && e.type !== "scene.turn" && e.type !== "scene.motivation");
   fresh.forEach((e) => seen.add(e.id));
   const html = fresh.map(feedItem).reverse().join("");
   if (prepend) feed.insertAdjacentHTML("afterbegin", html);
@@ -228,6 +233,7 @@ function connect() {
   es.onmessage = (m) => {
     const e = JSON.parse(m.data);
     addToFeed([e]);
+    if (e.type.startsWith("scene.") && openScene === e.payload.sceneId) showScene(openScene);
     refreshSoon();
   };
   es.onerror = () => $("#onair").classList.add("off");
@@ -337,6 +343,84 @@ document.addEventListener("click", (ev) => {
   else if (idea) (ev.preventDefault(), showIdea(idea.dataset.idea));
 });
 drawer.addEventListener("click", (ev) => { if (ev.target === drawer) drawer.close(); });
+
+// ------------------------------------------------------------ scenes
+
+const lower = (s) => String(s || "").replace(/^./, (c) => c.toLowerCase());
+let openScene = null;
+
+async function renderScenes() {
+  const list = await api("/api/scenes").catch(() => []);
+  const el = $("#scenes");
+  if (!list.length) {
+    el.innerHTML = `<p class="muted empty">No scenes yet.</p>`;
+    return;
+  }
+  el.innerHTML = list
+    .slice(0, 6)
+    .map(
+      (s) => `<button class="scene-card ghost" data-scene="${esc(s.sceneId)}">
+        <span class="scene-id">${esc(s.sceneId)} · ${s.closed ? `${s.turns.length} lines` : `playing · ${s.turns.length}/${s.maxTurns}`}</span>
+        <b>${esc(s.title)}</b>
+        <span class="muted">${s.cast.map((c) => esc(c.name)).join(" & ")}</span>
+      </button>`,
+    )
+    .join("");
+}
+
+async function showScene(id) {
+  const s = await api(`/api/scenes/${id}`);
+  openScene = id;
+  const lines = s.turns
+    .map(
+      (t) => `${t.cue ? `<li class="cue">${esc(t.cue)}</li>` : ""}<li class="${esc(t.character)} ${esc(roleOf(t.character) || "")}">
+        <div class="who">${esc(nameOf(t.character))}</div>
+        <p>${esc(t.line)}</p>
+        ${/^\(offline/.test(t.line) ? "" : `<button class="play ghost" data-play="${esc(s.sceneId)}/${t.n}" aria-label="Hear line ${t.n}">${t.voiced ? "▶" : "▷"} hear</button>`}
+      </li>`,
+    )
+    .join("");
+  const wanted = s.motivations
+    ? `<h3>What each of them wanted</h3><ul class="wanted">${s.cast.map((c) => `<li><b>${esc(c.name)}:</b> ${esc(s.motivations[c.character])}</li>`).join("")}</ul>`
+    : s.closed
+      ? `<p class="muted">This scene keeps what they wanted to itself.</p>`
+      : `<p class="muted">What each of them wants is shown when the scene ends.</p>`;
+  open(`<h2>${esc(s.sceneId)} — ${esc(s.title)}</h2>
+    <dl class="scene-card-dl">
+      <dt>Setting</dt><dd>${esc(s.setting)}</dd>
+      <dt>Situation</dt><dd>${esc(s.situation)}</dd>
+      <dt>At stake</dt><dd>${esc(s.stakes)}</dd>
+      <dt>Ends when</dt><dd>${esc(s.stoppingRule)}</dd>
+    </dl>
+    <ol class="script">${lines || `<li class="muted">The scene hasn't started.</li>`}</ol>
+    <p class="muted">${s.closed ? `Closed: ${esc(s.closed.reason)}.${s.closed.repo ? ` Transcript in <code>${esc(s.closed.repo.name)}/${esc(s.closed.repo.file)}</code>.` : ""}` : `Playing · ${s.turns.length} of at most ${s.maxTurns} lines.`}</p>
+    ${wanted}
+    <p class="muted small">Lines are text until someone asks to hear them; then each is generated once in the character's voice and kept, so it is only paid for once. Improvised here; nothing is canon until it is in a released episode.</p>`);
+}
+
+const player = new Audio();
+document.addEventListener("click", async (ev) => {
+  const sc = ev.target.closest("[data-scene]");
+  if (sc) return void showScene(sc.dataset.scene).catch((e) => alertIn(e.message));
+  const play = ev.target.closest("[data-play]");
+  if (!play) return;
+  const [id, n] = play.dataset.play.split("/");
+  play.disabled = true;
+  play.textContent = "… voicing";
+  try {
+    const res = await fetch(`/api/scenes/${id}/lines/${n}/audio`);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Couldn't voice that line (${res.status}).`);
+    player.src = URL.createObjectURL(await res.blob());
+    await player.play();
+    play.textContent = "▶ hear";
+  } catch (e) {
+    play.textContent = "▷ hear";
+    play.insertAdjacentHTML("afterend", `<span class="form-msg err">${esc(e.message)}</span>`);
+  } finally {
+    play.disabled = false;
+  }
+});
+const alertIn = (m) => open(`<p class="form-msg err">${esc(m)}</p>`);
 
 // ------------------------------------------------------------ propose
 

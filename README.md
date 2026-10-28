@@ -210,6 +210,28 @@ reported, never forced.
 dressing rooms' CI fetches it), points every dressing room's workflow at
 `github:YOU/future-radio-character-bible`, then creates the rest (private by default).
 
+## Scenes
+
+The characters can play a scene together. Write a card (setting, situation, stakes, a
+stopping rule, a turn limit) and give each character a private motivation:
+
+```
+npm run room -- scene open scenes/cards/two-songs.json --run
+npm run room -- scene show S-0001
+npm run room -- scene voice S-0001 3 --out line3.mp3
+```
+
+The showrunner directs; it sees every motivation and picks who speaks next. Each character
+sees only their own. Every line is a recorded run in the speaker's dressing room. When the
+scene ends, the motivations are revealed on the workshop page and, if the card names an
+episode, the transcript is committed to its repo.
+
+Scenes stay text. Pressing play on a line generates it once in that character's voice and
+caches it, so the same line is never paid for twice; each generation is on the record and the
+ledger. Voice needs `ELEVENLABS_API_KEY` (and optionally `TTS_PRICE_PER_1K_CHARS`, `TTS_MODEL`,
+`VOICE_PATRON_DAILY`, `VOICE_PER_IP`). Real lines need `ANTHROPIC_API_KEY`; offline, the
+director goes round the cast with placeholders, which are never voiced.
+
 ## Roles and characters
 
 The room runs on three roles: **memory** (remembers, cites, never invents), **making**

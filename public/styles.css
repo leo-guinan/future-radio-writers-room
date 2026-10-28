@@ -208,3 +208,22 @@ h3 { margin-top: 18px; margin-bottom: 6px; }
 .extra p { margin: 4px 0 0; font-size: .88rem; color: var(--ink-2); }
 .extra .stats { font: .7rem var(--mono); color: var(--muted); }
 .extra .links { font-size: .82rem; }
+
+/* scenes */
+.scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.scene-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; padding: 12px 14px; font-weight: 400; }
+.scene-card b { font-family: var(--display, inherit); font-size: 1.05rem; }
+.scene-id { font: 600 .72rem var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.scene-card-dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0 0 16px; }
+.scene-card-dl dt { color: var(--muted); font-size: .85rem; }
+.scene-card-dl dd { margin: 0; }
+.script { list-style: none; padding: 0; margin: 0 0 12px; }
+.script li { padding: 10px 0; border-top: 1px solid var(--rule); }
+.script li .who { font-weight: 600; font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; }
+.script li p { margin: 4px 0 6px; }
+.script li.memory .who { color: var(--memory); } .script li.making .who { color: var(--making); } .script li.accounting .who { color: var(--accounting); }
+.script li.cue { font-style: italic; color: var(--muted); border-top: 0; padding: 4px 0; }
+.play { padding: .2rem .55rem; font-size: .8rem; }
+.wanted { padding-left: 1.1rem; }
+.small { font-size: .82rem; }
+.play + .form-msg { margin-left: 8px; }

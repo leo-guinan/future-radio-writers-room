@@ -144,6 +144,21 @@ deterministic offline output, and every run is still recorded.
 - **Costs:** set `PRICE_INPUT_PER_MTOK` and `PRICE_OUTPUT_PER_MTOK`, and compute becomes
   observed USD on the accounting role's ledger. Unpriced tokens are booked as "unknown", never
   as free.
+- **Scenes.** The characters can also play a scene together. A scene card has a setting, a
+  situation, stakes, a stopping rule and a turn limit; each character in it gets a private
+  motivation. The showrunner directs: it sees every motivation, picks who speaks next and gives
+  them a beat. Each character answers from their own bible, the card, their own motivation and
+  the transcript, never anyone else's motivation. Every line is a recorded run (committed to the
+  speaker's dressing room, compute on the ledger). Motivations are producer-only events until
+  the scene closes, then revealed unless the card says `"revealMotivations": false`. With an
+  `episodeId`, the transcript lands in the episode repo as `scenes/S-xxxx.md`. Code:
+  `src/scenes/scenes.ts`; example card: `scenes/cards/two-songs.json`.
+- **Voice, just in time.** Scenes are text. When someone asks to hear a line, it is generated
+  once in the speaker's production voice (`voice/voice.json` in their dressing room), cached by
+  a hash of voice, model and text, recorded as `scene.voiced`, and booked on the ledger (priced
+  with `TTS_PRICE_PER_1K_CHARS`, otherwise characters of unknown cost). Cached lines are served
+  free; new generations by patrons are limited per day (`VOICE_PATRON_DAILY`) and per address
+  (`VOICE_PER_IP`). Code: `src/scenes/voice.ts`. Change the provider by replacing `generate()`.
 
 ## Layer 5. Memory: dressing rooms, bibles and extras
 
@@ -267,9 +282,13 @@ Public:
 | POST | `/api/ideas` | Propose an idea: `{consent: true, name, title, question, source, output, episodeId?, credit, reuse, contact?}`. `output` is one of `scene`, `song`, `episode`, `trailer`, `capability`, `broadcast`, `other`; `reuse` is one of `cc-by`, `show-only`, `ask-first` |
 | POST | `/api/ideas/:id/vote` | Vote for an idea |
 | POST | `/api/ideas/:id/ask` | Ask a character about an idea: `{character: "borges"\|"leonardo"\|"agnolo", question, name?}` |
+| GET | `/api/scenes` | Recent scenes (motivations only once closed) |
+| GET | `/api/scenes/:id` | One scene with its transcript |
+| GET | `/api/scenes/:id/lines/:n/audio` | One line as audio: cached, or generated now within the day's voice limits |
+| POST | `/api/producer/scenes` | Producer: open a scene `{title, setting, situation, stakes, stoppingRule, maxTurns?, episodeId?, ideaId?, revealMotivations?, cast: [{character, motivation}], run?}` and play it |
 
 Producer only (`Authorization: Bearer $PRODUCER_TOKEN`): explore, move, signal, advance, tick,
-`scorecard` and `console`.
+`scorecard`, `scenes` and `console`.
 
 ## Contributing back
 

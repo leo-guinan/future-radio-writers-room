@@ -24,6 +24,9 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { castFile, isPrincipal, principals } from "./core/cast.ts";
 import { extrasRepo, slugify } from "./repos/extras.ts";
+import { readFileSync } from "node:fs";
+import { closeScene, openScene, runScene, sceneMarkdown, transcript } from "./scenes/scenes.ts";
+import { lineAudio } from "./scenes/voice.ts";
 
 /** A character's home: their dressing room, or their folder in the extras. */
 function homeFor(slug: string) {
@@ -88,6 +91,15 @@ Ideas
 The characters
   explore ID                             memory remembers → making creates → accounting evaluates (cast in cast.json)
   ask <character|role> "..." [--idea ID] [--public]   roles: memory, making, accounting
+
+Scenes (characters playing a scene together; text unless someone asks to hear it)
+  scene open <card.json> [--run] [--steps N]   Card: title, setting, situation, stakes, stoppingRule, maxTurns,
+                                         episodeId?, ideaId?, cast: [{character, motivation}]  (see scenes/cards/)
+  scene run S-0001 [--steps N]           Play on until the stopping rule or the turn limit
+  scene close S-0001 --reason "..."      Stop it here and reveal the motivations
+  scene show S-0001 [--md]               The transcript (motivations once closed; the producer sees them always)
+  scene list                             Every scene and where it stands
+  scene voice S-0001 <n> [--out f.mp3]   Voice one line just in time (cached; needs ELEVENLABS_API_KEY)
 
 Showrunner & repos
   showrunner tick EP [--no-explore] [--assigned-only]   Explore, gate, and assemble first cuts into the episode repo
@@ -277,6 +289,54 @@ async function main() {
       const llm = makeLLM();
       const r = await ask({ room, llm, askedBy: by, scope: flags.public ? "public" : "producer" }, need(pos[0], "character") as Character, need(pos[1], "question"), flags.idea);
       return out(r.text);
+    }
+
+    case "scene": {
+      const llm = makeLLM();
+      const ctx = { room, llm, askedBy: by };
+      const steps = flags.steps ? Number(flags.steps) : undefined;
+      const sub = pos[0];
+      if (sub === "open") {
+        const card = JSON.parse(readFileSync(need(pos[1], "card.json"), "utf8"));
+        const { cast, ...rest } = card;
+        const s = openScene(ctx, rest, cast ?? []);
+        out(`${s.sceneId} opened: ${s.title} (${s.cast.join(", ")}, at most ${s.maxTurns} lines)`);
+        if (!flags.run) return;
+        const done = await runScene(ctx, s.sceneId, { maxSteps: steps });
+        out(`\n${transcript(done)}`);
+        if (done.closed) out(`\n— closed: ${done.closed.reason}`);
+        if (llm.offline) out("\n(offline: set ANTHROPIC_API_KEY for the characters' own lines)");
+        return;
+      }
+      if (sub === "run") {
+        const done = await runScene(ctx, need(pos[1], "scene id"), { maxSteps: steps });
+        out(transcript(done));
+        if (done.closed) out(`\n— closed: ${done.closed.reason}`);
+        return;
+      }
+      if (sub === "close") {
+        const s = room.mustScene(need(pos[1], "scene id"));
+        closeScene(ctx, s, need(flags.reason, "--reason"));
+        return out(`${s.sceneId} closed.`);
+      }
+      if (sub === "show") {
+        const s = room.mustScene(need(pos[1], "scene id"));
+        if (flags.md) return out(sceneMarkdown(s, s.closed?.reason));
+        out(`${s.sceneId} — ${s.title}${s.closed ? ` (closed: ${s.closed.reason})` : ` (${s.turns.length}/${s.maxTurns})`}\n`);
+        out(transcript(s));
+        out(`\nMotivations:\n${s.cast.map((c) => `  ${c}: ${s.motivations[c]}`).join("\n")}`);
+        return;
+      }
+      if (sub === "list" || !sub) {
+        for (const s of room.scenes.values()) out(`${s.sceneId} ${(s.closed ? "closed" : "open").padEnd(6)} ${String(s.turns.length).padStart(2)}/${s.maxTurns} lines  ${s.title}`);
+        return;
+      }
+      if (sub === "voice") {
+        const r = await lineAudio(room, need(pos[1], "scene id"), Number(need(pos[2], "line number")), { requestedBy: by });
+        if (flags.out) copyFileSync(r.path, flags.out);
+        return out(`${r.generated ? "generated" : "from cache"}: ${flags.out ?? r.path}`);
+      }
+      throw new RuleError("usage", "scene open|run|close|show|list|voice");
     }
 
     case "scorecard":

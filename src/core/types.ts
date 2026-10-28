@@ -35,7 +35,12 @@ export type EventType =
   | "conference.held"
   | "repo.commit"
   | "idea.cut"
-  | "showrunner.tick";
+  | "showrunner.tick"
+  | "scene.opened"
+  | "scene.motivation"
+  | "scene.turn"
+  | "scene.closed"
+  | "scene.voiced";
 
 // ---------- Ideas: the central unit of the room ----------
 
@@ -249,4 +254,59 @@ export interface ShowrunnerTick {
   held: Array<{ ideaId: string; failed: GateResult[] }>;
   queued: string[]; // ready, but over capacity
   repoSha: string;
+}
+
+// ---------- Scenes: characters playing a scene together ----------
+
+/** What everyone in the scene knows. Motivations are private to each character until the scene closes. */
+export interface SceneOpened {
+  sceneId: string;
+  title: string;
+  setting: string;
+  situation: string;
+  stakes: string;
+  stoppingRule: string;
+  maxTurns: number;
+  cast: string[]; // character slugs, in the order they're introduced
+  episodeId?: string;
+  ideaId?: string;
+  revealMotivations: boolean; // publish the motivations when the scene closes
+}
+
+export interface SceneMotivation {
+  sceneId: string;
+  character: string;
+  motivation: string;
+}
+
+export interface SceneTurn {
+  sceneId: string;
+  n: number; // 1-based
+  character: string;
+  line: string;
+  beat?: string; // the director's note for this line
+  cue?: string; // a music or sound cue before the line, e.g. "[MUSIC] The Unspoken Orchestra, unresolved"
+  runId: string;
+}
+
+export interface SceneClosed {
+  sceneId: string;
+  reason: string;
+  turns: number;
+  motivations?: Record<string, string>; // present when revealed
+  repo?: { name: string; sha: string; file: string };
+}
+
+/** A line given a voice, just in time; the audio is cached by content. */
+export interface SceneVoiced {
+  sceneId: string;
+  n: number;
+  character: string;
+  voiceId: string;
+  model: string;
+  cacheKey: string;
+  sha256: string;
+  characters: number;
+  costUsd: number | null;
+  requestedBy: string;
 }
