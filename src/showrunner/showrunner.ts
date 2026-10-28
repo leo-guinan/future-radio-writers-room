@@ -10,11 +10,12 @@
 
 import type { Idea, Room } from "../core/room.ts";
 import type { GateResult, IdeaCut, ShowrunnerTick } from "../core/types.ts";
-import { explore, record, showBible, persona, type Approach, type Evaluation, DEFAULT_CEILING } from "../agents/characters.ts";
+import { explore, latestRun, nameOf, record, showBible, persona, type Approach, type Evaluation, DEFAULT_CEILING } from "../agents/characters.ts";
 import type { LLM } from "../agents/llm.ts";
 import { EpisodeRepo, type Projection } from "../repos/episode-repo.ts";
 import { extrasRepo } from "../repos/extras.ts";
 import { activeGates, evaluate, type Candidate, type GatesFile } from "./gates.ts";
+import { castFile, playedBy, roleCharacters, type Role } from "../core/cast.ts";
 
 const OPEN = new Set(["proposed", "explored", "compared", "selected"]);
 const MIN_CUT_BUDGET = Number(process.env.SHOWRUNNER_MIN_BUDGET ?? 0.5);
@@ -22,7 +23,7 @@ const DAILY_EXPLORES = Number(process.env.SHOWRUNNER_DAILY_EXPLORES ?? 30);
 
 function exploresToday(room: Room) {
   const day = new Date().toISOString().slice(0, 10);
-  return [...room.runs.values()].filter((r) => r.askedBy === "showrunner" && r.character === "leonardo" && r.at.startsWith(day)).length;
+  return [...room.runs.values()].filter((r) => r.askedBy === "showrunner" && (r.role ? r.role === "making" : r.character === playedBy("making")) && r.at.startsWith(day)).length;
 }
 
 export interface TickOptions {
@@ -37,14 +38,13 @@ export function candidatesFor(room: Room, episodeId: string, includeUnassigned =
   );
 }
 
-function latest<T>(room: Room, ideaId: string, character: "leonardo" | "agnolo"): T | null {
-  const runs = [...room.runs.values()].filter((r) => r.ideaId === ideaId && r.character === character);
-  return (runs.at(-1)?.output as T) ?? null;
+function latest<T>(room: Room, ideaId: string, role: Role): T | null {
+  return (latestRun(room, ideaId, role)?.output as T) ?? null;
 }
 
 export function describeCandidate(room: Room, idea: Idea, remaining: number): Candidate {
-  const leo = latest<{ approaches: Approach[]; favorite?: number }>(room, idea.ideaId, "leonardo");
-  const evaluation = latest<Evaluation>(room, idea.ideaId, "agnolo");
+  const leo = latest<{ approaches: Approach[]; favorite?: number }>(room, idea.ideaId, "making");
+  const evaluation = latest<Evaluation>(room, idea.ideaId, "accounting");
   const approaches = leo?.approaches ?? null;
   let chosen: Approach | null = null;
   if (approaches?.length) {
@@ -71,7 +71,7 @@ export async function tick(room: Room, llm: LLM, episodeId: string, opts: TickOp
   if (opts.explore !== false) {
     for (const idea of candidatesFor(room, episodeId, opts.includeUnassigned !== false)) {
       if (explored.length >= cap.maxExploresPerTick || exploresToday(room) >= DAILY_EXPLORES) break;
-      const hasRuns = latest(room, idea.ideaId, "leonardo") && latest(room, idea.ideaId, "agnolo");
+      const hasRuns = latest(room, idea.ideaId, "making") && latest(room, idea.ideaId, "accounting");
       if (!hasRuns) {
         await explore(ctx, idea.ideaId);
         explored.push(idea.ideaId);
@@ -128,9 +128,9 @@ async function assembleCut(room: Room, llm: LLM, repo: EpisodeRepo, episodeId: s
   const idea = c.idea;
   const a = c.chosen!;
   const query = `${idea.title} ${idea.question} ${idea.source}`;
-  // The three who work in the room, plus any extra the idea mentions by name.
+  // The characters who play the room's roles, plus any extra the idea mentions by name.
   const mentioned = extrasRepo().repo.exists ? extrasRepo().mentionedIn(`${idea.title} ${idea.question} ${idea.source} ${a.title} ${a.deliverable}`) : [];
-  const projections: Projection[] = [...(["borges", "leonardo", "agnolo"] as const), ...mentioned].map((ch) => repo.project(ch, query, idea.ideaId));
+  const projections: Projection[] = [...roleCharacters(), ...mentioned.filter((m) => !roleCharacters().includes(m))].map((ch) => repo.project(ch, query, idea.ideaId));
   const cast = projections.map((p) => repo.repo.read(p.file)).join("\n\n---\n\n");
   const ep = room.mustEpisode(episodeId);
 
@@ -147,7 +147,7 @@ Runtime target for this cut: ${a.runtimeMinutes} minutes. Stopping rule: ${a.sto
 Idea ${idea.ideaId} "${idea.title}" — ${idea.question}
 Source: ${idea.source}
 Chosen approach: ${JSON.stringify(a)}
-Agnolo's evaluation: ${JSON.stringify(c.evaluation)}
+${nameOf(playedBy("accounting"))}'s evaluation: ${JSON.stringify(c.evaluation)}
 
 The cast, projected from their dressing rooms (use only this material; cite dressing-room paths for borrowed lines):
 ${cast}
@@ -189,37 +189,38 @@ Write the first cut. Reply with exactly two sections:
 }
 
 function templateCut(room: Room, idea: Idea, a: Approach, c: Candidate, projections: Projection[]) {
-  const bor = projections.find((p) => p.character === "borges")!;
-  const borgesSaid = [...room.runs.values()].filter((r) => r.ideaId === idea.ideaId && r.character === "borges").at(-1);
-  const leoSaid = [...room.runs.values()].filter((r) => r.ideaId === idea.ideaId && r.character === "leonardo").at(-1);
-  const agSaid = [...room.runs.values()].filter((r) => r.ideaId === idea.ideaId && r.character === "agnolo").at(-1);
+  const cast = castFile();
+  const mem = cast.roles.memory, mak = cast.roles.making, acc = cast.roles.accounting;
+  const upper = (slug: string) => nameOf(slug).toUpperCase();
+  const HOST = cast.host ? upper(cast.host) : "HOST";
+  const memProj = projections.find((p) => p.character === mem)!;
+  const said = (role: Role) => latestRun(room, idea.ideaId, role);
   const s = c.evaluation?.scores;
   const secs = Math.round(a.runtimeMinutes * 60);
   const beats = [
-    `1. **Cold open** — YURIA introduces the transmission. We hear the radio warm up. (~${Math.round(secs * 0.1)}s)`,
-    `2. **Borges remembers** — what the archive already holds on "${idea.title}". (~${Math.round(secs * 0.2)}s) _source: \`${bor.repo}@${bor.sha.slice(0, 7)}\`_`,
-    `3. **Leonardo makes it** — ${a.deliverable}. (~${Math.round(secs * 0.45)}s)`,
-    `4. **Agnolo accounts** — story ${s?.story ?? "?"}/3, business ${s?.business ?? "?"}/3, participation ${s?.participation ?? "?"}/3; ~$${a.estCashUsd} projected, not booked. (~${Math.round(secs * 0.15)}s)`,
-    `5. **The invitation** — YURIA asks listeners to answer: "${idea.question}" (~${Math.round(secs * 0.1)}s)`,
+    `1. **Cold open** — ${HOST} introduces the transmission. (~${Math.round(secs * 0.1)}s)`,
+    `2. **${nameOf(mem)} remembers** — what the archive already holds on "${idea.title}". (~${Math.round(secs * 0.2)}s) _source: \`${memProj.repo}@${memProj.sha.slice(0, 7)}\`_`,
+    `3. **${nameOf(mak)} makes it** — ${a.deliverable}. (~${Math.round(secs * 0.45)}s)`,
+    `4. **${nameOf(acc)} accounts** — story ${s?.story ?? "?"}/3, business ${s?.business ?? "?"}/3, participation ${s?.participation ?? "?"}/3; ~$${a.estCashUsd} projected, not booked. (~${Math.round(secs * 0.15)}s)`,
+    `5. **The invitation** — ${HOST} asks listeners to answer: "${idea.question}" (~${Math.round(secs * 0.1)}s)`,
   ].join("\n");
   const clip = (t?: string) => {
     const line = (t ?? "").split(/\n/)[0];
     return line.length <= 280 ? line : line.slice(0, 280).replace(/\s+\S*$/, "") + "…";
   };
   const script = [
-    `[MUSIC] Future Radio ident, warm valve hum.`,
-    `YURIA: This is Future Radio. Tonight, a transmission the audience asked for: ${idea.title}.`,
+    `[MUSIC] ${cast.show} ident.`,
+    `${HOST}: This is ${cast.show}. Tonight, a transmission the audience asked for: ${idea.title}.`,
     ``,
-    `BORGES: ${clip(borgesSaid?.text) || "The library has no volume on this yet."}`,
+    `${upper(mem)}: ${clip(said("memory")?.text) || "The archive has nothing on this yet."}`,
     ``,
-    `[MUSIC] The Unspoken Orchestra enters under Leonardo.`,
-    `LEONARDO: ${clip(leoSaid?.text) || `Let me sketch it: ${a.deliverable}.`}`,
-    `LEONARDO: (to himself) And I stop when — ${a.stoppingRule.toLowerCase()}.`,
+    `[MUSIC] Under ${nameOf(mak)}.`,
+    `${upper(mak)}: ${clip(said("making")?.text) || `Let me sketch it: ${a.deliverable}.`}`,
+    `${upper(mak)}: (aside) And I stop when — ${a.stoppingRule.toLowerCase()}.`,
     ``,
-    `[SFX] Agnolo's screen clicks on.`,
-    `AGNOLO: ${clip(agSaid?.text) || "Every number here is a forecast, and I've booked it as one."}`,
+    `${upper(acc)}: ${clip(said("accounting")?.text) || "Every number here is a forecast, and I've booked it as one."}`,
     ``,
-    `YURIA: ${idea.question} Tell us. The writers' room is open.`,
+    `${HOST}: ${idea.question} Tell us. The writers' room is open.`,
     `[MUSIC] Out.`,
   ].join("\n");
   return { beats: `${beats}\n\n_Template cut (offline). Lines reuse what each character already said in the room._`, script };
@@ -241,7 +242,7 @@ function cardFor(idea: Idea, a: Approach, c: Candidate, passed: GateResult[], ac
 | Stopping rule | ${a.stoppingRule} |
 | Estimate | ~$${a.estCashUsd} · ~${a.estHours}h _(projected, not booked)_ |
 | Remaining ceiling | $${c.remaining.toFixed(2)} |
-| Agnolo | story ${s?.story ?? "—"} · business ${s?.business ?? "—"} · participation ${s?.participation ?? "—"} → ${c.evaluation?.recommend ?? "—"} |
+| ${nameOf(playedBy("accounting"))} | story ${s?.story ?? "—"} · business ${s?.business ?? "—"} · participation ${s?.participation ?? "—"} → ${c.evaluation?.recommend ?? "—"} |
 | Signals | creative ${c.idea.signals.creative.join(", ") || "—"} · community ${c.idea.signals.community} · support $${c.idea.signals.financial} |
 | Assembled by | ${usedModel ? "showrunner (model)" : "showrunner (template)"} |
 

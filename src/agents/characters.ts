@@ -1,6 +1,7 @@
-// Borges remembers. Leonardo creates. Agnolo keeps the score.
-// Each character reads its persona from characters/*.md, does one job, and every run
-// is written to the event log with its usage and cost.
+// Three roles do the room's work: memory remembers, making creates, accounting keeps the score.
+// cast.json says which character plays each role (in Future Radio: Borges, Leonardo, Agnolo).
+// Each character reads its persona from its dressing room (characters/*.md are the templates),
+// does its role's job, and every run is written to the event log with its usage and cost.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,6 +9,7 @@ import type { Room } from "../core/room.ts";
 import type { AgentRun, Character, RoomEvent } from "../core/types.ts";
 import { extractJson, type LLM } from "./llm.ts";
 import { dressingRoom, reposEnabled } from "../repos/dressing-room.ts";
+import { displayName, playedBy, roleOf, type Role } from "../core/cast.ts";
 
 const CHAR_DIR = process.env.CHARACTERS_DIR ?? join(process.cwd(), "characters");
 const template = (name: string) => readFileSync(join(CHAR_DIR, `${name}.md`), "utf8");
@@ -17,6 +19,15 @@ export const showBible = () => template("show-bible");
 /** Merged canon — the producer's notes and viewer notes merged by pull request — rides along on every run. */
 export const canon = (c: Character) => (reposEnabled() ? dressingRoom(c).canon() : "");
 export const systemFor = (c: Character) => [showBible(), "---", persona(c), canon(c)].filter(Boolean).join("\n\n");
+/** The name a character goes by: from their bible once they have a dressing room, else from the slug. */
+export function nameOf(c: Character): string {
+  if (reposEnabled()) {
+    try {
+      return dressingRoom(c).bible().name;
+    } catch {}
+  }
+  return displayName(c);
+}
 
 export const DEFAULT_CEILING = Number(process.env.DEFAULT_CASH_CEILING ?? 20);
 
@@ -24,13 +35,13 @@ export interface AskContext {
   room: Room;
   llm: LLM;
   askedBy: string;
-  scope: "public" | "producer"; // what Borges may read
+  scope: "public" | "producer"; // what the memory role may read
 }
 
 let runCounter = 0;
 export const runId = (c: Character) => `R-${c[0].toUpperCase()}${Date.now().toString(36)}${(runCounter++).toString(36)}`;
 
-// ---------------------------------------------------------------- Borges
+// ---------------------------------------------------------------- memory
 
 export interface Passage {
   id: string;
@@ -107,7 +118,8 @@ export function search(room: Room, query: string, scope: "public" | "producer", 
   return scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, k);
 }
 
-export async function borges(ctx: AskContext, question: string, ref: { ideaId?: string; episodeId?: string } = {}) {
+export async function remember(ctx: AskContext, question: string, ref: { ideaId?: string; episodeId?: string } = {}) {
+  const who = playedBy("memory");
   const passages = search(ctx.room, question, ctx.scope);
   const allowed = new Set(passages.map((p) => p.id));
   let text: string;
@@ -115,8 +127,8 @@ export async function borges(ctx: AskContext, question: string, ref: { ideaId?: 
   const flags: string[] = [];
   const records = passages.map((p) => p.text).join("\n");
   const c = await ctx.llm.complete({
-    system: systemFor("borges"),
-    user: `Question from ${ctx.askedBy}: ${question}\n\nRecords you may use (and only these):\n${records || "(none)"}\n\nAnswer in Borges' voice, citing record ids in [brackets].`,
+    system: systemFor(who),
+    user: `Question from ${ctx.askedBy}: ${question}\n\nRecords you may use (and only these):\n${records || "(none)"}\n\nAnswer in ${nameOf(who)}'s voice, citing record ids in [brackets].`,
     maxTokens: 700,
   });
   if (c.offline || !c.text) {
@@ -133,11 +145,11 @@ export async function borges(ctx: AskContext, question: string, ref: { ideaId?: 
     for (const id of citations) if (!allowed.has(id)) flags.push(`cited ${id}, which was not in the retrieved records`);
     if (!citations.length && passages.length) flags.push("no citations given");
   }
-  const run = record(ctx, "borges", { question, ...ref }, { passages: passages.map((p) => p.id) }, text, c, citations, flags);
+  const run = record(ctx, who, { question, ...ref }, { passages: passages.map((p) => p.id) }, text, c, citations, flags);
   return { run, passages, text };
 }
 
-// ---------------------------------------------------------------- Leonardo
+// ---------------------------------------------------------------- making
 
 export interface Approach {
   title: string;
@@ -150,16 +162,17 @@ export interface Approach {
   risk: string;
 }
 
-export async function leonardo(ctx: AskContext, ideaId: string, memory?: string) {
+export async function make(ctx: AskContext, ideaId: string, memory?: string) {
   const idea = ctx.room.mustIdea(ideaId);
+  const who = playedBy("making");
   const c = await ctx.llm.complete({
-    system: systemFor("leonardo"),
+    system: systemFor(who),
     user: `Idea ${idea.ideaId} from ${idea.contributor.credit ? idea.contributor.name : "a patron"}: "${idea.title}"
 Creative question: ${idea.question}
 Proposed output: ${idea.output}
 Source: ${idea.source}
-${memory ? `Borges remembers: ${memory}\n` : ""}
-Reply with two or three sentences in Leonardo's voice, then a JSON block:
+${memory ? `${nameOf(playedBy("memory"))} remembers: ${memory}\n` : ""}
+Reply with two or three sentences in ${nameOf(who)}'s voice, then a JSON block:
 \`\`\`json
 {"approaches":[{"title":"","deliverable":"","runtimeMinutes":0,"stoppingRule":"","estCashUsd":0,"estHours":0,"reuses":[],"risk":""}],"favorite":0}
 \`\`\``,
@@ -178,7 +191,7 @@ Reply with two or three sentences in Leonardo's voice, then a JSON block:
     if (!a.stoppingRule?.trim()) flags.push(`approach ${i + 1} has no stopping rule`);
     if (!(a.estCashUsd >= 0)) flags.push(`approach ${i + 1} has no cash estimate`);
   });
-  const run = record(ctx, "leonardo", { ideaId, episodeId: idea.episodeId }, parsed, voice, c, [], flags);
+  const run = record(ctx, who, { ideaId, episodeId: idea.episodeId }, parsed, voice, c, [], flags);
   return { run, approaches: parsed.approaches, favorite: parsed.favorite ?? 0, text: voice };
 }
 
@@ -191,17 +204,17 @@ function fallbackApproaches(title: string, output: string): Approach[] {
       stoppingRule: "Done after one listen-through with no blocking defects",
       estCashUsd: 4,
       estHours: 1.5,
-      reuses: ["established character voices", "Not Enough Time motif"],
+      reuses: ["established character voices", "an existing music motif"],
       risk: "May feel thin without sound design",
     },
     {
-      title: `${title} — as a press-conference exhibit`,
-      deliverable: "Agnolo puts the idea on his screen and summons it as a witness (4–5 min)",
+      title: `${title} — as an exhibit`,
+      deliverable: "The characters put the idea on trial in the show's recurring setting (4–5 min)",
       runtimeMinutes: 5,
       stoppingRule: "Done when the witness answers the creative question once",
       estCashUsd: 8,
       estHours: 3,
-      reuses: ["Milliways ambience", "Agnolo and Yuria voices"],
+      reuses: ["the recurring setting's ambience", "established character voices"],
       risk: "Leans on the frame; must still advance the story",
     },
     {
@@ -211,13 +224,13 @@ function fallbackApproaches(title: string, output: string): Approach[] {
       stoppingRule: "Done at the first take that carries the lyric clearly",
       estCashUsd: 10,
       estHours: 3,
-      reuses: ["Unspoken Orchestra grammar"],
+      reuses: ["the show's musical grammar"],
       risk: "Music generation cost and quality vary most",
     },
   ];
 }
 
-// ---------------------------------------------------------------- Agnolo
+// ---------------------------------------------------------------- accounting
 
 export interface Evaluation {
   scores: { story: number; business: number; participation: number };
@@ -228,8 +241,9 @@ export interface Evaluation {
   reason: string;
 }
 
-export async function agnolo(ctx: AskContext, ideaId: string, approaches: Approach[]) {
+export async function account(ctx: AskContext, ideaId: string, approaches: Approach[]) {
   const idea = ctx.room.mustIdea(ideaId);
+  const who = playedBy("accounting");
   const ep = idea.episodeId ? ctx.room.episodes.get(idea.episodeId) : undefined;
   const ceiling = ep?.ceiling ?? DEFAULT_CEILING;
   const spent = ep ? ctx.room.episodeCash(ep.episodeId) : 0;
@@ -242,14 +256,14 @@ export async function agnolo(ctx: AskContext, ideaId: string, approaches: Approa
   }));
   const s = idea.signals;
   const c = await ctx.llm.complete({
-    system: systemFor("agnolo"),
+    system: systemFor(who),
     user: `On the screen: idea ${idea.ideaId} "${idea.title}" (${idea.output}), proposed by ${idea.contributor.credit ? idea.contributor.name : "a patron"}.
 Question: ${idea.question}
-Leonardo's approaches: ${JSON.stringify(approaches)}
+${nameOf(playedBy("making"))}'s approaches: ${JSON.stringify(approaches)}
 Budget (computed by the room): ceiling $${ceiling.toFixed(2)}, observed spend $${spent.toFixed(2)}, remaining $${remaining.toFixed(2)}. Fit by approach: ${JSON.stringify(budget)}
 Signals, kept separate: creative judgments ${JSON.stringify(s.creative)}, community votes ${s.community}, financial support received $${s.financial}.
 
-Reply with two or three sentences in Agnolo's voice, then a JSON block:
+Reply with two or three sentences in ${nameOf(who)}'s voice, then a JSON block:
 \`\`\`json
 {"scores":{"story":0,"business":0,"participation":0},"why":{"story":"","business":"","participation":""},"claims":[{"text":"","status":"projected"}],"evidence":"","recommend":"compare","reason":""}
 \`\`\``,
@@ -261,7 +275,7 @@ Reply with two or three sentences in Agnolo's voice, then a JSON block:
   if (!ev?.scores) {
     if (!c.offline) flags.push("no structured evaluation returned; used rule-based scoring");
     ev = fallbackEvaluation(idea.output, approaches);
-    voice ||= `Exhibit ${idea.ideaId} is on the screen. Every number Leonardo gave me is a forecast, and I have booked it as one.`;
+    voice ||= `Exhibit ${idea.ideaId} is on the screen. Every number ${nameOf(playedBy("making"))} gave me is a forecast, and I have booked it as one.`;
   }
   for (const k of ["story", "business", "participation"] as const) ev.scores[k] = Math.max(0, Math.min(3, Math.round(Number(ev.scores[k]) || 0)));
   // The rules overrule the recommendation when the money doesn't fit.
@@ -270,7 +284,7 @@ Reply with two or three sentences in Agnolo's voice, then a JSON block:
     ev.reason = `No approach fits the remaining $${remaining.toFixed(2)}. Simplify, or authorize a larger budget first. (${ev.reason})`;
     flags.push("select overruled: over budget");
   }
-  const run = record(ctx, "agnolo", { ideaId, episodeId: idea.episodeId }, { ...ev, budget: { ceiling, spent, remaining, byApproach: budget } }, voice, c, [], flags);
+  const run = record(ctx, who, { ideaId, episodeId: idea.episodeId }, { ...ev, budget: { ceiling, spent, remaining, byApproach: budget } }, voice, c, [], flags);
   return { run, evaluation: ev, budget: { ceiling, spent, remaining, byApproach: budget }, text: voice };
 }
 
@@ -294,30 +308,45 @@ function fallbackEvaluation(output: string, approaches: Approach[]): Evaluation 
 
 // ---------------------------------------------------------------- the room at work
 
-/** Borges → Leonardo → Agnolo on one idea, then mark it explored. */
+/** memory → making → accounting on one idea, then mark it explored. */
 export async function explore(ctx: AskContext, ideaId: string) {
   const idea = ctx.room.mustIdea(ideaId);
-  const memory = await borges(ctx, `${idea.title} ${idea.question} ${idea.source}`, { ideaId, episodeId: idea.episodeId });
-  const created = await leonardo(ctx, ideaId, memory.text);
-  const judged = await agnolo(ctx, ideaId, created.approaches);
+  const memory = await remember(ctx, `${idea.title} ${idea.question} ${idea.source}`, { ideaId, episodeId: idea.episodeId });
+  const created = await make(ctx, ideaId, memory.text);
+  const judged = await account(ctx, ideaId, created.approaches);
   if (idea.status === "proposed") {
+    const n = (r: Role) => nameOf(playedBy(r));
     ctx.room.transitionIdea("system", {
       ideaId,
       to: "explored",
-      reason: `Explored by the room: Borges ${memory.run.id}, Leonardo ${created.run.id}, Agnolo ${judged.run.id}. Agnolo recommends '${judged.evaluation.recommend}'.`,
+      reason: `Explored by the room: ${n("memory")} ${memory.run.id}, ${n("making")} ${created.run.id}, ${n("accounting")} ${judged.run.id}. ${n("accounting")} recommends '${judged.evaluation.recommend}'.`,
     });
   }
   return { memory, created, judged };
 }
 
-export async function ask(ctx: AskContext, character: Character, question: string, ideaId?: string) {
-  if (character === "borges") return borges(ctx, question, { ideaId });
-  if (!ideaId) throw new Error(`${character} needs an idea to work on.`);
-  if (character === "leonardo") return leonardo(ctx, ideaId, question);
-  const prior = [...ctx.room.runs.values()].filter((r) => r.ideaId === ideaId && r.character === "leonardo").at(-1);
-  const approaches = ((prior?.output as any)?.approaches as Approach[]) ?? fallbackApproaches(ctx.room.mustIdea(ideaId).title, ctx.room.mustIdea(ideaId).output);
-  return agnolo(ctx, ideaId, approaches);
+/** The latest run on an idea by whoever plays a role (runs before roles were recorded match by character). */
+export function latestRun(room: Room, ideaId: string, role: Role): AgentRun | undefined {
+  const who = playedBy(role);
+  return [...room.runs.values()].filter((r) => r.ideaId === ideaId && (r.role ? r.role === role : r.character === who)).at(-1);
 }
+
+/** Ask a character, or a role, to do their job. Accepts a slug ("borges") or a role ("memory"). */
+export async function ask(ctx: AskContext, who: Character | Role, question: string, ideaId?: string) {
+  const role = (["memory", "making", "accounting"] as string[]).includes(who) ? (who as Role) : roleOf(who);
+  if (!role) throw new Error(`${who} doesn't play a role in this room. Ask ${(["memory", "making", "accounting"] as Role[]).map(playedBy).join(", ")}.`);
+  if (role === "memory") return remember(ctx, question, { ideaId });
+  if (!ideaId) throw new Error(`${nameOf(playedBy(role))} needs an idea to work on.`);
+  if (role === "making") return make(ctx, ideaId, question);
+  const prior = latestRun(ctx.room, ideaId, "making");
+  const approaches = ((prior?.output as any)?.approaches as Approach[]) ?? fallbackApproaches(ctx.room.mustIdea(ideaId).title, ctx.room.mustIdea(ideaId).output);
+  return account(ctx, ideaId, approaches);
+}
+
+/** Future Radio's names for the role functions, kept for existing callers. */
+export const borges = remember;
+export const leonardo = make;
+export const agnolo = account;
 
 export function record(
   ctx: AskContext,
@@ -332,6 +361,7 @@ export function record(
   const run: AgentRun = {
     runId: runId(character),
     character,
+    role: roleOf(character),
     ideaId: ref.ideaId,
     episodeId: ref.episodeId,
     askedBy: ctx.askedBy,

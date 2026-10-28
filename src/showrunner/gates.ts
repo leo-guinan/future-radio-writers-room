@@ -3,7 +3,8 @@
 
 import type { Idea, Room } from "../core/room.ts";
 import type { GateResult } from "../core/types.ts";
-import type { Approach, Evaluation } from "../agents/characters.ts";
+import { nameOf, type Approach, type Evaluation } from "../agents/characters.ts";
+import { playedBy } from "../core/cast.ts";
 
 export interface GateConfig {
   gate: string;
@@ -46,11 +47,11 @@ export const CHECKS: Record<string, Check> = {
   },
   explored: (c, cfg) => {
     const ok = !!c.approaches?.length && !!c.evaluation;
-    return { gate: cfg.gate, pass: ok, why: ok ? "explored by the room" : "waiting for Leonardo's approaches and Agnolo's evaluation" };
+    return { gate: cfg.gate, pass: ok, why: ok ? "explored by the room" : `waiting for ${nameOf(playedBy("making"))}'s approaches and ${nameOf(playedBy("accounting"))}'s evaluation` };
   },
   "not-declined": (c, cfg) => {
     const rec = c.evaluation?.recommend;
-    return { gate: cfg.gate, pass: rec !== "decline", why: `Agnolo: ${rec ?? "no recommendation yet"}` };
+    return { gate: cfg.gate, pass: rec !== "decline", why: `${nameOf(playedBy("accounting"))}: ${rec ?? "no recommendation yet"}` };
   },
   "stopping-rule": (c, cfg) => {
     const ok = !!c.chosen?.stoppingRule?.trim();

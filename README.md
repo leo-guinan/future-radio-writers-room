@@ -210,7 +210,13 @@ reported, never forced.
 dressing rooms' CI fetches it), points every dressing room's workflow at
 `github:YOU/future-radio-character-bible`, then creates the rest (private by default).
 
-## Characters
+## Roles and characters
+
+The room runs on three roles: **memory** (remembers, cites, never invents), **making**
+(approaches with stopping rules and costs) and **accounting** (keeps the score). The showrunner
+does a fourth, **assembly**. `cast.json` says who plays each role; in Future Radio that's
+Borges, Leonardo and Agnolo. To recast, change a slug in `cast.json` and give the new
+character a `characters/<slug>.md`.
 
 Templates live in `characters/*.md` and seed each dressing room the first time. After that, edit `CHARACTER.md` in the dressing room. `show-bible.md` is shared by all.
 

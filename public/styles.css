@@ -6,9 +6,9 @@
   --ink-2: #4a443b;
   --muted: #7a7265;
   --rule: #d8cfbd;
-  --borges: #2f4a7a;
-  --leonardo: #a3561c;
-  --agnolo: #2f6b4f;
+  --memory: #2f4a7a;
+  --making: #a3561c;
+  --accounting: #2f6b4f;
   --patron: #7a3b6b;
   --alarm: #a8322a;
   --screen-bg: #17201b;
@@ -21,13 +21,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #15130f; --paper-2: #1d1a15; --card: #1f1c17; --ink: #efe8da; --ink-2: #cfc6b5;
-    --muted: #9a917f; --rule: #3a342b; --borges: #8fb0e6; --leonardo: #e4a06a; --agnolo: #7fc9a2;
+    --muted: #9a917f; --rule: #3a342b; --memory: #8fb0e6; --making: #e4a06a; --accounting: #7fc9a2;
     --patron: #d99ccb; --alarm: #ee7a6f; --screen-bg: #0d1310;
   }
 }
 :root[data-theme="dark"] {
   --paper: #15130f; --paper-2: #1d1a15; --card: #1f1c17; --ink: #efe8da; --ink-2: #cfc6b5;
-  --muted: #9a917f; --rule: #3a342b; --borges: #8fb0e6; --leonardo: #e4a06a; --agnolo: #7fc9a2;
+  --muted: #9a917f; --rule: #3a342b; --memory: #8fb0e6; --making: #e4a06a; --accounting: #7fc9a2;
   --patron: #d99ccb; --alarm: #ee7a6f; --screen-bg: #0d1310;
 }
 
@@ -43,7 +43,7 @@ button { font: 600 .9rem var(--body); background: var(--ink); color: var(--paper
 button:hover { opacity: .88; }
 button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
 button:disabled { opacity: .45; cursor: default; }
-.c-borges { color: var(--borges); } .c-leonardo { color: var(--leonardo); } .c-agnolo { color: var(--agnolo); }
+.c-memory { color: var(--memory); } .c-making { color: var(--making); } .c-accounting { color: var(--accounting); }
 
 /* masthead */
 .masthead { border-bottom: 3px double var(--rule); padding: 28px 0 20px; background: var(--paper-2); }
@@ -68,9 +68,9 @@ section { margin-top: 32px; }
 .ep .st { font: .68rem var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .ep.released { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .ep.released .t, .ep.released .st { color: var(--paper-2); }
-.ep.active { box-shadow: inset 0 -3px 0 var(--leonardo); }
+.ep.active { box-shadow: inset 0 -3px 0 var(--making); }
 .bar { height: 3px; background: var(--rule); border-radius: 2px; overflow: hidden; }
-.bar i { display: block; height: 100%; background: var(--leonardo); }
+.bar i { display: block; height: 100%; background: var(--making); }
 @media (max-width: 760px) { .season { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 
 /* layout */
@@ -86,16 +86,16 @@ section { margin-top: 32px; }
 .feed .what { margin: .1rem 0 0; }
 .feed .voice { font-size: 1.02rem; margin: .35rem 0 0; padding-left: 12px; border-left: 3px solid currentColor; }
 .feed .voice p { margin: 0 0 .4rem; color: var(--ink); }
-.feed li.borges .who, .feed li.borges .voice { color: var(--borges); }
-.feed li.leonardo .who, .feed li.leonardo .voice { color: var(--leonardo); }
-.feed li.agnolo .who, .feed li.agnolo .voice { color: var(--agnolo); }
+.feed li.memory .who, .feed li.memory .voice { color: var(--memory); }
+.feed li.making .who, .feed li.making .voice { color: var(--making); }
+.feed li.accounting .who, .feed li.accounting .voice { color: var(--accounting); }
 .feed li.patron .who { color: var(--patron); }
 .feed a, .link { color: inherit; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; cursor: pointer; }
 .flags { font: .72rem var(--mono); color: var(--alarm); margin-top: .3rem; }
 .approaches { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .93rem; color: var(--ink-2); }
 .approaches li { display: list-item; border: 0; padding: 2px 0; animation: none; }
 .scores { display: flex; gap: 10px; flex-wrap: wrap; font: .78rem var(--mono); margin-top: .4rem; color: var(--ink-2); }
-.scores b { color: var(--agnolo); }
+.scores b { color: var(--accounting); }
 .empty { color: var(--muted); font-style: italic; padding: 16px 0; }
 
 /* Agnolo's screen */
@@ -152,10 +152,10 @@ dialog::backdrop { background: rgba(20, 16, 10, .45); }
 .scenes li.cut .tt { text-decoration: line-through; text-decoration-color: var(--rule); }
 .checklist { list-style: none; padding: 0; font-size: .92rem; }
 .checklist li::before { content: "○ "; color: var(--muted); }
-.checklist li.done::before { content: "● "; color: var(--agnolo); }
+.checklist li.done::before { content: "● "; color: var(--accounting); }
 .askbox { margin-top: 18px; border-top: 3px double var(--rule); padding-top: 14px; }
 .askers { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-.askers button.borges { background: var(--borges); } .askers button.leonardo { background: var(--leonardo); } .askers button.agnolo { background: var(--agnolo); }
+.askers button.memory { background: var(--memory); } .askers button.making { background: var(--making); } .askers button.accounting { background: var(--accounting); }
 .history { font-size: .88rem; color: var(--ink-2); padding-left: 1.1rem; }
 
 .foot { color: var(--muted); font-size: .85rem; border-top: 3px double var(--rule); margin-top: 48px; padding-top: 16px; padding-bottom: 32px; }
@@ -190,9 +190,9 @@ h3 { margin-top: 18px; margin-bottom: 6px; }
 .cast { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 860px) { .cast { grid-template-columns: 1fr; } }
 .member { background: var(--card); border: 1px solid var(--rule); border-top: 4px solid var(--ink-2); border-radius: 3px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
-.member.borges { border-top-color: var(--borges); } .member.leonardo { border-top-color: var(--leonardo); } .member.agnolo { border-top-color: var(--agnolo); }
+.member.memory { border-top-color: var(--memory); } .member.making { border-top-color: var(--making); } .member.accounting { border-top-color: var(--accounting); }
 .member h3 { margin: 0; font-size: 1.25rem; }
-.member.borges h3 { color: var(--borges); } .member.leonardo h3 { color: var(--leonardo); } .member.agnolo h3 { color: var(--agnolo); }
+.member.memory h3 { color: var(--memory); } .member.making h3 { color: var(--making); } .member.accounting h3 { color: var(--accounting); }
 .member .intro { margin: 0; font-size: .92rem; color: var(--ink-2); }
 .member blockquote { margin: 2px 0; padding-left: 10px; border-left: 2px solid var(--rule); font-style: italic; font-size: .92rem; }
 .member .stats { margin: 0; font: .72rem var(--mono); color: var(--muted); }

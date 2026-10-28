@@ -11,7 +11,7 @@ import { basename, join } from "node:path";
 import { sha256 } from "../core/events.ts";
 import type { Room } from "../core/room.ts";
 import type { IdeaStatus, LedgerEntry, OutputKind } from "../core/types.ts";
-import { isPrincipal } from "../core/cast.ts";
+import { isPrincipal, roleCharacters } from "../core/cast.ts";
 import { extrasRepo, slugify } from "../repos/extras.ts";
 import { dressingRoom, reposEnabled } from "../repos/dressing-room.ts";
 import { EpisodeRepo } from "../repos/episode-repo.ts";
@@ -216,7 +216,7 @@ export function importEpisode(room: Room, dir: string, opts: { actor?: string; m
     if (!src || !existsSync(src) || sha256(readFileSync(src)) !== m.sha256) report.missingMedia.push(m.file);
   }
   const query = [spec.logline, ...spec.scenes.map((s) => `${s.title} ${s.summary}`)].join(" ");
-  const projections = (["borges", "leonardo", "agnolo"] as const).map((c) => repo.project(c, query));
+  const projections = roleCharacters().map((c) => repo.project(c, query));
   const sha = repo.repo.commit(`Import ${spec.episodeId} "${spec.title}" as released (${spec.release.version})`);
   repo.repo.tag(spec.release.version, `${spec.episodeId} ${spec.release.version}: ${spec.release.file} sha256 ${spec.release.sha256}`);
   if (report.recorded)

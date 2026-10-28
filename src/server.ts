@@ -9,13 +9,13 @@ import { openRoom } from "./core/open.ts";
 import { RuleError } from "./core/room.ts";
 import type { Character, EpisodeStage, IdeaStatus, OutputKind, RoomEvent, SignalKind } from "./core/types.ts";
 import { makeLLM } from "./agents/llm.ts";
-import { ask, explore } from "./agents/characters.ts";
+import { ask, explore, nameOf } from "./agents/characters.ts";
 import { checklist, nextStep } from "./production/loop.ts";
 import { tick } from "./showrunner/showrunner.ts";
 import { EpisodeRepo } from "./repos/episode-repo.ts";
 import { dressingRoom, reposEnabled } from "./repos/dressing-room.ts";
 import { syncAll } from "./repos/sync.ts";
-import { principals } from "./core/cast.ts";
+import { castFile, playedBy, principals, roleCharacters, roleOf } from "./core/cast.ts";
 import { extrasRepo } from "./repos/extras.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -184,7 +184,8 @@ function publicScorecard() {
 
 function snapshot() {
   return {
-    show: "Future Radio",
+    show: castFile().show,
+    roles: castFile().roles,
     offline: llm.offline,
     limits: { patronRunsToday: patronRunsToday(), patronDailyRuns: PATRON_DAILY_RUNS },
     episodes: [...room.episodes.values()].map((e) => ({
@@ -289,12 +290,12 @@ const routes: Array<[string, RegExp, Handler]> = [
   }],
   ["POST", /^\/api\/ideas\/([\w-]+)\/ask$/, async (req, res, m) => {
     const b = await body(req);
-    const character = b.character as Character;
-    if (!["borges", "leonardo", "agnolo"].includes(character)) throw new RuleError("request", "Ask borges, leonardo, or agnolo.");
+    const character = String(b.character ?? "") as Character;
+    if (!roleOf(character) && !["memory", "making", "accounting"].includes(character)) throw new RuleError("request", `Ask ${roleCharacters().join(", ")} (or a role: memory, making, accounting).`);
     const question = clip(b.question, 500);
     if (!question) throw new RuleError("request", "Ask a question.");
     room.mustIdea(m[1]);
-    if (patronRunsToday() >= PATRON_DAILY_RUNS) throw new RuleError("limits", "The characters have done all the patron work today's budget allows. Agnolo insists.");
+    if (patronRunsToday() >= PATRON_DAILY_RUNS) throw new RuleError("limits", `The characters have done all the patron work today's budget allows. ${nameOf(playedBy("accounting"))} insists.`);
     bump("asks", ipOf(req), PATRON_RUNS_PER_IP);
     const name = clip(b.name, 60) || "a patron";
     const r = await ask({ room, llm, askedBy: `patron:${name}`, scope: "public" }, character, question, m[1]);

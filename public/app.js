@@ -4,7 +4,11 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const usd = (n) => `$${(n ?? 0).toFixed(2)}`;
 const STAGES = ["planned", "select", "write", "generate", "review", "publish", "account"];
-const CHARS = { borges: "Borges", leonardo: "Leonardo", agnolo: "Agnolo", showrunner: "Showrunner" };
+// Roles are the system; characters are this show's casting (cast.json). Colours follow the role.
+const ROLE_VERBS = { memory: ["remembers", "to remember"], making: ["creates", "to sketch"], accounting: ["keeps the score", "to score"] };
+const NAMES = { showrunner: "Showrunner" };
+const nameOf = (slug) => NAMES[slug] || (slug ? slug[0].toUpperCase() + slug.slice(1).replace(/-/g, " ") : "");
+const roleOf = (slug) => Object.keys(snap?.roles || {}).find((r) => snap.roles[r] === slug);
 let snap = null;
 const seen = new Set();
 
@@ -15,10 +19,21 @@ async function api(path, opts = {}) {
   return data;
 }
 
+function renderTagline() {
+  const el = $("#tagline");
+  if (!el || !snap?.roles) return;
+  el.innerHTML = Object.entries(snap.roles)
+    .map(([role, slug]) => `<b class="c-${esc(role)}">${esc(nameOf(slug))}</b> ${esc(ROLE_VERBS[role]?.[0] || role)}.`)
+    .join(" ");
+  const screen = $("#screen-h");
+  if (screen) screen.textContent = `${nameOf(snap.roles.accounting)}'s screen`;
+}
+
 // ------------------------------------------------------------ snapshot
 
 async function refresh() {
   snap = await api("/api/room");
+  renderTagline();
   $("#head").textContent = snap.head.slice(0, 16) + "…";
   $("#seq").textContent = `${snap.seq} events`;
   renderSeason();
@@ -94,8 +109,10 @@ function renderBoard() {
 
 async function renderCast() {
   const cast = await api("/api/cast").catch(() => []);
+  for (const c of cast) NAMES[c.character] = c.name;
+  renderTagline();
   $("#cast").innerHTML = cast
-    .map((c) => `<article class="member ${esc(c.character)}">
+    .map((c) => `<article class="member ${esc(c.character)} ${esc(roleOf(c.character) || "")}">
       <h3>${esc(c.name)}</h3>
       <p class="intro">${esc(c.intro)}</p>
       ${c.voice ? `<blockquote>${esc(c.voice)}</blockquote>` : ""}
@@ -171,10 +188,11 @@ function runBody(p) {
   const voice = String(p.text || "").split(/\n{2,}/).map((x) => `<p>${esc(x)}</p>`).join("");
   let extra = "";
   const o = p.output || {};
-  if (p.character === "leonardo" && o.approaches)
+  const role = p.role || roleOf(p.character);
+  if (role === "making" && o.approaches)
     extra = `<ol class="approaches">${o.approaches.map((a) => `<li><b>${esc(a.title)}</b> — ${esc(a.deliverable)} · ~${usd(a.estCashUsd)} · ~${esc(a.estHours)}h · <i>stop: ${esc(a.stoppingRule)}</i></li>`).join("")}</ol>`;
   if (p.character === "showrunner") extra = "";
-  if (p.character === "agnolo" && o.scores)
+  if (role === "accounting" && o.scores)
     extra = `<div class="scores"><span>story <b>${o.scores.story}</b>/3</span><span>business <b>${o.scores.business}</b>/3</span><span>participation <b>${o.scores.participation}</b>/3</span><span>→ <b>${esc(o.recommend)}</b></span>${o.budget ? `<span>remaining ${usd(o.budget.remaining)}</span>` : ""}</div>`;
   const flags = p.flags?.length ? `<div class="flags">⚑ ${p.flags.map(esc).join(" · ")}</div>` : "";
   return `<div class="voice">${voice}</div>${extra}${flags}`;
@@ -187,7 +205,7 @@ function feedItem(e) {
     const p = e.payload;
     const asked = p.askedBy.startsWith("patron:") ? `asked by ${esc(p.askedBy.slice(7))}` : `for ${esc(p.askedBy)}`;
     const target = p.ideaId ? ` on <a class="link" data-idea="${esc(p.ideaId)}">${esc(p.ideaId)}</a>` : "";
-    return `<li class="${esc(p.character)}"><time>${time}</time><div><div class="who">${CHARS[p.character]} · ${asked}${target}${p.offline ? " · offline" : ""}</div>${runBody(p)}</div></li>`;
+    return `<li class="${esc(p.character)} ${esc(p.role || roleOf(p.character) || "")}"><time>${time}</time><div><div class="who">${esc(nameOf(p.character))} · ${asked}${target}${p.offline ? " · offline" : ""}</div>${runBody(p)}</div></li>`;
   }
   const [actor, what] = line(e);
   return `<li class="${who(e)}"><time>${time}</time><div><div class="who">${esc(actor)}</div><p class="what">${what}</p></div></li>`;
@@ -273,9 +291,7 @@ async function showIdea(id) {
       <label>Your name<input id="ask-name" maxlength="60" placeholder="optional" /></label>
       <label>Question<textarea id="ask-q" rows="2" maxlength="500" placeholder="What has the room already tried along these lines?"></textarea></label>
       <div class="askers">
-        <button class="borges" data-ask="borges">Ask Borges to remember</button>
-        <button class="leonardo" data-ask="leonardo">Ask Leonardo to sketch</button>
-        <button class="agnolo" data-ask="agnolo">Ask Agnolo to score</button>
+        ${Object.entries(snap?.roles || {}).map(([role, slug]) => `<button class="${esc(role)}" data-ask="${esc(slug)}">Ask ${esc(nameOf(slug))} ${esc(ROLE_VERBS[role]?.[1] || "")}</button>`).join("\n        ")}
       </div>
       <p class="form-msg" id="ask-msg" role="status"></p>
     </div>
@@ -289,7 +305,7 @@ async function showIdea(id) {
       const msg = $("#ask-msg");
       const question = $("#ask-q").value.trim() || `What should the room know about "${i.title}"?`;
       document.querySelectorAll("[data-ask]").forEach((x) => (x.disabled = true));
-      msg.className = "form-msg"; msg.textContent = `${CHARS[b.dataset.ask]} is working…`;
+      msg.className = "form-msg"; msg.textContent = `${nameOf(b.dataset.ask)} is working…`;
       try {
         await api(`/api/ideas/${encodeURIComponent(id)}/ask`, { method: "POST", body: JSON.stringify({ character: b.dataset.ask, question, name: $("#ask-name").value }) });
         await showIdea(id);

@@ -1,5 +1,12 @@
 {
-  "$comment": "Who has a dressing room of their own (principals) and how an extra earns one. Agents (borges, leonardo, agnolo) do jobs in the room; any principal can appear in episodes. `npm run room -- extras promote <slug>` moves an extra here.",
+  "$comment": "roles: who plays each of the room's roles in this show; change a slug to recast, and give the new character a characters/<slug>.md. principals: everyone with a dressing room of their own. `npm run room -- extras promote <slug>` moves an extra here.",
+  "show": "Future Radio",
+  "host": "yuria",
+  "roles": {
+    "memory": "borges",
+    "making": "leonardo",
+    "accounting": "agnolo"
+  },
   "principals": ["borges", "leonardo", "agnolo"],
   "promotion": {
     "$comment": "Suggestions only — the producer decides. An extra is worth considering when they have this many released appearances AND either enough merged viewer notes or enough community votes on ideas about them.",

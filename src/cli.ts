@@ -86,8 +86,8 @@ Ideas
   board                                  Ideas with their three separate signals
 
 The characters
-  explore ID                             Borges remembers → Leonardo creates → Agnolo evaluates
-  ask borges|leonardo|agnolo "..." [--idea ID] [--public]
+  explore ID                             memory remembers → making creates → accounting evaluates (cast in cast.json)
+  ask <character|role> "..." [--idea ID] [--public]   roles: memory, making, accounting
 
 Showrunner & repos
   showrunner tick EP [--no-explore] [--assigned-only]   Explore, gate, and assemble first cuts into the episode repo

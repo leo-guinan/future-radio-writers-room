@@ -125,15 +125,16 @@ deterministic offline output, and every run is still recorded.
 - `characters/*.md`: personas and the show bible.
 - `src/agents/characters.ts`: `systemFor`, `explore` and `ask`, the role pipeline.
 - `src/agents/llm.ts`: `AnthropicLLM`, `OfflineLLM` and `makeLLM`.
-- `cast.json`: who the principals are, and the promotion thresholds.
+- `cast.json`: who plays each role (`roles`), the show's name and host, who the principals
+  are, and the promotion thresholds.
+- `src/core/cast.ts`: `playedBy(role)`, `roleOf(character)`, and the role definitions.
 
 **How to change it.**
-- **Recast a role:** today the roles are bound to the slugs `borges`, `leonardo` and `agnolo` in
-  code. These live in `CAST` and `Character` in `src/core/types.ts`, `AGENTS` in
-  `src/core/cast.ts`, the role functions in `src/agents/characters.ts`,
-  `src/showrunner/showrunner.ts`, `src/production/import.ts`, and the `ask` route in
-  `src/server.ts`. To recast, write your character into `characters/<slug>.md` and either keep
-  the slug or rename it at those sites. Run `npm test` after.
+- **Recast a role:** edit `roles` in `cast.json`, e.g. `"memory": "ada"`, and write the new
+  character's persona in `characters/ada.md`. Their dressing room opens on first use. Runs
+  record the role they were played in, so the showrunner, the ledger and the workshop page
+  follow the casting, not the name. `test/roles.test.ts` recasts all three and checks that
+  the work moves with them. The roles are validated: each needs its own character.
 - **Add a character with no role:** add `characters/<slug>.md` and a dressing room, and list
   the slug in `cast.json`. Or start them as an extra and let the audience promote them.
 - **Change what a role does:** change its function in `characters.ts`, keeping the outputs

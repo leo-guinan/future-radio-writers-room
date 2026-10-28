@@ -182,12 +182,13 @@ export interface ForecastResolved {
 
 // ---------- Agents ----------
 
-export type Character = "borges" | "leonardo" | "agnolo" | "showrunner";
-export const CAST: Character[] = ["borges", "leonardo", "agnolo"];
+/** A character slug. Which character plays which role is set in cast.json (see src/core/cast.ts). */
+export type Character = string;
 
 export interface AgentRun {
   runId: string;
   character: Character;
+  role?: "memory" | "making" | "accounting"; // the role the character was playing (absent on runs from before roles were recorded)
   ideaId?: string;
   episodeId?: string;
   askedBy: string;

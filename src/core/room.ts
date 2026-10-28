@@ -9,6 +9,7 @@
 //   6. Creative judgment, community interest and financial support stay separate signals.
 
 import { EventStore, sha256 } from "./events.ts";
+import { playedBy } from "./cast.ts";
 import {
   EPISODE_STAGES,
   IDEA_EXITS,
@@ -350,7 +351,7 @@ export class Room {
     // Compute is a real operating cost. Unknown prices are recorded as unknown, not zero.
     this.store.append(
       "ledger.entry",
-      "agnolo",
+      playedBy("accounting"),
       {
         entryId: `L-${String(this.ledger.length + 1).padStart(4, "0")}`,
         ledger: "operations",
