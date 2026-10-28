@@ -19,7 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
     "tsx": "^4.19.0",
-    "future-radio-character-bible": "file:../future-radio-character-bible"
+    "future-radio-character-bible": "github:leo-guinan/future-radio-character-bible"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

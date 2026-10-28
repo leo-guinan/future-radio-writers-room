@@ -1,8 +1,6 @@
 services:
   room:
-    build:
-      context: ..
-      dockerfile: future-radio-writers-room/Dockerfile
+    build: .
     restart: unless-stopped
     env_file: .env
     ports:
