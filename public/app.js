@@ -118,6 +118,7 @@ async function renderCast() {
       ${c.voice ? `<blockquote>${esc(c.voice)}</blockquote>` : ""}
       <p class="stats">${c.runs} run${c.runs === 1 ? "" : "s"}${c.lastSeen ? ` · last seen ${esc(c.lastSeen)}` : ""}${c.episodes.length ? ` · ${esc(c.episodes.join(", "))}` : ""} · ${c.canon + c.viewerNotes.length} canon note${c.canon + c.viewerNotes.length === 1 ? "" : "s"}${c.viewerNotes.length ? `, ${c.viewerNotes.length} from viewers` : ""}</p>
       ${c.viewerNotes.length ? `<ul class="vnotes">${c.viewerNotes.slice(-2).map((v) => `<li>${esc(v.note)} <span class="muted">— ${esc(v.from)}</span></li>`).join("")}</ul>` : ""}
+      ${c.talk ? `<p class="talk"><a class="link" href="${esc(c.talk)}" target="_blank" rel="noopener">Talk with ${esc(c.name)} →</a> <span class="muted">voice call, in their own voice</span></p>` : ""}
       <p class="links">${
         c.links
           ? `<a class="link" href="${esc(c.links.bible)}" target="_blank" rel="noopener">Read the bible</a> · <a class="link" href="${esc(c.links.contribute)}" target="_blank" rel="noopener">Propose a change</a> · <a class="link" href="${esc(c.links.note)}" target="_blank" rel="noopener">Leave a viewer note</a>`

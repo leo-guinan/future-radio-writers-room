@@ -154,6 +154,10 @@ deterministic offline output, and every run is still recorded.
   character locally (`npx future-radio-character-bible chat .`).
 - Viewers change characters by **pull request**: viewer notes and `CHARACTER.md` edits. History
   is written by the room only, and CI enforces this.
+- Each bible can become a **voice agent** (`character-bible agent <dir> --publish`): the same
+  persona and canon with a prompt written for talking aloud, in the character's production
+  voice. Its settings and ElevenLabs id live in `voice/agent.json`, and the bible and the
+  workshop page link to it. Nothing said on a call becomes canon.
 - Characters without a story yet live as folders in a shared **extras** repo. They are promoted
   to a dressing room, with their git history, when the thresholds in `cast.json` are met
   (2 appearances, 3 viewer notes, 5 votes).

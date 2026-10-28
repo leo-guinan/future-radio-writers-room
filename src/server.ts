@@ -77,6 +77,7 @@ function cast() {
       canon: b.canon.notes.length,
       viewerNotes: b.canon.viewerNotes.map((v) => ({ from: v.from, note: v.note.split("\n")[0], episode: v.episode })),
       voice: b.voice.samples.at(-1)?.line ?? null,
+      talk: b.voice.agent?.agentId ? `https://elevenlabs.io/app/talk-to?agent_id=${b.voice.agent.agentId}` : null,
       repo: dr.repo.name,
       head: dr.repo.head(),
       links: url
