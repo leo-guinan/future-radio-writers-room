@@ -75,6 +75,7 @@ Season & episodes
   episode select EP SCENE yes|no --reason "..."
   episode asset EP <kind> <label> <path|url> [--private]   kind: script|audio|music|sfx|art|notes|other
   episode release EP <file> --invitation "..." [--version v1] [--script file] [--runtime min]
+  episode release EP --sha256 HEX --uri URL --invitation "..." [--script-sha256 HEX]   (file published elsewhere)
   episode account EP --hours N|--days N --learned "..." [--cash USD --evidence ref] [--revisions N] [--who name]
   budget EP <new-ceiling> --reason "..."
 
@@ -182,18 +183,19 @@ async function main() {
         return out(room.selectScene(by, { episodeId: epId, sceneId: need(pos[2], "scene id"), selected: pos[3] !== "no", reason: need(flags.reason, "--reason") }).id);
       if (sub === "asset") {
         const uri = need(pos[4], "path or url");
-        let hash: string | undefined;
-        try { hash = fileSha(uri); } catch { hash = undefined; }
+        let hash: string | undefined = flags.sha256;
+        if (!hash) try { hash = fileSha(uri); } catch { hash = undefined; }
         return out(room.addAsset(by, { episodeId: epId, kind: need(pos[2], "kind") as any, label: need(pos[3], "label"), uri, sha256: hash }, flags.private ? "producer" : "public").id);
       }
       if (sub === "release") {
-        const file = need(pos[2], "released file");
+        // Either a local file (hashed here), or --sha256 and --uri for a file published elsewhere.
+        const file = flags.sha256 ? undefined : need(pos[2], "released file (or --sha256 and --uri)");
         const ev = room.release(by, {
           episodeId: epId,
           version: flags.version ?? `v${room.mustEpisode(epId).releases.length + 1}`,
-          uri: flags.uri ?? file,
-          sha256: fileSha(file),
-          scriptSha256: flags.script ? fileSha(flags.script) : undefined,
+          uri: flags.uri ?? need(file, "--uri"),
+          sha256: flags.sha256 ?? fileSha(file!),
+          scriptSha256: flags["script-sha256"] ?? (flags.script ? fileSha(flags.script) : undefined),
           runtimeMinutes: num(flags.runtime),
           invitation: need(flags.invitation, "--invitation"),
         });

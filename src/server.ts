@@ -326,12 +326,47 @@ const routes: Array<[string, RegExp, Handler]> = [
     requireProducer(req);
     send(res, 201, await tick(room, llm, m[1], { includeUnassigned: m[1] === INTAKE }));
   }],
+  ["POST", /^\/api\/producer\/console$/, async (req, res) => {
+    requireProducer(req);
+    const b = await body(req);
+    send(res, 200, await runConsole(b.args));
+  }],
   ["GET", /^\/api\/producer\/scorecard$/, (req, res) => {
     requireProducer(req);
     send(res, 200, room.scorecard());
   }],
   ["GET", /^\/healthz$/, (_q, res) => send(res, 200, { ok: true, chain: room.store.verify() })],
 ];
+
+/**
+ * The producer's console, remotely: run one CLI command on the server, against the live room.
+ * Everything it does lands in the same log patrons are watching. Producer token required.
+ */
+let consoleBusy = false;
+async function runConsole(args: string[]): Promise<{ code: number; out: string }> {
+  if (!Array.isArray(args) || !args.length || args.some((a) => typeof a !== "string")) throw new RuleError("request", "args must be a non-empty array of strings.");
+  if (["serve", "seed"].includes(args[0])) throw new RuleError("request", `'${args[0]}' can't run inside the live server.`);
+  if (args[0] === "bible" && args[1] === "chat") throw new RuleError("request", "bible chat is interactive; run it locally.");
+  if (consoleBusy) throw new RuleError("limits", "The console is busy with another command.");
+  consoleBusy = true;
+  try {
+    const { spawn } = await import("node:child_process");
+    return await new Promise((resolve) => {
+      const child = spawn(process.execPath, ["--import", "tsx", "src/cli.ts", ...args], { cwd: process.cwd(), env: process.env });
+      let out = "";
+      child.stdout.on("data", (d) => (out += d));
+      child.stderr.on("data", (d) => (out += d));
+      const timer = setTimeout(() => child.kill("SIGTERM"), 10 * 60_000);
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        room.store.sync(); // pick up what the command wrote, and stream it to the workshop
+        resolve({ code: code ?? 1, out: out.slice(-20_000) });
+      });
+    });
+  } finally {
+    consoleBusy = false;
+  }
+}
 
 function requireProducer(req: IncomingMessage) {
   if (!isProducer(req)) throw new RuleError("auth", "Producer token required.");

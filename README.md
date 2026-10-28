@@ -216,18 +216,42 @@ Templates live in `characters/*.md` and seed each dressing room the first time. 
 
 ## Deploy
 
+The room runs at **writers.story.markets** on one VPS. On the server, as root:
+
 ```bash
-cp .env.example .env    # set PRODUCER_TOKEN, ANTHROPIC_API_KEY, prices, GITHUB_OWNER
-docker compose up -d --build
+curl -fsSL https://raw.githubusercontent.com/leo-guinan/future-radio-writers-room/main/deploy/hetzner/install.sh | sudo bash
 ```
 
-The character bible tool comes from [leo-guinan/future-radio-character-bible](https://github.com/leo-guinan/future-radio-character-bible).
-The deployed server only pushes to GitHub if its git can authenticate; give it a token with
-access to the dressing-room repos (and to create episode repos) if you want it to publish on its own.
+It installs Docker if needed, clones this repo to `/opt/future-radio-writers-room`, writes
+`deploy/hetzner/.env` (a generated producer token; it asks for an Anthropic key and a GitHub
+token, both optional, and they stay on the server), and starts the room behind Caddy, which
+gets the HTTPS certificate itself. If something already holds ports 80/443, Caddy is skipped and
+the room listens on `127.0.0.1:8787` for your own proxy. Re-run the same command to update;
+the log, the repos and `.env` are kept.
 
-The container seeds itself on first boot only and keeps the log on the `room-data` volume. Put any TLS proxy in front (e.g. Caddy: `room.example.com { reverse_proxy localhost:8787 }`). Run the producer console inside the container: `docker compose exec room npx tsx src/cli.ts status E10`.
+DNS: an `A` record for `writers` → the server's IP, **DNS only** in Cloudflare (Caddy needs
+to answer the certificate challenge itself).
 
-Back up `/data/events.jsonl`. It's the whole show.
+On first boot the room restores the published log (`seed/room-log.jsonl`) and clones every
+dressing room, the extras and the episode repos from `GITHUB_OWNER`. With a `GITHUB_TOKEN`
+it pushes them back on every sync; without one it keeps working and just doesn't publish.
+
+### The producer console, remotely
+
+Every CLI command runs against the live room through the producer API:
+
+```bash
+curl -s https://writers.story.markets/api/producer/console \
+  -H "authorization: Bearer $PRODUCER_TOKEN" -H 'content-type: application/json' \
+  -d '{"args":["status","E10"]}' | jq -r .out
+```
+
+Patrons watching `/api/stream` see each command's events land. On the server itself:
+`cd /opt/future-radio-writers-room/deploy/hetzner && docker compose exec room npx tsx src/cli.ts status E10`.
+A released file published elsewhere is recorded by checksum:
+`episode release E10 --sha256 <hex> --uri <url> --invitation "..."`.
+
+Back up the `room-data` volume (`/data/events.jsonl` above all). It's the whole show.
 
 ## Layout
 

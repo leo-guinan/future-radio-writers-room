@@ -10,8 +10,10 @@ COPY seed ./seed
 COPY gates.json ./gates.json
 COPY public ./public
 COPY src ./src
+COPY cast.json ./cast.json
+COPY deploy/entrypoint.sh /usr/local/bin/room-entrypoint
 VOLUME ["/data"]
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://localhost:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 # Seed on first boot only; the seed command refuses to run on a log with history.
-CMD ["sh", "-c", "[ -s /data/events.jsonl ] || npx tsx src/cli.ts seed; npx tsx src/server.ts"]
+CMD ["room-entrypoint"]

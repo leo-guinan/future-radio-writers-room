@@ -1,0 +1,7 @@
+{$DOMAIN} {
+	encode gzip
+	# The workshop stream is server-sent events: never buffer it.
+	reverse_proxy room:8787 {
+		flush_interval -1
+	}
+}

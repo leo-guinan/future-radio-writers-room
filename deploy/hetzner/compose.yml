@@ -1,0 +1,27 @@
+# writers.story.markets on a single VPS: the room behind Caddy (automatic HTTPS).
+name: future-radio
+services:
+  room:
+    build: ../..
+    restart: unless-stopped
+    env_file: .env
+    expose: ["8787"]
+    ports: ["127.0.0.1:8787:8787"]   # for a host-level proxy, if Caddy isn't used
+    volumes:
+      - room-data:/data
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    profiles: ["caddy"]
+    environment:
+      DOMAIN: ${DOMAIN:-writers.story.markets}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [room]
+volumes:
+  room-data:
+  caddy-data:
+  caddy-config:

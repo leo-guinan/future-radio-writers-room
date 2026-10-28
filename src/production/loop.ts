@@ -36,8 +36,13 @@ export function checklist(room: Room, episodeId: string) {
     { task: "Choose one clear dramatic spine", done: reached("write") && (!scenesKnown || selected.length > 0) },
     {
       task: `Cut to a feasible runtime (${ep.budget.runtimeMinutes[0]}–${ep.budget.runtimeMinutes[1]} min)`,
-      done: scenesKnown ? minMinutes <= ep.budget.runtimeMinutes[1] : reached("write"),
-      detail: scenesKnown ? `selected scenes estimate ${minMinutes}–${maxMinutes} min` : undefined,
+      // Once a cut is released, the measured runtime is the answer; estimates were only ever forecasts.
+      done: release?.runtimeMinutes
+        ? release.runtimeMinutes >= ep.budget.runtimeMinutes[0] && release.runtimeMinutes <= ep.budget.runtimeMinutes[1]
+        : scenesKnown ? minMinutes <= ep.budget.runtimeMinutes[1] : reached("write"),
+      detail: release?.runtimeMinutes
+        ? `released runtime ${release.runtimeMinutes} min`
+        : scenesKnown ? `selected scenes estimate ${minMinutes}–${maxMinutes} min` : undefined,
     },
     { task: "Lock voices and recurring character identities", done: hasAsset("script") },
     { task: "Produce dialogue, music cues and minimal sound design", done: hasAsset("audio") || hasAsset("music") },

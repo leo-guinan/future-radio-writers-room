@@ -10,7 +10,9 @@ import { build as buildBible, characterFolders } from "future-radio-character-bi
 import { principals } from "../core/cast.ts";
 import { dressingRoom } from "./dressing-room.ts";
 import { extrasRepo } from "./extras.ts";
-import type { Repo } from "./git.ts";
+import { Repo as GitRepo, REPOS_DIR, type Repo } from "./git.ts";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 export interface SyncResult {
   character: string;
@@ -90,9 +92,37 @@ export function syncExtras(): SyncResult {
   }
 }
 
-/** Sync every dressing room and the extras, and record what came in on the room's log. */
+/** Episode repos with a GitHub remote: rebase onto anything pushed there, then push the room's work. */
+export function syncEpisodes(): SyncResult[] {
+  const dir = REPOS_DIR();
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((n) => n.startsWith("episode-") && existsSync(join(dir, n, ".git")))
+    .map((n) => {
+      const repo = new GitRepo(n);
+      const base: SyncResult = { character: n, repo: n, status: "no-remote", pulled: [], newViewerNotes: [], pushed: false };
+      if (!repo.remote()) return base;
+      try {
+        repo.git(["fetch", "-q", "origin"]);
+        if (repo.git(["rev-parse", "--verify", "-q", "origin/main"], true)) {
+          base.pulled = repo.git(["log", "--format=%s", "HEAD..origin/main"], true).split("\n").filter(Boolean);
+          repo.git(["rebase", "-q", "origin/main"], true);
+          if (repo.git(["rev-parse", "-q", "--verify", "REBASE_HEAD"], true)) {
+            repo.git(["rebase", "--abort"], true);
+            return { ...base, status: "conflict" as const, message: `Conflict rebasing ${n}; resolve it by hand.` };
+          }
+        }
+        repo.git(["push", "-q", "-u", "origin", "main"]);
+        return { ...base, status: "synced" as const, pushed: true };
+      } catch (e: any) {
+        return { ...base, status: "error" as const, message: String(e.stderr || e.message).trim().split("\n").at(-1) };
+      }
+    });
+}
+
+/** Sync every dressing room, the extras and the episode repos, and record what came in on the room's log. */
 export function syncAll(room: Room): SyncResult[] {
-  const results = [...principals().map(syncDressingRoom), syncExtras()];
+  const results = [...principals().map(syncDressingRoom), syncExtras(), ...syncEpisodes()];
   for (const r of results) {
     if (r.status !== "synced" || (!r.pulled.length && !r.newViewerNotes.length)) continue;
     room.store.append(
@@ -100,7 +130,7 @@ export function syncAll(room: Room): SyncResult[] {
       "system",
       {
         repo: r.repo,
-        sha: r.repo === "extras" ? extrasRepo().repo.head() : dressingRoom(r.character).repo.head(),
+        sha: r.repo === "extras" ? extrasRepo().repo.head() : r.repo.startsWith("episode-") ? new GitRepo(r.repo).head() : dressingRoom(r.character).repo.head(),
         message: `Synced ${r.pulled.length} change(s) from GitHub${r.newViewerNotes.length ? `, ${r.newViewerNotes.length} new viewer note(s)` : ""}`,
         files: r.newViewerNotes,
       },
