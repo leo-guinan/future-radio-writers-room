@@ -1,6 +1,6 @@
 // Validates proposal front matter in a PR. Usage: node scripts/check-proposals.mjs <files...>
 import { readFileSync } from "node:fs";
-const LAYERS = ["record", "rules", "work", "characters", "memory", "showrunner", "production", "participation", "deploy"];
+const LAYERS = ["record", "rules", "work", "roles", "characters", "memory", "showrunner", "production", "participation", "deploy"];
 const KINDS = ["capability", "change", "output", "question"];
 const REUSE = ["cc-by", "show-only", "ask-first"];
 let failed = 0;
