@@ -12,6 +12,9 @@ declare module "future-radio-character-bible" {
   export function render(dir: string): { model: BibleModel; files: Record<string, string> };
   export function stale(dir: string): string[];
   export function check(dir: string, opts?: { base?: string }): { ok: boolean; problems: string[]; notes: string[]; changed: Array<{ status: string; path: string }> };
+  export function load(dir: string): { name: string; slug: string };
   export function initGithub(dir: string, opts?: { pkg?: string; force?: boolean }): string[];
+  export function initExtrasGithub(root: string, opts?: { pkg?: string; force?: boolean }): string[];
+  export function characterFolders(dir: string): string[];
   export function propose(dir: string, opts: { note: string; from?: string; experience?: string; episode?: string; transcript?: Array<{ role: string; content: string }> }): string;
 }

@@ -104,10 +104,31 @@ export class Repo {
 
   /** Read a file exactly as it was at a commit. */
   showAt(sha: string, rel: string): string {
-    return this.git(["show", `${sha}:${rel}`]);
+    return this.git(["show", `${sha}:./${rel}`]); // ./ resolves against this folder, so it works for SubRepo too
   }
 
   remote(): string {
     return this.git(["remote", "get-url", "origin"], true);
+  }
+}
+
+/**
+ * A folder inside another repo, used like a repo of its own: reads and writes are
+ * relative to the folder, commits go to the repo that holds it.
+ */
+export class SubRepo extends Repo {
+  constructor(name: string, dir: string, readonly root: Repo) {
+    super(name, dir);
+  }
+  override get exists() {
+    return this.root.exists && existsSync(this.dir);
+  }
+  override init(): this {
+    if (!this.root.exists) throw new Error(`${this.root.name} is not set up yet.`);
+    mkdirSync(this.dir, { recursive: true });
+    return this;
+  }
+  override remote(): string {
+    return this.root.remote();
   }
 }

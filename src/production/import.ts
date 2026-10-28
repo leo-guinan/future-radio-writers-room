@@ -10,7 +10,9 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { sha256 } from "../core/events.ts";
 import type { Room } from "../core/room.ts";
-import { CAST, type Character, type IdeaStatus, type LedgerEntry, type OutputKind } from "../core/types.ts";
+import type { IdeaStatus, LedgerEntry, OutputKind } from "../core/types.ts";
+import { isPrincipal } from "../core/cast.ts";
+import { extrasRepo, slugify } from "../repos/extras.ts";
 import { dressingRoom, reposEnabled } from "../repos/dressing-room.ts";
 import { EpisodeRepo } from "../repos/episode-repo.ts";
 
@@ -20,12 +22,20 @@ interface Imported {
   imported: { at: string; by: string; sources: string[] };
   logline: string;
   tagline?: string;
-  cast: Array<{ character: string; role?: string; voice?: { provider: string; name: string; id: string; kind?: string; direction?: string } }>;
+  cast: Array<{
+    character: string;
+    slug?: string; // folder name, when it differs from `character`
+    extra?: boolean; // lives in the extras repo rather than a dressing room of their own
+    speaker?: string; // the name their lines carry in the script, e.g. LISTENER
+    cues?: string[]; // for characters without lines: patterns that pick out their [SFX]/[MUSIC] cues
+    role?: string;
+    voice?: { provider: string; name: string; id: string; kind?: string; direction?: string };
+  }>;
   scenes: Array<{ sceneId: string; title: string; role: string; start: string; minutes: [number, number]; summary: string; question: string }>;
   chaptersSource?: string;
   ideas: Array<{ title: string; question: string; output: OutputKind; episodeId?: string; status: IdeaStatus; reason: string; result?: string }>;
   decisions: string[];
-  canon: Partial<Record<Character, string[]>>;
+  canon: Record<string, string[]>;
   release: {
     version: string;
     file: string;
@@ -49,7 +59,7 @@ export interface ImportReport {
   episodeId: string;
   recorded: boolean; // false when the room already had this release
   events: number;
-  appearances: Array<{ character: Character; lines: number; file: string }>;
+  appearances: Array<{ character: string; lines: number; kind: "lines" | "cues"; extra: boolean; file: string }>;
   canonAdded: number;
   repo: { name: string; sha: string; files: number } | null;
   missingMedia: string[];
@@ -57,6 +67,15 @@ export interface ImportReport {
 
 // "**LEONARDO:** line" or "**AGNOLO** (off): line"
 const SPEAKER = /^\*\*([A-Z][A-Z ]+?)(?::\*\*|\*\*(?:\s*\(([^)]*)\))?:)\s*(.+)$/;
+
+/** Stage cues ([SFX: …], [MUSIC: …], [SONG: …]) matching any of `patterns`, in order. */
+export function cuesFor(script: string, patterns: string[]): string[] {
+  const res = patterns.map((p) => new RegExp(p, "i"));
+  return script
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^\[(SFX|MUSIC|SONG|Pause)/i.test(l) && res.some((re) => re.test(l)));
+}
 
 /** Every line a character speaks in a released script, in order. */
 export function linesFor(script: string, character: string): string[] {
@@ -127,24 +146,29 @@ export function importEpisode(room: Room, dir: string, opts: { actor?: string; m
   // The cast: voices, appearances and canon go into their dressing rooms.
   const releaseEvent = room.store.all().find((e) => e.type === "episode.released" && (e.payload as any).sha256 === spec.release.sha256)!;
   for (const member of spec.cast) {
-    const c = member.character as Character;
-    if (!CAST.includes(c)) continue;
-    const dr = dressingRoom(c).ensure();
+    const c = member.slug ?? slugify(member.character);
+    const extra = !isPrincipal(c);
+    // Principals have their own dressing room; anyone else is an extra, opened on first appearance.
+    if (extra && !member.extra) continue; // mentioned in the cast list, but not someone we track
+    const dr = extra ? extrasRepo().open(c) : dressingRoom(c).ensure();
     if (member.voice) dr.setVoice(member.voice);
-    const lines = linesFor(script, c);
+    const spoken = linesFor(script, member.speaker ?? c);
+    const kind: "lines" | "cues" = spoken.length || !member.cues ? "lines" : "cues";
+    const lines = kind === "lines" ? spoken : cuesFor(script, member.cues!);
     if (lines.length) {
       const a = dr.recordAppearance({
         episodeId: spec.episodeId,
         version: spec.release.version,
         title: spec.title,
         lines,
+        kind,
         releaseSha256: spec.release.sha256,
         at: spec.release.madeAt ?? releaseEvent.ts,
         eventId: releaseEvent.id,
         eventHash: releaseEvent.hash,
         script: `seed/episodes/${basename(dir)}/SCRIPT.md`,
       });
-      report.appearances.push({ character: c, lines: lines.length, file: a.file });
+      report.appearances.push({ character: c, lines: lines.length, kind, extra, file: a.file });
       if (a.created) room.store.append("repo.commit", "system", { repo: dr.repo.name, sha: a.sha, message: `Appears in ${spec.episodeId} ${spec.release.version}`, files: [a.file], episodeId: spec.episodeId }, "public");
     }
     for (const note of spec.canon[c] ?? []) {
@@ -153,6 +177,10 @@ export function importEpisode(room: Room, dir: string, opts: { actor?: string; m
       report.canonAdded++;
     }
   }
+
+  // The extras' index lists where each has been released; bring it up to date.
+  if (report.appearances.some((a) => a.extra)) extrasRepo().reindex(`Index ${spec.episodeId}'s extras`);
+  report.events = room.store.all().length - before;
 
   // The episode repo: the show plan, the record, and the cast projected as of this release.
   // Once written it is a fixed reference, like the release: a re-import leaves it alone.

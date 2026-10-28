@@ -22,7 +22,16 @@ import { REPOS_DIR } from "./repos/git.ts";
 import { syncAll } from "./repos/sync.ts";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { CAST } from "./core/types.ts";
+import { castFile, isPrincipal, principals } from "./core/cast.ts";
+import { extrasRepo, slugify } from "./repos/extras.ts";
+
+/** A character's home: their dressing room, or their folder in the extras. */
+function homeFor(slug: string) {
+  if (isPrincipal(slug)) return dressingRoom(slug);
+  const x = extrasRepo();
+  if (x.repo.exists && x.has(slug)) return x.extra(slug);
+  throw new RuleError("usage", `No dressing room or extra called ${slug}. Principals: ${principals().join(", ")}. Extras: ${x.repo.exists ? x.list().join(", ") || "none" : "none"}.`);
+}
 
 const INTAKE = process.env.INTAKE_EPISODE ?? "E02";
 
@@ -82,15 +91,20 @@ The characters
 Showrunner & repos
   showrunner tick EP [--no-explore] [--assigned-only]   Explore, gate, and assemble first cuts into the episode repo
   showrunner gates EP                    Active gates and why each open candidate is held
-  remember borges|leonardo|agnolo "note" [--source ref]  Add a durable note to a dressing room
+  remember <character> "note" [--source ref]  Add a durable note to a dressing room or an extra's folder
   repos list                             Dressing rooms and episode repos, with heads
   repos publish --owner GH_OWNER [--public] [--yes]   Create/push GitHub repos (dry run without --yes)
   repos sync                             Pull merged viewer PRs into dressing rooms, rebuild bibles, push
 
+Extras (characters without a story of their own yet)
+  extras list | extras status [slug]     Who's here, where they've turned up, and the case for promotion
+  extras open <slug> [--name "The cat"]  Give someone a folder (sketch from seed/extras/<slug>.md if present)
+  extras promote <slug> --reason "..."   Move them, with their git history, into a dressing room of their own
+
 Character bibles
-  bible build [character]                Rebuild bible/ in one or all dressing rooms
+  bible build [character]                Rebuild bible/ for one character, or everyone (principals and extras)
   bible show <character>                 Print the character's loadable system prompt
-  bible chat <character> [--from name]   Talk with the character locally; /propose drafts a viewer note
+  bible chat <character> [--from name]   Talk with a principal or an extra locally; /propose drafts a viewer note
 
 Agnolo's screen
   scorecard                              Observed / projected / disputed / unknown, three ledgers
@@ -321,23 +335,51 @@ async function main() {
       throw new RuleError("usage", "showrunner tick EP | showrunner gates EP");
     }
     case "remember": {
-      const c = need(pos[0], "character") as Character;
-      if (!CAST.includes(c)) throw new RuleError("usage", `Characters: ${CAST.join(", ")}`);
-      return out(dressingRoom(c).remember(need(pos[1], "note"), flags.source ?? by));
+      return out(homeFor(need(pos[0], "character")).remember(need(pos[1], "note"), flags.source ?? by));
+    }
+    case "extras": {
+      const x = extrasRepo().ensure();
+      const sub = pos[0] ?? "list";
+      if (sub === "list" || sub === "status") {
+        const who = sub === "status" && pos[1] ? [pos[1]] : x.list();
+        if (!who.length) out("No extras yet. Open one with: npm run room -- extras open <slug>");
+        for (const slug of who) {
+          const s = x.signals(slug, room);
+          out(`${s.worthConsidering ? "★" : " "} ${s.slug.padEnd(24)} ${s.name}`);
+          out(`    released in ${s.appearances.join(", ") || "nothing yet"} · ${s.viewerNotes} viewer note(s) · ideas ${s.ideas.join(", ") || "none"} (${s.votes} vote(s)) · ${s.openQuestions} open question(s)`);
+        }
+        const t = castFile().promotion;
+        out(`\n★ worth considering for a dressing room: ${t.appearances}+ released appearances and either ${t.viewerNotes}+ viewer notes or ${t.votes}+ votes. You decide.`);
+        for (const p of x.promoted()) out(`  promoted: ${p.slug}`);
+        return;
+      }
+      if (sub === "open") {
+        const slug = slugify(need(pos[1], "slug"));
+        const home = x.open(slug, { name: flags.name });
+        room.store.append("repo.commit", by, { repo: home.repo.name, sha: home.repo.head(), message: `Opened ${home.bible().name}'s folder in the extras`, files: [`${slug}/CHARACTER.md`] }, "public");
+        return out(`${slug}: ${home.repo.dir}\nEdit ${slug}/CHARACTER.md to sketch them (or add seed/extras/${slug}.md before opening).`);
+      }
+      if (sub === "promote") {
+        const slug = need(pos[1], "slug");
+        const before = x.signals(slug, room);
+        const r = x.promote(slug, need(flags.reason, "--reason (why they've earned it)"));
+        room.store.append("repo.commit", by, { repo: r.dressingRoom.repo.name, sha: r.dressingRoom.repo.head(), message: `Promoted ${before.name} from the extras: ${flags.reason}`, files: ["CHARACTER.md", "history.jsonl"] }, "public");
+        room.store.append("repo.commit", by, { repo: "extras", sha: r.extrasSha, message: `${before.name} left a forwarding note`, files: [`${slug}/PROMOTED.md`] }, "public");
+        out(`${before.name} has a dressing room: ${r.dressingRoom.repo.dir} (${r.carried} commits of history carried over).`);
+        out(`cast.json now lists them as a principal — commit it. To publish: create ${process.env.REPO_PREFIX ?? "future-radio-"}dressing-room-${slug} on GitHub and push, and push the extras.`);
+        return;
+      }
+      throw new RuleError("usage", "extras list | extras status [slug] | extras open <slug> [--name 'The cat'] | extras promote <slug> --reason '...'");
     }
     case "bible": {
       const [sub, who] = pos;
-      const pick = (w?: string): Character[] => {
-        if (!w) return CAST;
-        if (!CAST.includes(w as Character)) throw new RuleError("usage", `Characters: ${CAST.join(", ")}`);
-        return [w as Character];
-      };
+      const pick = (w?: string): string[] => (w ? [w] : [...principals(), ...extrasRepo().list()]);
       if (sub === "build") {
-        for (const c of pick(who)) out(`${c}: ${dressingRoom(c).ensure().refresh()} `);
+        for (const c of pick(who)) out(`${c}: ${homeFor(c).ensure().refresh()} `);
         return;
       }
       const c = pick(need(who, "character"))[0];
-      const dir = dressingRoom(c).ensure().repo.dir;
+      const dir = homeFor(c).ensure().repo.dir;
       const bin = createRequire(import.meta.url).resolve("future-radio-character-bible/bin/character-bible.js");
       if (sub === "show" || sub === "chat") {
         spawnSync(process.execPath, [bin, sub, dir, ...(flags.from ? ["--from", flags.from] : [])], { stdio: "inherit" });
@@ -363,7 +405,7 @@ async function main() {
         }
         // Point every dressing room's CI at the published bible tool before it goes up.
         const pkg = `github:${flags.owner}/future-radio-character-bible`;
-        for (const c of CAST) dressingRoom(c).retarget(pkg);
+        for (const c of principals()) dressingRoom(c).retarget(pkg);
         for (const r of publish(planPublish(flags.owner, flags.public ? "public" : "private"))) out(`${r.ok ? "✓" : "✗"} ${r.action} ${r.target}${r.ok ? "" : ` — ${r.error}`}`);
         return;
       }

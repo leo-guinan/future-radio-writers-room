@@ -14,7 +14,8 @@ import { join } from "node:path";
 import { sha256 } from "../core/events.ts";
 import type { Episode } from "../core/room.ts";
 import { LOCKED_RULES } from "../core/room.ts";
-import type { Character } from "../core/types.ts";
+import { isPrincipal } from "../core/cast.ts";
+import { extrasRepo } from "./extras.ts";
 import { dressingRoom } from "./dressing-room.ts";
 import { Repo } from "./git.ts";
 import { execFileSync } from "node:child_process";
@@ -35,7 +36,7 @@ function cloneFromGithub(name: string, dir: string): boolean {
 }
 
 export interface Projection {
-  character: Character;
+  character: string;
   file: string;
   repo: string;
   sha: string;
@@ -77,8 +78,10 @@ export class EpisodeRepo {
    * Project a character into the episode: their persona, their notes, and the history
    * entries most relevant to `query` — each cited to the dressing room commit it came from.
    */
-  project(character: Character, query: string, ideaId?: string): Projection {
-    const room = dressingRoom(character).ensure();
+  project(character: string, query: string, ideaId?: string): Projection {
+    // Principals project from their dressing room into cast/; extras from their folder into cast/extras/.
+    const extra = !isPrincipal(character);
+    const room = extra ? extrasRepo().extra(character).ensure() : dressingRoom(character).ensure();
     const sha = room.repo.head();
     const short = sha.slice(0, 7);
     const repoName = room.repo.name;
@@ -90,7 +93,7 @@ export class EpisodeRepo {
     ];
     const voice = bible.voice.samples.slice(-4);
     const sources = ["CHARACTER.md", "bible/bible.json", ...(notes.length ? ["memory/notes.md"] : []), ...bible.canon.viewerNotes.map((v) => v.file), ...relevant.map((r) => r.file)];
-    const name = character[0].toUpperCase() + character.slice(1);
+    const name = bible.name;
     const content =
       `<!-- projected from ${repoName}@${sha} — do not edit; re-project instead -->\n` +
       `# ${name} in ${this.episodeId}\n\n` +
@@ -103,7 +106,7 @@ export class EpisodeRepo {
         ? relevant.map((r) => `- ${oneLine(r.text)} — \`${repoName}@${short}:${r.file}\` (room ${r.eventId})`).join("\n")
         : "_Nothing yet. This is their first time near this idea._") +
       "\n";
-    const file = `cast/${character}.md`;
+    const file = extra ? `cast/extras/${character}.md` : `cast/${character}.md`;
     this.repo.write(file, content);
     const prov = this.provenance();
     prov.files[file] = { repo: repoName, sha, sources, sha256: sha256(content), projectedAt: new Date().toISOString() };

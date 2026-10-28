@@ -230,7 +230,7 @@ export interface IdeaCut {
   path: string; // cuts/I-0008
   approach: string;
   gatesPassed: string[];
-  projections: Array<{ character: Character; repo: string; sha: string }>;
+  projections: Array<{ character: string; repo: string; sha: string }>;
 }
 
 export interface GateResult {

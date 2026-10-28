@@ -25,6 +25,7 @@ async function refresh() {
   renderScore();
   renderBoard();
   renderCast();
+  renderExtras();
   const sel = $("#ep-select");
   if (sel.options.length === 1)
     for (const e of snap.episodes) if (!e.releases.length) sel.add(new Option(`${e.number}. ${e.title}`, e.episodeId));
@@ -107,6 +108,22 @@ async function renderCast() {
       }</p>
     </article>`)
     .join("");
+}
+
+async function renderExtras() {
+  const extras = await api("/api/extras").catch(() => []);
+  $("#extras").innerHTML = extras.length
+    ? extras
+        .map(
+          (x) => `<article class="extra">
+      <h4>${esc(x.name)}${x.worthConsidering ? ` <span class="tag" title="Enough appearances and interest to consider a dressing room">rising</span>` : ""}</h4>
+      <p>${esc(x.intro)}</p>
+      <p class="stats">${x.appearances.length ? `in ${esc(x.appearances.join(", "))}` : "not in a released episode yet"} · ${x.openQuestions} open question${x.openQuestions === 1 ? "" : "s"}${x.viewerNotes ? ` · ${x.viewerNotes} viewer note${x.viewerNotes === 1 ? "" : "s"}` : ""}${x.votes ? ` · ${x.votes} vote${x.votes === 1 ? "" : "s"}` : ""}</p>
+      ${x.links ? `<p class="links"><a class="link" href="${esc(x.links.folder)}" target="_blank" rel="noopener">What we know</a> · <a class="link" href="${esc(x.links.note)}" target="_blank" rel="noopener">Tell us something</a></p>` : ""}
+    </article>`,
+        )
+        .join("")
+    : `<p class="empty">No extras yet.</p>`;
 }
 
 // ------------------------------------------------------------ feed

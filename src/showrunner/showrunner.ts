@@ -13,6 +13,7 @@ import type { GateResult, IdeaCut, ShowrunnerTick } from "../core/types.ts";
 import { explore, record, showBible, persona, type Approach, type Evaluation, DEFAULT_CEILING } from "../agents/characters.ts";
 import type { LLM } from "../agents/llm.ts";
 import { EpisodeRepo, type Projection } from "../repos/episode-repo.ts";
+import { extrasRepo } from "../repos/extras.ts";
 import { activeGates, evaluate, type Candidate, type GatesFile } from "./gates.ts";
 
 const OPEN = new Set(["proposed", "explored", "compared", "selected"]);
@@ -127,7 +128,9 @@ async function assembleCut(room: Room, llm: LLM, repo: EpisodeRepo, episodeId: s
   const idea = c.idea;
   const a = c.chosen!;
   const query = `${idea.title} ${idea.question} ${idea.source}`;
-  const projections: Projection[] = (["borges", "leonardo", "agnolo"] as const).map((ch) => repo.project(ch, query, idea.ideaId));
+  // The three who work in the room, plus any extra the idea mentions by name.
+  const mentioned = extrasRepo().repo.exists ? extrasRepo().mentionedIn(`${idea.title} ${idea.question} ${idea.source} ${a.title} ${a.deliverable}`) : [];
+  const projections: Projection[] = [...(["borges", "leonardo", "agnolo"] as const), ...mentioned].map((ch) => repo.project(ch, query, idea.ideaId));
   const cast = projections.map((p) => repo.repo.read(p.file)).join("\n\n---\n\n");
   const ep = room.mustEpisode(episodeId);
 

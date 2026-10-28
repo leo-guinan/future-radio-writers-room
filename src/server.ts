@@ -15,7 +15,8 @@ import { tick } from "./showrunner/showrunner.ts";
 import { EpisodeRepo } from "./repos/episode-repo.ts";
 import { dressingRoom, reposEnabled } from "./repos/dressing-room.ts";
 import { syncAll } from "./repos/sync.ts";
-import { CAST } from "./core/types.ts";
+import { principals } from "./core/cast.ts";
+import { extrasRepo } from "./repos/extras.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TOKEN = process.env.PRODUCER_TOKEN ?? "";
@@ -36,9 +37,32 @@ function githubUrl(remote: string): string | null {
   return m ? `https://github.com/${m[1]}` : null;
 }
 
+function extrasList() {
+  if (!reposEnabled()) return [];
+  const x = extrasRepo();
+  if (!x.repo.exists) return [];
+  const url = githubUrl(x.repo.remote());
+  return x.list().map((slug) => {
+    const s = x.signals(slug, room);
+    const b = x.extra(slug).bible();
+    return {
+      slug,
+      name: s.name,
+      intro: b.identity.intro.split("\n\n")[0],
+      appearances: s.appearances,
+      viewerNotes: s.viewerNotes,
+      openQuestions: s.openQuestions,
+      ideas: s.ideas,
+      votes: s.votes,
+      worthConsidering: s.worthConsidering,
+      links: url ? { folder: `${url}/tree/main/${slug}`, bible: `${url}/blob/main/${slug}/bible/BIBLE.md`, contribute: `${url}/blob/main/CONTRIBUTING.md`, note: `${url}/issues/new?template=viewer-note.yml` } : null,
+    };
+  });
+}
+
 function cast() {
   if (!reposEnabled()) return [];
-  return CAST.map((c) => {
+  return principals().map((c) => {
     const dr = dressingRoom(c).ensure();
     const b = dr.bible();
     const url = githubUrl(dr.repo.remote());
@@ -187,6 +211,7 @@ type Handler = (req: IncomingMessage, res: ServerResponse, m: RegExpMatchArray) 
 const routes: Array<[string, RegExp, Handler]> = [
   ["GET", /^\/api\/room$/, (_q, res) => send(res, 200, snapshot())],
   ["GET", /^\/api\/cast$/, (_q, res) => send(res, 200, cast())],
+  ["GET", /^\/api\/extras$/, (_q, res) => send(res, 200, extrasList())],
   ["GET", /^\/api\/events$/, (req, res) => {
     const since = Number(new URL(req.url!, "http://x").searchParams.get("since") ?? 0);
     send(res, 200, room.publicEvents(since).slice(-300));

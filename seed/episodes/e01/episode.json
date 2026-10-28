@@ -52,15 +52,28 @@
         "name": "Yuria - Expressive, Playful, Witty",
         "id": "vGfq3y2g8QTWjuUhrNYc",
         "kind": "library"
-      }
+      },
+      "extra": true,
+      "speaker": "LISTENER"
     },
     {
       "character": "the cat",
-      "role": "sound design only"
+      "role": "sound design only",
+      "slug": "the-cat",
+      "extra": true,
+      "cues": [
+        "\\bcat\\b"
+      ]
     },
     {
       "character": "the Unspoken Orchestra",
-      "role": "music, D minor, 92 BPM; the machine's tenor voice sings"
+      "role": "music, D minor, 92 BPM; the machine's tenor voice sings",
+      "slug": "the-unspoken-orchestra",
+      "extra": true,
+      "cues": [
+        "^\\[(MUSIC|SONG)",
+        "Unspoken Orchestra"
+      ]
     }
   ],
   "scenes": [
@@ -208,6 +221,16 @@
       "Has been hearing Leonardo's broadcasts for a long time, in fragments between the shelves — though Episode 001 is the first one.",
       "Gave the radio its name: he has been waiting for someone to invent it.",
       "\"I have nothing but time.\""
+    ],
+    "yuria": [
+      "In E01, a listener in the future, overheard mid-sentence talking to someone in her own room: \"—no, leave it on. I like this one.\" She is Leonardo's first proof that someone is there."
+    ],
+    "the-cat": [
+      "Leonardo's cat, in his workshop in Florence, 1504. He calls her a research cat; the beeswax was her idea, and Agnolo found her fish entered under \"research.\""
+    ],
+    "the-unspoken-orchestra": [
+      "Leonardo built it to say what he means when his words are too slow. It has opinions, and insists on singing, in a tenor voice better than his.",
+      "In E01 it sings the chorus of \"Not Enough Time\" until Leonardo admits his fear, then stops dead; later it turns his technical explanation into \"Make It With Me.\""
     ]
   },
   "release": {

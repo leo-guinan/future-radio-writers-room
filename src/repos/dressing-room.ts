@@ -15,9 +15,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { join } from "node:path";
-import type { AgentRun, Character } from "../core/types.ts";
+import type { AgentRun } from "../core/types.ts";
 import { build as buildBible, initGithub, render as renderBible, type BibleModel } from "future-radio-character-bible";
-import { Repo, REPOS_DIR } from "./git.ts";
+import { Repo, REPOS_DIR, SubRepo } from "./git.ts";
 
 const TEMPLATE_DIR = () => process.env.CHARACTERS_DIR ?? join(process.cwd(), "characters");
 export const biblePackage = () =>
@@ -37,10 +37,19 @@ export interface HistoryEntry {
 
 const tokens = (s: string) => new Set(s.toLowerCase().match(/[a-z0-9]{4,}/g) ?? []);
 
+/**
+ * A character's home: their own repo (a dressing room) or, for an extra, their folder in
+ * the shared extras repo. Everything below works the same way in both.
+ */
 export class DressingRoom {
   readonly repo: Repo;
-  constructor(readonly character: Character) {
-    this.repo = new Repo(`dressing-room-${character}`);
+  constructor(readonly character: string, home?: Repo) {
+    this.repo = home ?? new Repo(`dressing-room-${character}`);
+  }
+
+  /** Extras live in a folder of the shared extras repo, not in a repo of their own. */
+  get isExtra() {
+    return this.repo instanceof SubRepo;
   }
 
   /** Open the room the first time, seeded from the template persona in characters/. */
@@ -49,6 +58,7 @@ export class DressingRoom {
       if (!this.repo.has("bible/BIBLE.md")) this.refresh("Add the character bible and viewer contribution guide");
       return this;
     }
+    if (this.isExtra) throw new Error(`No extra called ${this.character}. Open one with: npm run room -- extras open ${this.character}`);
     if (this.cloneFromGithub()) return this;
     this.repo.init();
     const template = join(TEMPLATE_DIR(), `${this.character}.md`);
@@ -91,7 +101,7 @@ export class DressingRoom {
   }
 
   /** Commit, then rebuild the bible so its changelog includes this commit, and fold that in. */
-  private commitWithBible(message: string): string {
+  commitWithBible(message: string): string {
     buildBible(this.repo.dir);
     this.repo.commit(message);
     return buildBible(this.repo.dir).changed.length ? this.repo.amend() : this.repo.head();
@@ -107,13 +117,17 @@ export class DressingRoom {
 
   /** Bring scaffolding, show bible and character bible up to date, and commit if anything changed. */
   refresh(message = "Rebuild the character bible"): string {
-    this.syncShowBible();
-    initGithub(this.repo.dir, { pkg: biblePackage() });
+    if (!this.isExtra) {
+      // An extra shares the extras repo's show bible and contribution guide.
+      this.syncShowBible();
+      initGithub(this.repo.dir, { pkg: biblePackage() });
+    }
     return this.commitWithBible(message);
   }
 
   /** Point the CI workflow and contribution guide at the published character-bible package. */
   retarget(pkg: string): string {
+    if (this.isExtra) return this.repo.head();
     initGithub(this.repo.dir, { pkg, force: true });
     return this.commitWithBible(`Use ${pkg} for the character bible`);
   }
@@ -195,7 +209,8 @@ export class DressingRoom {
    * A released episode is the strongest record of how a character sounds. Their lines
    * from it go into history as an appearance, pinned to the release's checksum.
    */
-  recordAppearance(a: { episodeId: string; version: string; title: string; lines: string[]; releaseSha256: string; at: string; eventId: string; eventHash: string; script: string }): { sha: string; file: string; created: boolean } {
+  recordAppearance(a: { episodeId: string; version: string; title: string; lines: string[]; kind?: "lines" | "cues"; releaseSha256: string; at: string; eventId: string; eventHash: string; script: string }): { sha: string; file: string; created: boolean } {
+    const what = a.kind === "cues" ? `${a.lines.length} cue${a.lines.length === 1 ? "" : "s"}, no spoken lines` : `${a.lines.length} line${a.lines.length === 1 ? "" : "s"}`;
     this.ensure();
     const runId = `${a.episodeId}-${a.version}`;
     const file = `history/appearances/${runId}.md`;
@@ -217,7 +232,7 @@ export class DressingRoom {
       "",
       `# ${a.episodeId} — ${a.title} (${a.version}, as released)`,
       "",
-      `${a.lines.length} lines.`,
+      `${what}.`,
       "",
       ...a.lines.map((l) => `- ${l}`),
       "",
@@ -225,7 +240,7 @@ export class DressingRoom {
     this.repo.write(file, body);
     const entry: HistoryEntry = { runId, at: a.at, episodeId: a.episodeId, askedBy: "released", eventId: a.eventId, eventHash: a.eventHash, file, text: a.lines.join(" ").slice(0, 600) };
     this.repo.append("history.jsonl", JSON.stringify(entry) + "\n");
-    return { sha: this.commitWithBible(`${this.character}: appears in ${a.episodeId} ${a.version} (${a.lines.length} lines)`), file, created: true };
+    return { sha: this.commitWithBible(`${this.character}: appears in ${a.episodeId} ${a.version} (${what})`), file, created: true };
   }
 
   remember(note: string, source: string): string {
@@ -270,7 +285,7 @@ export class DressingRoom {
 }
 
 const rooms = new Map<string, DressingRoom>();
-export const dressingRoom = (c: Character) => {
+export const dressingRoom = (c: string) => {
   const key = `${REPOS_DIR()}|${c}`;
   let r = rooms.get(key);
   if (!r) rooms.set(key, (r = new DressingRoom(c)));

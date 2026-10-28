@@ -198,3 +198,13 @@ h3 { margin-top: 18px; margin-bottom: 6px; }
 .member .stats { margin: 0; font: .72rem var(--mono); color: var(--muted); }
 .member .vnotes { margin: 0; padding-left: 1rem; font-size: .86rem; }
 .member .links { margin: auto 0 0; font-size: .85rem; padding-top: 4px; }
+
+/* extras */
+.extras-head { margin-top: 20px; }
+.extras-head h3 { font-size: 1.05rem; margin: 0; }
+.extras { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 8px; }
+.extra { border: 1px dashed var(--rule); border-radius: 3px; padding: 10px 12px; background: transparent; }
+.extra h4 { margin: 0; font: 600 1rem var(--display); }
+.extra p { margin: 4px 0 0; font-size: .88rem; color: var(--ink-2); }
+.extra .stats { font: .7rem var(--mono); color: var(--muted); }
+.extra .links { font-size: .82rem; }
