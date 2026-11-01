@@ -92,6 +92,27 @@
       "repo": {"url": null, "branch": null, "commit": null},
       "releases": [{"release_id": "youtube-2026-11-01", "state": "verified_public", "repo_path": null, "runtime_seconds": 208, "youtube": {"video_id": "VFxdhiqjWUE", "url": "https://www.youtube.com/watch?v=VFxdhiqjWUE", "title": "Future Radio — From Minus One to Zero", "privacy_status": "public", "processing_status": "succeeded", "readback_duration": "PT3M28S"}, "assets": [{"asset_id": "minus-zero-master", "kind": "master_video", "state": "local_only", "sha256": "1be9f00d7ccb860ee7aad046a1bf8d9bb500990f09f54dba53876f9a29c8db9d"}, {"asset_id": "minus-zero-thumbnail", "kind": "thumbnail", "state": "local_only", "sha256": "26921ab235db75d9a5b99fc80d035918b6f5e4f6050e19041de0615599c6e0c5"}]}],
       "youtube": {"state": "verified_public", "video_id": "VFxdhiqjWUE", "url": "https://www.youtube.com/watch?v=VFxdhiqjWUE"}
+    },
+    {
+      "work_id": "ledger-of-what-happened",
+      "kind": "meeting-episode",
+      "title": "The Ledger of What Happened",
+      "episode_number": null,
+      "repo": {"url": "https://github.com/leo-guinan/future-radio-writers-room", "branch": "main", "commit": null, "path": "catalog/releases/ledger-of-what-happened"},
+      "releases": [{
+        "release_id": "audio-draft-v1",
+        "state": "repo_release",
+        "repo_path": "catalog/releases/ledger-of-what-happened",
+        "runtime_seconds": 502.24,
+        "assets": [
+          {"asset_id": "ledger-audio-master", "kind": "master_audio", "state": "repo_release", "sha256": "03437d83de65fffcf1ea1568161ee3b57556c933c0bfe912fbcb128ec97322e1", "uri": null},
+          {"asset_id": "ledger-line-manifest", "kind": "dialogue_manifest", "state": "repo_release", "sha256": "d0f52962aa5e48cdf07f73bd2577fe491ee94697e91cef3a2600857665418def", "uri": null},
+          {"asset_id": "ledger-voice-generation-manifest", "kind": "voice_receipts", "state": "repo_release", "sha256": "ce60a0307b44567a1bfb3333ca5882d245313c704dfcb52a61655a8ab372e22a", "uri": null}
+        ],
+        "publication": null,
+        "gaps": ["youtube_publication", "visual_master", "public_repository_readback"]
+      }],
+      "youtube": {"state": "missing", "video_id": null, "url": null}
     }
   ]
 }

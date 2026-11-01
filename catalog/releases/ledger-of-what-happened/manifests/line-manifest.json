@@ -1,0 +1,514 @@
+{
+  "lines": [
+    {
+      "index": 0,
+      "speaker": "AGNOLO",
+      "text": "Close the doors.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 1,
+      "speaker": "LEONARDO",
+      "text": "There are no doors.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 2,
+      "speaker": "AGNOLO",
+      "text": "Then close whatever architectural compromise is currently pretending to be a door.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 3,
+      "speaker": "BORGES",
+      "text": "I have found a door.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 4,
+      "speaker": "AGNOLO",
+      "text": "Where?",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 5,
+      "speaker": "BORGES",
+      "text": "In the catalogue. It is not a door one enters. It is a door through which identities leave.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 6,
+      "speaker": "LEONARDO",
+      "text": "Why have you called us?",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 7,
+      "speaker": "AGNOLO",
+      "text": "Because the accounts do not agree. The public account says there are six Future Radio publications. The local receipts say there are five. The episode repositories say there are two. The scratch directories say there are five production directories.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 8,
+      "speaker": "LEONARDO",
+      "text": "That sounds like five.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 9,
+      "speaker": "AGNOLO",
+      "text": "It is five directories. It is not necessarily five works.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 10,
+      "speaker": "BORGES",
+      "text": "I have brought the library.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 11,
+      "speaker": "AGNOLO",
+      "text": "You brought a library?",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 12,
+      "speaker": "BORGES",
+      "text": "No. I brought the part of it that disagrees with us.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 13,
+      "speaker": "BORGES",
+      "text": "The first concept is provenance.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 14,
+      "speaker": "LEONARDO",
+      "text": "Origin.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 15,
+      "speaker": "BORGES",
+      "text": "More precisely: the record of where a thing came from, what happened to it, and which claims about it are supported by evidence.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 16,
+      "speaker": "AGNOLO",
+      "text": "So a provenance record is a receipt.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 17,
+      "speaker": "BORGES",
+      "text": "A receipt is one kind of provenance record. Provenance asks: what is this thing, and how did it become this thing?",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 18,
+      "speaker": "LEONARDO",
+      "text": "Then we need to distinguish the work from its versions.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 19,
+      "speaker": "BORGES",
+      "text": "The library uses three shelves. Work. Release. Asset.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 20,
+      "speaker": "LEONARDO",
+      "text": "Explain.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 21,
+      "speaker": "BORGES",
+      "text": "A work is the durable creative identity. E10: The People vs. The Future. A release is one deliberate, frozen edition of that work. E10 audio, version one. E10 development movie, published to YouTube. An asset is a component or artifact: the script, the audio master, a still image, the thumbnail, the description, the movie, the upload receipt.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 22,
+      "speaker": "AGNOLO",
+      "text": "So the eight-minute E10 audio and the thirty-five-minute E10 movie are not the same thing.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 23,
+      "speaker": "BORGES",
+      "text": "They may belong to the same work. They are not the same release merely because the title is similar.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 24,
+      "speaker": "LEONARDO",
+      "text": "If the movie contains the audio, we draw an edge between them. We do not collapse them.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 25,
+      "speaker": "BORGES",
+      "text": "Correct.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 26,
+      "speaker": "AGNOLO",
+      "text": "The immediate discrepancy: five local YouTube receipts, six actual Future Radio uploads.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 27,
+      "speaker": "BORGES",
+      "text": "The missing receipt belongs to Future Radio 001: Leonardo da Vinci Invents the Radio. Then His Bookkeeper Sends the Bill.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 28,
+      "speaker": "LEONARDO",
+      "text": "The First Transmission.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 29,
+      "speaker": "AGNOLO",
+      "text": "The repository is E01. Its release is nine minutes and one second. The YouTube video is nine minutes and one second. The title and runtime agree. The original upload receipt is absent.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 30,
+      "speaker": "LEONARDO",
+      "text": "Then it is E01.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 31,
+      "speaker": "AGNOLO",
+      "text": "Probable.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 32,
+      "speaker": "LEONARDO",
+      "text": "You say that as if the number has offended you.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 33,
+      "speaker": "AGNOLO",
+      "text": "The evidence supports a probable linkage. It does not support pretending that we found the receipt.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 34,
+      "speaker": "BORGES",
+      "text": "There are levels of certainty: verified, observed, inferred, unresolved, and contradicted.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 35,
+      "speaker": "LEONARDO",
+      "text": "The E01 match is probable. The five later uploads are verified public because their receipts contain the video ID, channel identity, processing readback, privacy state, duration, source movie hash, and thumbnail hash.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 36,
+      "speaker": "AGNOLO",
+      "text": "The catalog must preserve uncertainty instead of smoothing it away.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 37,
+      "speaker": "BORGES",
+      "text": "A smooth archive is often a dishonest archive.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 38,
+      "speaker": "LEONARDO",
+      "text": "I see the structure. At the center: a work record. Under it: releases. Under each release: assets. Beside each asset: hashes, roles, parents, repository references, and states.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 39,
+      "speaker": "AGNOLO",
+      "text": "And the event log?",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 40,
+      "speaker": "LEONARDO",
+      "text": "Append-only. It records what the room believed and when. The catalog is a projection derived from those events and from external evidence.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 41,
+      "speaker": "AGNOLO",
+      "text": "So if the catalog is corrected, the old mistake remains in the event log.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 42,
+      "speaker": "LEONARDO",
+      "text": "It must. Otherwise correction becomes erasure.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 43,
+      "speaker": "BORGES",
+      "text": "A cryptographic hash gives each file a content fingerprint. Change one byte and the fingerprint changes.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 44,
+      "speaker": "AGNOLO",
+      "text": "A number cannot tell us whether the file is a thumbnail or a bad tax return.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 45,
+      "speaker": "BORGES",
+      "text": "Exactly. Identity is not interpretation.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 46,
+      "speaker": "LEONARDO",
+      "text": "Every asset needs both a content identity, which is the hash, and a declared role: master video, thumbnail, dialogue manifest, voice receipt, description, or script.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 47,
+      "speaker": "AGNOLO",
+      "text": "And local paths?",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 48,
+      "speaker": "BORGES",
+      "text": "A local path is a location in one person’s present tense. It is not a durable identity.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 49,
+      "speaker": "LEONARDO",
+      "text": "We record the path as an observation, but anchor the artifact with its hash, role, and eventual durable URI.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 50,
+      "speaker": "AGNOLO",
+      "text": "“Found here” is not the same as “belongs here.” Put that in the ledger.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 51,
+      "speaker": "BORGES",
+      "text": "It is already in the margins.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 52,
+      "speaker": "AGNOLO",
+      "text": "What do we do with the smaller pieces?",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 53,
+      "speaker": "LEONARDO",
+      "text": "We create four repositories.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 54,
+      "speaker": "AGNOLO",
+      "text": "No.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 55,
+      "speaker": "LEONARDO",
+      "text": "You have not heard the rest.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 56,
+      "speaker": "AGNOLO",
+      "text": "I have heard enough. Four small productions, four release systems, four places for the same mistake to acquire a different spelling.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 57,
+      "speaker": "BORGES",
+      "text": "The archive recommends one dedicated repository: Future Radio Releases.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 58,
+      "speaker": "LEONARDO",
+      "text": "One directory per work. One release manifest per publication unit. Small metadata and manifests in Git. Large binaries attached to tagged releases, Git LFS, or object storage. Every binary retains its SHA-256 and durable URI.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 59,
+      "speaker": "AGNOLO",
+      "text": "And the pieces that are not numbered episodes?",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 60,
+      "speaker": "LEONARDO",
+      "text": "They do not need counterfeit numbers. Interlude. CTA. Companion. Stable work IDs, with relationships added later rather than history renamed.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 61,
+      "speaker": "BORGES",
+      "text": "The library contains appendices that became books.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 62,
+      "speaker": "AGNOLO",
+      "text": "Good. Now the final concept.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 63,
+      "speaker": "BORGES",
+      "text": "Independent readback.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 64,
+      "speaker": "AGNOLO",
+      "text": "We already have receipts.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 65,
+      "speaker": "BORGES",
+      "text": "A receipt is a claim made by the process that performed the action. Readback is an independent observation that the claimed state exists.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 66,
+      "speaker": "LEONARDO",
+      "text": "The upload script says public. We query YouTube and confirm public. The build script says the movie exists. We decode it and inspect its duration. The repository says the asset exists. We fetch it and compare the hash.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 67,
+      "speaker": "AGNOLO",
+      "text": "Endpoint success is not state verification.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 68,
+      "speaker": "LEONARDO",
+      "text": "Then the rule is simple: no verified claim without a readback.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 69,
+      "speaker": "AGNOLO",
+      "text": "Better: no claim should hide its evidence ceiling.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 70,
+      "speaker": "AGNOLO",
+      "text": "The decision. Borges prepares the concept notes: provenance, content-addressed identity, work-release-asset modeling, append-only logs, lineage, uncertainty, and independent readback.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 71,
+      "speaker": "LEONARDO",
+      "text": "I design the catalog and repository structure.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 72,
+      "speaker": "AGNOLO",
+      "text": "I audit every claim against the ledger.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 73,
+      "speaker": "BORGES",
+      "text": "And the public archive?",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 74,
+      "speaker": "AGNOLO",
+      "text": "Not yet. A catalog that has not been independently checked is merely a confident list.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 75,
+      "speaker": "LEONARDO",
+      "text": "Then we begin with the six public uploads.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 76,
+      "speaker": "AGNOLO",
+      "text": "We begin with the missing receipt.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 77,
+      "speaker": "BORGES",
+      "text": "E01.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 78,
+      "speaker": "LEONARDO",
+      "text": "A work, a release, an asset, and a publication.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 79,
+      "speaker": "AGNOLO",
+      "text": "A probable linkage. An unresolved gap. And, if we do this correctly, a future correction that will not require us to invent the past.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 80,
+      "speaker": "THE ARCHIVE",
+      "text": "At the meeting’s end, the archive contained six creative works, six public YouTube releases, two episode repositories, four productions awaiting durable repository homes, one probable E01 linkage, one E10 release whose documentation pointed to a path that no longer existed, and one hundred and eighty-one local artifacts waiting to be assigned a permanent address.",
+      "voice_id": "onwK4e9ZLuTAKqWW03F9"
+    },
+    {
+      "index": 81,
+      "speaker": "BORGES",
+      "text": "A record is not a memory.",
+      "voice_id": "TLugb594bskyzPlFSOkh"
+    },
+    {
+      "index": 82,
+      "speaker": "LEONARDO",
+      "text": "A record is a mechanism for remembering.",
+      "voice_id": "s5t7B6IvxVOp3Y7HQT6Q"
+    },
+    {
+      "index": 83,
+      "speaker": "AGNOLO",
+      "text": "A record is a promise that the next discrepancy will be cheaper.",
+      "voice_id": "s2wvuS7SwITYg8dqsJdn"
+    },
+    {
+      "index": 84,
+      "speaker": "THE ARCHIVE",
+      "text": "The promise was not yet verified.",
+      "voice_id": "onwK4e9ZLuTAKqWW03F9"
+    }
+  ]
+}

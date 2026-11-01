@@ -1,0 +1,82 @@
+{
+  "status": "generated",
+  "episode_id": "ledger-of-what-happened",
+  "release_id": "audio-draft-v1",
+  "source_script": "/Users/leoguinan/.hermes/profiles/quainance/cache/scratch/future-radio-ledger-of-what-happened.md",
+  "source_sha256": "20c5ec387eac19ff3978d0437eeecb4ecb08b96bf8199efe7260b4ba6ec186c7",
+  "provider": "elevenlabs",
+  "endpoint": "/v1/text-to-dialogue",
+  "model_id": "eleven_v4",
+  "output_format": "mp3_44100_128",
+  "line_count": 85,
+  "batch_count": 4,
+  "voices": {
+    "LEONARDO": "s5t7B6IvxVOp3Y7HQT6Q",
+    "BORGES": "TLugb594bskyzPlFSOkh",
+    "AGNOLO": "s2wvuS7SwITYg8dqsJdn",
+    "THE ARCHIVE": "onwK4e9ZLuTAKqWW03F9"
+  },
+  "batches": [
+    {
+      "index": 0,
+      "status": "generated",
+      "http_status": 200,
+      "line_start": 0,
+      "line_end": 25,
+      "characters": 1748,
+      "bytes": 2243647,
+      "path": "/Users/leoguinan/.hermes/profiles/quainance/cache/scratch/future-radio-ledger-of-what-happened/batch-00.mp3",
+      "sha256": "713766786f81cd5bf54151cca3b7b9c910600bfe23dc0cf103c5a9f99fec3f1e",
+      "response_headers": {
+        "request-id": "oVlLhZN4mCCCm5zKvSNB",
+        "content-type": "audio/mpeg"
+      }
+    },
+    {
+      "index": 1,
+      "status": "generated",
+      "http_status": 200,
+      "line_start": 26,
+      "line_end": 45,
+      "characters": 1677,
+      "bytes": 2113244,
+      "path": "/Users/leoguinan/.hermes/profiles/quainance/cache/scratch/future-radio-ledger-of-what-happened/batch-01.mp3",
+      "sha256": "9756fa4a2846134ed267a802e6c859b5afa29342c8de48d9b4f7ea15fc386ddd",
+      "response_headers": {
+        "request-id": "nIEuB4fuaT9m7ADZFCCu",
+        "content-type": "audio/mpeg"
+      }
+    },
+    {
+      "index": 2,
+      "status": "generated",
+      "http_status": 200,
+      "line_start": 46,
+      "line_end": 68,
+      "characters": 1772,
+      "bytes": 2215644,
+      "path": "/Users/leoguinan/.hermes/profiles/quainance/cache/scratch/future-radio-ledger-of-what-happened/batch-02.mp3",
+      "sha256": "8ae241228667391efb6e3dd80ad5b5b8095001de4674e057c4fb24b308f79268",
+      "response_headers": {
+        "request-id": "Sii2xFaaFf6SN8AzMFgi",
+        "content-type": "audio/mpeg"
+      }
+    },
+    {
+      "index": 3,
+      "status": "generated",
+      "http_status": 200,
+      "line_start": 69,
+      "line_end": 84,
+      "characters": 1214,
+      "bytes": 1467915,
+      "path": "/Users/leoguinan/.hermes/profiles/quainance/cache/scratch/future-radio-ledger-of-what-happened/batch-03.mp3",
+      "sha256": "baeaade40f59803769773875f8dfffb8cd862c650b4af6bf45716931dd7e7a80",
+      "response_headers": {
+        "request-id": "UfPnCQqiylyfpPSDMWeO",
+        "content-type": "audio/mpeg"
+      }
+    }
+  ],
+  "cue_note": "SFX directions are preserved for later mix; never spoken. THE ARCHIVE uses a neutral broadcast voice for draft assembly."
+}

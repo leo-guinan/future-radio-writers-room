@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://writers.story.markets/schemas/future-radio-release.v1.json",
+  "title": "Future Radio Release",
+  "type": "object",
+  "required": ["schema_version", "work_id", "release_id", "title", "state", "assets"],
+  "properties": {
+    "schema_version": {"const": "future-radio.release.v1"},
+    "work_id": {"type": "string", "minLength": 1},
+    "release_id": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "kind": {"type": "string"},
+    "state": {"enum": ["planned", "assembled_local", "repo_release", "verified_public", "withdrawn"]},
+    "canonical": {"type": "boolean"},
+    "source_script": {"$ref": "#/$defs/artifact"},
+    "assets": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "publication": {"type": ["object", "null"]},
+    "gaps": {"type": "array", "items": {"type": "object"}}
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "asset_id": {"type": "string"},
+        "role": {"type": "string"},
+        "path": {"type": "string"},
+        "uri": {"type": "string", "format": "uri"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "state": {"type": "string"},
+        "duration_seconds": {"type": "number", "minimum": 0}
+      }
+    }
+  }
+}

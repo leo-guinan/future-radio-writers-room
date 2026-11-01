@@ -1,0 +1,12 @@
+{
+  "schema_version": "future-radio.catalog-gaps.v1",
+  "generated_at": "2026-11-01T00:00:00Z",
+  "gaps": [
+    {"gap_id":"e01-upload-receipt","scope":"e01-the-first-transmission","state":"probable","claim":"YouTube a0c80hyyz90 corresponds to E01 repository release v1","evidence":["channel feed","direct YouTube metadata","matching title and runtime","E01 repository release"],"missing":["original local upload receipt","source movie hash readback"]},
+    {"gap_id":"e10-lineage","scope":"e10-the-people-vs-the-future","state":"unresolved","claim":"The 35:29 YouTube development movie is related to the repository's 8:23 audio release","evidence":["title and episode identity"],"missing":["explicit source-audio hash edge","movie manifest linkage readback"]},
+    {"gap_id":"small-release-repositories","scope":"four-published-smaller-works","state":"local_only","claim":"Four published works have durable repository homes","missing":["future-radio-releases repository","repository commit readback","binary URI and hash readback"]},
+    {"gap_id":"description-assets","scope":"all-publications","state":"partial","claim":"Every YouTube description is preserved as a hashed catalog asset","missing":["normalized description asset records for older uploads"]},
+    {"gap_id":"room-event-links","scope":"writers-room","state":"unresolved","claim":"Publication records link to hash-chained room event IDs","missing":["exported runtime room-log volume","event-to-release linkage observations"]},
+    {"gap_id":"e10-old-media-path","scope":"future-radio-episode-e10","state":"known_inconsistency","claim":"E10 release documentation points at the current media path","missing":["documentation repair or explicit historical-path annotation"]}
+  ]
+}
