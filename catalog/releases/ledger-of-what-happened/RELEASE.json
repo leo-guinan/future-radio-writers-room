@@ -4,18 +4,18 @@
   "release_id": "draft-v1",
   "title": "The Ledger of What Happened",
   "kind": "meeting-episode",
-  "state": "assembled_local",
+  "state": "repo_release",
   "canonical": false,
   "source_script": {
     "path": "future-radio-ledger-of-what-happened.md",
     "sha256": "20c5ec387eac19ff3978d0437eeecb4ecb08b96bf8199efe7260b4ba6ec186c7"
   },
   "assets": [
-    {"asset_id": "ledger-audio-master", "role": "master_audio", "path": "audio/episode-audio-master.mp3", "mime_type": "audio/mpeg", "sha256": "03437d83de65fffcf1ea1568161ee3b57556c933c0bfe912fbcb128ec97322e1", "duration_seconds": 502.24, "state": "assembled_local"},
-    {"asset_id": "ledger-line-manifest", "role": "dialogue_manifest", "path": "manifests/line-manifest.json", "sha256": "d0f52962aa5e48cdf07f73bd2577fe491ee94697e91cef3a2600857665418def", "state": "assembled_local"},
-    {"asset_id": "ledger-voice-generation-manifest", "role": "voice_receipts", "path": "manifests/manifest.json", "sha256": "ce60a0307b44567a1bfb3333ca5882d245313c704dfcb52a61655a8ab372e22a", "state": "assembled_local"},
-    {"asset_id": "ledger-video-master", "role": "master_video", "path": "video/episode-movie-master.mp4", "mime_type": "video/mp4", "sha256": "ebd80cf3ce542c75502c4407a6035dc9ec6cd926d4667e99c6644cac6b724cc5", "duration_seconds": 502.24, "state": "assembled_local"},
-    {"asset_id": "ledger-thumbnail", "role": "thumbnail", "path": "video/thumbnail.jpg", "mime_type": "image/jpeg", "sha256": "06d48b2bd92f3e5a031dde7e7e6cd1ee2d2d1a1cb96716f2f23c25ff183f9aab", "state": "assembled_local"}
+    {"asset_id": "ledger-audio-master", "role": "master_audio", "path": "audio/episode-audio-master.mp3", "mime_type": "audio/mpeg", "sha256": "03437d83de65fffcf1ea1568161ee3b57556c933c0bfe912fbcb128ec97322e1", "duration_seconds": 502.24, "state": "repo_release"},
+    {"asset_id": "ledger-line-manifest", "role": "dialogue_manifest", "path": "manifests/line-manifest.json", "sha256": "d0f52962aa5e48cdf07f73bd2577fe491ee94697e91cef3a2600857665418def", "state": "repo_release"},
+    {"asset_id": "ledger-voice-generation-manifest", "role": "voice_receipts", "path": "manifests/manifest.json", "sha256": "ce60a0307b44567a1bfb3333ca5882d245313c704dfcb52a61655a8ab372e22a", "state": "repo_release"},
+    {"asset_id": "ledger-video-master", "role": "master_video", "path": "video/episode-movie-master.mp4", "mime_type": "video/mp4", "sha256": "ebd80cf3ce542c75502c4407a6035dc9ec6cd926d4667e99c6644cac6b724cc5", "duration_seconds": 502.24, "state": "repo_release"},
+    {"asset_id": "ledger-thumbnail", "role": "thumbnail", "path": "video/thumbnail.jpg", "mime_type": "image/jpeg", "sha256": "06d48b2bd92f3e5a031dde7e7e6cd1ee2d2d1a1cb96716f2f23c25ff183f9aab", "state": "repo_release"}
   ],
   "voice_assignments": {
     "AGNOLO": "s2wvuS7SwITYg8dqsJdn",
