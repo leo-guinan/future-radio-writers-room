@@ -220,6 +220,11 @@ function snapshot() {
 type Handler = (req: IncomingMessage, res: ServerResponse, m: RegExpMatchArray) => Promise<void> | void;
 const routes: Array<[string, RegExp, Handler]> = [
   ["GET", /^\/api\/room$/, (_q, res) => send(res, 200, snapshot())],
+  ["GET", /^\/api\/catalog$/, (_q, res) => {
+    const file = join(process.cwd(), "catalog/works.json");
+    if (!existsSync(file)) return send(res, 404, { error: "Catalog not found" });
+    send(res, 200, JSON.parse(readFileSync(file, "utf8")));
+  }],
   ["GET", /^\/api\/cast$/, (_q, res) => send(res, 200, cast())],
   ["GET", /^\/api\/extras$/, (_q, res) => send(res, 200, extrasList())],
   ["GET", /^\/api\/events$/, (req, res) => {
