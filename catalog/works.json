@@ -100,17 +100,19 @@
       "episode_number": null,
       "repo": {"url": "https://github.com/leo-guinan/future-radio-writers-room", "branch": "main", "commit": null, "path": "catalog/releases/ledger-of-what-happened"},
       "releases": [{
-        "release_id": "audio-draft-v1",
+        "release_id": "draft-v1",
         "state": "assembled_local",
         "repo_path": "catalog/releases/ledger-of-what-happened",
         "runtime_seconds": 502.24,
         "assets": [
           {"asset_id": "ledger-audio-master", "kind": "master_audio", "state": "assembled_local", "sha256": "03437d83de65fffcf1ea1568161ee3b57556c933c0bfe912fbcb128ec97322e1", "uri": null},
           {"asset_id": "ledger-line-manifest", "kind": "dialogue_manifest", "state": "assembled_local", "sha256": "d0f52962aa5e48cdf07f73bd2577fe491ee94697e91cef3a2600857665418def", "uri": null},
-          {"asset_id": "ledger-voice-generation-manifest", "kind": "voice_receipts", "state": "assembled_local", "sha256": "ce60a0307b44567a1bfb3333ca5882d245313c704dfcb52a61655a8ab372e22a", "uri": null}
+          {"asset_id": "ledger-voice-generation-manifest", "kind": "voice_receipts", "state": "assembled_local", "sha256": "ce60a0307b44567a1bfb3333ca5882d245313c704dfcb52a61655a8ab372e22a", "uri": null},
+          {"asset_id": "ledger-video-master", "kind": "master_video", "state": "assembled_local", "sha256": "ebd80cf3ce542c75502c4407a6035dc9ec6cd926d4667e99c6644cac6b724cc5", "uri": null},
+          {"asset_id": "ledger-thumbnail", "kind": "thumbnail", "state": "assembled_local", "sha256": "06d48b2bd92f3e5a031dde7e7e6cd1ee2d2d1a1cb96716f2f23c25ff183f9aab", "uri": null}
         ],
         "publication": null,
-        "gaps": ["youtube_publication", "visual_master", "public_repository_readback"]
+        "gaps": ["youtube_publication", "public_repository_readback"]
       }],
       "youtube": {"state": "missing", "video_id": null, "url": null}
     }
