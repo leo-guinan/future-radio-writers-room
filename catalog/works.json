@@ -23,8 +23,27 @@
           {"asset_id": "e01-v1-master", "kind": "master_video", "state": "repo_release", "sha256": "0eb6a278f688a84f429cc89f8bb3efd9c843ed17a1bee6fc20fc32948b801b04", "uri": "https://github.com/leo-guinan/future-radio-episode-e01/releases/download/v1/Future_Radio_EP001_The_First_Transmission.mp4"},
           {"asset_id": "e01-v1-thumbnail", "kind": "thumbnail", "state": "repo_release", "sha256": "1d1fe608184f6d28c78dde09b641209b10e703ce5bfcf9e8cda694e6a458cb2d", "uri": "https://github.com/leo-guinan/future-radio-episode-e01/releases/download/v1/Future_Radio_EP001_thumbnail.png"}
         ]
+      }, {
+        "release_id": "e01-youtube-2026-10-27",
+        "state": "verified_public",
+        "repo_path": "v1",
+        "runtime_seconds": 541,
+        "youtube": {
+          "video_id": "a0c80hyyz90",
+          "url": "https://www.youtube.com/watch?v=a0c80hyyz90",
+          "title": "Leonardo da Vinci Invents the Radio. Then His Bookkeeper Sends the Bill. | Future Radio 001",
+          "privacy_status": "public",
+          "processing_status": "succeeded",
+          "readback_duration": "PT9M1S",
+          "published_at": "2026-10-27",
+          "channel_id": "UCecppCnzep90adRVsy3sj7w",
+          "source_identity": "youtube_channel_feed_and_metadata",
+          "linkage_state": "probable",
+          "linkage_basis": "title, episode number, exact runtime, and matching E01 repository release; original upload receipt not found locally"
+        },
+        "assets": []
       }],
-      "youtube": {"state": "missing", "video_id": null, "url": null}
+      "youtube": {"state": "verified_public", "video_id": "a0c80hyyz90", "url": "https://www.youtube.com/watch?v=a0c80hyyz90"}
     },
     {
       "work_id": "e10-the-people-vs-the-future",
