@@ -1,0 +1,78 @@
+{
+  "schema_version": "future-radio.catalog.v1",
+  "generated_at": "2026-11-01T00:00:00Z",
+  "identity": {
+    "youtube_channel_id": "UCecppCnzep90adRVsy3sj7w",
+    "youtube_channel_title": "Build In Public University",
+    "github_owner": "leo-guinan"
+  },
+  "states": ["verified_public", "repo_release", "local_only", "missing", "not_applicable"],
+  "works": [
+    {
+      "work_id": "e01-the-first-transmission",
+      "kind": "episode",
+      "title": "The First Transmission",
+      "episode_number": 1,
+      "repo": {"url": "https://github.com/leo-guinan/future-radio-episode-e01", "branch": "main", "commit": "3209225000f1f3bd46712ddd4061f7a3b3dbcbc9"},
+      "releases": [{
+        "release_id": "e01-v1",
+        "state": "repo_release",
+        "repo_path": "v1",
+        "runtime_seconds": 541,
+        "assets": [
+          {"asset_id": "e01-v1-master", "kind": "master_video", "state": "repo_release", "sha256": "0eb6a278f688a84f429cc89f8bb3efd9c843ed17a1bee6fc20fc32948b801b04", "uri": "https://github.com/leo-guinan/future-radio-episode-e01/releases/download/v1/Future_Radio_EP001_The_First_Transmission.mp4"},
+          {"asset_id": "e01-v1-thumbnail", "kind": "thumbnail", "state": "repo_release", "sha256": "1d1fe608184f6d28c78dde09b641209b10e703ce5bfcf9e8cda694e6a458cb2d", "uri": "https://github.com/leo-guinan/future-radio-episode-e01/releases/download/v1/Future_Radio_EP001_thumbnail.png"}
+        ]
+      }],
+      "youtube": {"state": "missing", "video_id": null, "url": null}
+    },
+    {
+      "work_id": "e10-the-people-vs-the-future",
+      "kind": "episode",
+      "title": "The People vs. The Future",
+      "episode_number": 10,
+      "repo": {"url": "https://github.com/leo-guinan/future-radio-episode-e10", "branch": "main", "commit": "841e83d78e2d00b286097954e1641a75ecbd5aad"},
+      "releases": [
+        {"release_id": "e10-v1-audio", "state": "repo_release", "repo_path": "releases/v1", "runtime_seconds": 503, "assets": [{"asset_id": "e10-v1-audio-master", "kind": "master_audio", "state": "repo_release", "sha256": "82cef6ccaac78b21239e9a6eb347d34181cfaeccab54c548598db5be09f4ef2a", "uri": "https://github.com/leo-guinan/future-radio-episode-e10/raw/main/media/Future_Radio_EP010_The_People_vs_The_Future.mp3"}]},
+        {"release_id": "e10-youtube-development-cut", "state": "verified_public", "repo_path": null, "runtime_seconds": 2129, "youtube": {"video_id": "mcNeg4t1qnc", "url": "https://www.youtube.com/watch?v=mcNeg4t1qnc", "title": "Future Radio E10 — The People vs. The Future", "privacy_status": "public", "processing_status": "succeeded", "readback_duration": "PT35M29S"}, "assets": [{"asset_id": "e10-youtube-movie", "kind": "master_video", "state": "local_only", "sha256": "21a312155f764fbf53db8815990022768ff68619f163c4e9f1a8beb9e1ba66d9"}, {"asset_id": "e10-youtube-thumbnail", "kind": "thumbnail", "state": "local_only", "sha256": "cb0f27ca5ee3cae278663434bb9ac032cff6cde3cabf3f83364e25129d75b527"}]}
+      ],
+      "youtube": {"state": "verified_public", "video_id": "mcNeg4t1qnc", "url": "https://www.youtube.com/watch?v=mcNeg4t1qnc"}
+    },
+    {
+      "work_id": "interlude-we-like-movies-not-snapshots",
+      "kind": "interlude",
+      "title": "We Like Movies, Not Snapshots",
+      "episode_number": null,
+      "repo": {"url": null, "branch": null, "commit": null},
+      "releases": [{"release_id": "youtube-2026-10-30", "state": "verified_public", "repo_path": null, "runtime_seconds": 351, "youtube": {"video_id": "wx6pKOZ8vy0", "url": "https://www.youtube.com/watch?v=wx6pKOZ8vy0", "title": "Future Radio — We Like Movies, Not Snapshots", "privacy_status": "public", "processing_status": "succeeded", "readback_duration": "PT5M51S"}, "assets": [{"asset_id": "movies-master", "kind": "master_video", "state": "local_only", "sha256": "93800655dd67a19fea4d4dd5c027c0735aee45bcca53c5650451100adcc307d2"}, {"asset_id": "movies-thumbnail", "kind": "thumbnail", "state": "local_only", "sha256": "df42d3fb78c153e2c976af1747eb232183197f1c19d359fb2ea70f9bdc037130"}]}],
+      "youtube": {"state": "verified_public", "video_id": "wx6pKOZ8vy0", "url": "https://www.youtube.com/watch?v=wx6pKOZ8vy0"}
+    },
+    {
+      "work_id": "cta-the-middle-is-yours",
+      "kind": "cta",
+      "title": "The Middle Is Yours",
+      "episode_number": null,
+      "repo": {"url": null, "branch": null, "commit": null},
+      "releases": [{"release_id": "youtube-2026-10-31", "state": "verified_public", "repo_path": null, "runtime_seconds": 194, "youtube": {"video_id": "LCqwr9eCn1o", "url": "https://www.youtube.com/watch?v=LCqwr9eCn1o", "title": "Future Radio — The Middle Is Yours", "privacy_status": "public", "processing_status": "succeeded", "readback_duration": "PT3M14S"}, "assets": [{"asset_id": "middle-master", "kind": "master_video", "state": "local_only", "sha256": "9a27e879381c1b125dca23b8ea55f4aed3893374e699184c5e222fb9065a8edd"}, {"asset_id": "middle-thumbnail", "kind": "thumbnail", "state": "local_only", "sha256": "de7f220a3f08dd84c7c783c10488399cc6bfca07c494efd791abc727c386b1f6"}]}],
+      "youtube": {"state": "verified_public", "video_id": "LCqwr9eCn1o", "url": "https://www.youtube.com/watch?v=LCqwr9eCn1o"}
+    },
+    {
+      "work_id": "two-empires",
+      "kind": "episode-like",
+      "title": "The Two Empires",
+      "episode_number": null,
+      "repo": {"url": null, "branch": null, "commit": null},
+      "releases": [{"release_id": "youtube-2026-10-31", "state": "verified_public", "repo_path": null, "runtime_seconds": 454, "youtube": {"video_id": "slo70xMv0rY", "url": "https://www.youtube.com/watch?v=slo70xMv0rY", "title": "Future Radio — The Two Empires", "privacy_status": "public", "processing_status": "succeeded", "readback_duration": "PT7M34S"}, "assets": [{"asset_id": "empires-master", "kind": "master_video", "state": "local_only", "sha256": "23305b83ee942c05245aafb109809982415bcbc048dbfb3bf5bb2b146400f0e2"}, {"asset_id": "empires-thumbnail", "kind": "thumbnail", "state": "local_only", "sha256": "4f20c38f1e57275cdff7eb76ad0f25623706642a6c8ce71e0bfb30bb6ff26ea9"}]}],
+      "youtube": {"state": "verified_public", "video_id": "slo70xMv0rY", "url": "https://www.youtube.com/watch?v=slo70xMv0rY"}
+    },
+    {
+      "work_id": "cta-from-minus-one-to-zero",
+      "kind": "cta",
+      "title": "From Minus One to Zero",
+      "episode_number": null,
+      "repo": {"url": null, "branch": null, "commit": null},
+      "releases": [{"release_id": "youtube-2026-11-01", "state": "verified_public", "repo_path": null, "runtime_seconds": 208, "youtube": {"video_id": "VFxdhiqjWUE", "url": "https://www.youtube.com/watch?v=VFxdhiqjWUE", "title": "Future Radio — From Minus One to Zero", "privacy_status": "public", "processing_status": "succeeded", "readback_duration": "PT3M28S"}, "assets": [{"asset_id": "minus-zero-master", "kind": "master_video", "state": "local_only", "sha256": "1be9f00d7ccb860ee7aad046a1bf8d9bb500990f09f54dba53876f9a29c8db9d"}, {"asset_id": "minus-zero-thumbnail", "kind": "thumbnail", "state": "local_only", "sha256": "26921ab235db75d9a5b99fc80d035918b6f5e4f6050e19041de0615599c6e0c5"}]}],
+      "youtube": {"state": "verified_public", "video_id": "VFxdhiqjWUE", "url": "https://www.youtube.com/watch?v=VFxdhiqjWUE"}
+    }
+  ]
+}
