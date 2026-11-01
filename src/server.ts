@@ -447,7 +447,8 @@ function requireProducer(req: IncomingMessage) {
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json" };
 
 function serveStatic(path: string, res: ServerResponse) {
-  const rel = normalize(path === "/" ? "/index.html" : path).replace(/^(\.\.[/\\])+/, "");
+  const requested = path === "/" ? "/index.html" : path === "/room" ? "/room.html" : path;
+  const rel = normalize(requested).replace(/^(\.\.[/\\])+/, "");
   const file = join(PUBLIC_DIR, rel);
   if (!file.startsWith(PUBLIC_DIR) || !existsSync(file)) return send(res, 404, { error: "Not found" });
   res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" });
