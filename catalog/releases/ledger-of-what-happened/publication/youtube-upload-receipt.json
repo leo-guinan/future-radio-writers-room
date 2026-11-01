@@ -1,0 +1,60 @@
+{
+  "status": "verified_public",
+  "video_id": "lrKZydKVp9o",
+  "url": "https://www.youtube.com/watch?v=lrKZydKVp9o",
+  "channel_id": "UCecppCnzep90adRVsy3sj7w",
+  "channel_title": "Build In Public University",
+  "title": "Future Radio \u2014 The Ledger of What Happened",
+  "source_video": "/Users/leoguinan/.hermes/profiles/quainance/cache/scratch/future-radio-ledger-of-what-happened/episode-movie-master.mp4",
+  "source_sha256": "ebd80cf3ce542c75502c4407a6035dc9ec6cd926d4667e99c6644cac6b724cc5",
+  "thumbnail": "/Users/leoguinan/.hermes/profiles/quainance/cache/scratch/future-radio-ledger-of-what-happened/thumbnail.jpg",
+  "thumbnail_sha256": "06d48b2bd92f3e5a031dde7e7e6cd1ee2d2d1a1cb96716f2f23c25ff183f9aab",
+  "description_sha256": "886369577db3ce66f335bb9dbc52ae943c8a3bd8daf1ed87ec663e5039e38a75",
+  "uploaded_at": "2026-11-01T20:30:51Z",
+  "intended_privacy": "public",
+  "initial_readback": {
+    "title": "Future Radio \u2014 The Ledger of What Happened",
+    "channel_id": "UCecppCnzep90adRVsy3sj7w",
+    "privacyStatus": "unlisted",
+    "uploadStatus": "uploaded",
+    "processingStatus": "processing",
+    "duration": "P0D",
+    "thumbnail_keys": [
+      "default",
+      "medium",
+      "high",
+      "standard",
+      "maxres"
+    ]
+  },
+  "processing_observations": [
+    {
+      "at": "2026-11-01T20:31:25Z",
+      "privacyStatus": "unlisted",
+      "uploadStatus": "processed",
+      "processingStatus": "succeeded",
+      "duration": "PT8M23S",
+      "processingFailureReason": null,
+      "fileDetailsAvailability": "available",
+      "thumbnailsAvailability": "inProgress"
+    }
+  ],
+  "final_readback": {
+    "at": "2026-11-01T20:31:42Z",
+    "privacyStatus": "public",
+    "uploadStatus": "processed",
+    "processingStatus": "succeeded",
+    "duration": "PT8M23S",
+    "title": "Future Radio \u2014 The Ledger of What Happened",
+    "channel_id": "UCecppCnzep90adRVsy3sj7w",
+    "description_sha256": "5838cd86c37eff4e08c3a8f63b2940c4e588e8891eaaef0fbe38ba846b9bc8c6",
+    "description_has_catalog_url": true,
+    "thumbnail_keys": [
+      "default",
+      "medium",
+      "high",
+      "standard",
+      "maxres"
+    ]
+  }
+}

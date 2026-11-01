@@ -4,7 +4,7 @@
   "release_id": "draft-v1",
   "title": "The Ledger of What Happened",
   "kind": "meeting-episode",
-  "state": "repo_release",
+  "state": "verified_public",
   "canonical": false,
   "source_script": {
     "path": "future-radio-ledger-of-what-happened.md",
@@ -23,9 +23,17 @@
     "LEONARDO": "s5t7B6IvxVOp3Y7HQT6Q",
     "THE ARCHIVE": "onwK4e9ZLuTAKqWW03F9"
   },
-  "publication": null,
-  "gaps": [
-    {"field": "youtube_publication", "state": "not_published"},
-    {"field": "durable_public_repository_readback", "state": "pending"}
-  ]
+  "publication": {
+    "platform": "youtube",
+    "video_id": "lrKZydKVp9o",
+    "url": "https://www.youtube.com/watch?v=lrKZydKVp9o",
+    "channel_id": "UCecppCnzep90adRVsy3sj7w",
+    "title": "Future Radio — The Ledger of What Happened",
+    "source_asset_id": "ledger-video-master",
+    "thumbnail_asset_id": "ledger-thumbnail",
+    "receipt_path": "publication/youtube-upload-receipt.json",
+    "receipt_sha256": "a8b62744d99fc1d5eb55097c355643bf1db4f2f5e813a5582f38bfe88b0faddc",
+    "final_readback": {"privacy_status": "public", "upload_status": "processed", "processing_status": "succeeded", "duration": "PT8M23S", "read_back_at": "2026-11-01T20:31:42Z"}
+  },
+  "gaps": []
 }

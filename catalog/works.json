@@ -101,7 +101,7 @@
       "repo": {"url": "https://github.com/leo-guinan/future-radio-writers-room", "branch": "main", "commit": "1ef64ee89352a673ac20833eb29b26a30c766dbb", "path": "catalog/releases/ledger-of-what-happened"},
       "releases": [{
         "release_id": "draft-v1",
-        "state": "repo_release",
+        "state": "verified_public",
         "repo_path": "catalog/releases/ledger-of-what-happened",
         "runtime_seconds": 502.24,
         "assets": [
@@ -111,10 +111,22 @@
           {"asset_id": "ledger-video-master", "kind": "master_video", "state": "repo_release", "sha256": "ebd80cf3ce542c75502c4407a6035dc9ec6cd926d4667e99c6644cac6b724cc5", "uri": "https://raw.githubusercontent.com/leo-guinan/future-radio-writers-room/main/catalog/releases/ledger-of-what-happened/video/episode-movie-master.mp4"},
           {"asset_id": "ledger-thumbnail", "kind": "thumbnail", "state": "repo_release", "sha256": "06d48b2bd92f3e5a031dde7e7e6cd1ee2d2d1a1cb96716f2f23c25ff183f9aab", "uri": "https://raw.githubusercontent.com/leo-guinan/future-radio-writers-room/main/catalog/releases/ledger-of-what-happened/video/thumbnail.jpg"}
         ],
-        "publication": null,
-        "gaps": ["youtube_publication"]
+        "youtube": {"video_id": "lrKZydKVp9o", "url": "https://www.youtube.com/watch?v=lrKZydKVp9o", "title": "Future Radio — The Ledger of What Happened", "privacy_status": "public", "processing_status": "succeeded", "readback_duration": "PT8M23S"},
+        "publication": {
+          "platform": "youtube",
+          "video_id": "lrKZydKVp9o",
+          "url": "https://www.youtube.com/watch?v=lrKZydKVp9o",
+          "channel_id": "UCecppCnzep90adRVsy3sj7w",
+          "title": "Future Radio — The Ledger of What Happened",
+          "receipt_sha256": "a8b62744d99fc1d5eb55097c355643bf1db4f2f5e813a5582f38bfe88b0faddc",
+          "privacy_status": "public",
+          "processing_status": "succeeded",
+          "duration": "PT8M23S",
+          "read_back_at": "2026-11-01T20:31:42Z"
+        },
+        "gaps": []
       }],
-      "youtube": {"state": "missing", "video_id": null, "url": null}
+      "youtube": {"state": "verified_public", "video_id": "lrKZydKVp9o", "url": "https://www.youtube.com/watch?v=lrKZydKVp9o"}
     }
   ]
 }
