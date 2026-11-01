@@ -57,7 +57,7 @@
     {
       "title": "The producer they could build",
       "setting": "Milliways, at a table that exists at every sitting. The press conference hasn't started. In the chair where Leo should be sits a version of Leo they assembled from his plans.",
-      "situation": "They couldn't reach Leo, so they built one from what he left: the plans, the budgets, the deadlines, the rules of the room. Now they interrogate him. Did he mean Episode 2 or Episode 10? Did he mean to be obeyed? Then they argue about whether anything he says counts, since he is made only of plans.",
+      "situation": "They couldn't reach Leo, so they built one from what he left: the plans, the budgets, the deadlines, the rules of the room. He has no voice of his own; the plans never said what Leo sounds like. Now they interrogate him. Did he mean Episode 2 or Episode 10? Did he mean to be obeyed? Then they argue about whether anything he says counts, since he is made only of plans.",
       "stakes": "Whether a plan can speak for the person who wrote it. If it can, they did what he asked. If it can't, they have built an episode on a guess about him.",
       "stoppingRule": "They decide the episode is both 2 and 10, and the simulated Leo either agrees or admits he can't know.",
       "maxTurns": 14,
@@ -72,7 +72,10 @@
         },
         {
           "character": "leonardo",
-          "motivation": "You love him already: a producer who can never say no in person. Get him to approve something enormous."
+          "motivation": "You love him already: a producer who can never say no in person. Get him to approve something enormous. And he has no voice. You can't bear that. Give him one: design it yourself, right now, from what you imagine Leo sounds like.",
+          "abilities": [
+            "design-voice"
+          ]
         },
         {
           "character": "borges",
@@ -108,8 +111,20 @@
     }
   ],
   "lineups": [
-    { "name": "Claude throughout", "models": { "default": "anthropic/claude-sonnet-5.5", "director": "anthropic/claude-sonnet-5.5" } },
-    { "name": "GPT throughout", "models": { "default": "openai/gpt-6.1-sol", "director": "anthropic/claude-sonnet-5.5" } },
+    {
+      "name": "Claude throughout",
+      "models": {
+        "default": "anthropic/claude-sonnet-5.5",
+        "director": "anthropic/claude-sonnet-5.5"
+      }
+    },
+    {
+      "name": "GPT throughout",
+      "models": {
+        "default": "openai/gpt-6.1-sol",
+        "director": "anthropic/claude-sonnet-5.5"
+      }
+    },
     {
       "name": "Mixed casting",
       "models": {

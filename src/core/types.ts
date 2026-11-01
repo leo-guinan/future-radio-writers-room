@@ -46,7 +46,10 @@ export type EventType =
   | "trial.lineups"
   | "trial.feedback"
   | "trial.revealed"
-  | "daily.recorded";
+  | "daily.recorded"
+  | "scene.happening"
+  | "voice.designed"
+  | "voice.selected";
 
 // ---------- Ideas: the central unit of the room ----------
 
@@ -283,7 +286,47 @@ export interface SceneOpened {
   after?: string[];
   /** Part of a blind tasting: the runs stay producer-only until the tasting is revealed. */
   trialId?: string;
+  /** What a character can do in this scene beyond talking, e.g. {"leonardo": ["design-voice"]}. */
+  abilities?: Record<string, string[]>;
 }
+
+/** Something that happens in a scene between lines: a bill arrives, a voice is born. */
+export interface SceneHappening {
+  sceneId: string;
+  afterTurn: number;
+  kind: "bill" | "voice" | "notice";
+  text: string;
+  /** Who it lands on; the next line is theirs. */
+  addressee?: string;
+  ref?: string; // e.g. a design id
+}
+
+/** Three candidate voices designed from a description (ElevenLabs Voice Design). */
+export interface VoiceDesigned {
+  designId: string; // VD-0001
+  by: string; // the character (or person) who ordered it
+  forCharacter: string;
+  description: string;
+  sample: string; // the text the previews speak
+  model: string;
+  mode: "choose" | "offer"; // choose: one is selected now; offer: three wait for review
+  previews: Array<{ k: number; generatedVoiceId: string; sha256: string; file: string; durationSecs: number | null }>;
+  costUsd: number | null;
+  sceneId?: string;
+  afterTurn?: number;
+}
+
+/** A designed preview made into a voice, for a character (in a scene's lineage, or everywhere). */
+export interface VoiceSelected {
+  designId: string;
+  k: number;
+  character: string;
+  voiceId: string;
+  name: string;
+  by: string;
+  sceneId?: string; // scoped to this scene and scenes that follow it; absent = everywhere in the room
+}
+
 
 /** Producer-only: which model plays whom in a scene. */
 export interface SceneCasting {

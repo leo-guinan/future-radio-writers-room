@@ -27,6 +27,7 @@ import { extrasRepo, slugify } from "./repos/extras.ts";
 import { readFileSync } from "node:fs";
 import { closeScene, openScene, runScene, sceneMarkdown, transcript } from "./scenes/scenes.ts";
 import { lineAudio } from "./scenes/voice.ts";
+import { designVoice, selectDesignedVoice } from "./scenes/abilities.ts";
 import { collect, defaultSince, readAssets, recordDaily, today, writeAssets, type Digest } from "./daily/daily.ts";
 import { spawnRoom } from "./spawn/spawn.ts";
 import { castingFor, loadCards, modelReport, playEpisode, revealTrial, runTrial, trialMarkdown, type Lineup } from "./scenes/trials.ts";
@@ -104,6 +105,13 @@ Scenes (characters playing a scene together; text unless someone asks to hear it
   scene list                             Every scene and where it stands
   scene voice S-0001 <n> [--out f.mp3]   Voice one line just in time (cached; needs ELEVENLABS_API_KEY)
   scene play <cards.json> [--lineup N]   Play an episode of cards in order (each scene remembers the earlier ones)
+
+Designed voices (ElevenLabs Voice Design; needs ELEVENLABS_API_KEY; each design is a bill)
+  voice design <character> "<description>" [--sample "100+ chars"]   Three candidates, kept for review
+  voice designs                          Every design: who ordered it, for whom, and what was chosen
+  voice pick VD-0001 <1-3> [--for slug] [--scene S-0001] [--name "..."]   Make one a voice
+                                         (scoped to a scene and what follows it, or room-wide without --scene)
+  In a scene card, "abilities": ["design-voice"] on a cast member lets them do it mid-scene.
 
 New rooms and the morning episode
   spawn "<idea>" --name slug [--show "Title"] [--dir path] [--cast memory=x,making=y,accounting=z]
@@ -369,6 +377,25 @@ async function main() {
       throw new RuleError("usage", "scene open|run|close|show|list|voice");
     }
 
+    case "voice": {
+      const sub = pos[0];
+      if (sub === "design") {
+        const d = await designVoice(room, { by, forCharacter: need(pos[1], "character"), description: need(pos[2], "description"), sample: flags.sample, mode: "offer" });
+        out(`${d.designId}: ${d.previews.length} candidates for ${d.forCharacter}${d.costUsd === null ? " (cost unknown; set VOICE_DESIGN_PRICE_USD)" : ` ($${d.costUsd.toFixed(2)})`}`);
+        for (const p of d.previews) out(`  ${p.k}. ${p.file}${p.durationSecs ? ` · ${p.durationSecs.toFixed(1)}s` : ""}`);
+        return out(`Listen on the workshop page, then: voice pick ${d.designId} <1-3>`);
+      }
+      if (sub === "pick") {
+        const r = await selectDesignedVoice(room, need(pos[1], "design id"), Number(need(pos[2], "1-3")), { by, character: flags.for, name: flags.name, sceneId: flags.scene });
+        return out(`${r.character} speaks with "${r.name}" (${r.voiceId})${flags.scene ? ` in ${flags.scene} and the scenes that follow it` : " everywhere in this room"}.`);
+      }
+      if (sub === "designs" || !sub) {
+        for (const d of room.voiceDesigns.values())
+          out(`${d.designId} ${d.at.slice(0, 16)} ${d.by} → ${d.forCharacter} (${d.mode}${d.sceneId ? `, ${d.sceneId}` : ""}): "${d.description.slice(0, 80)}"${d.selected.length ? `  chosen: ${d.selected.map((v) => v.k).join(", ")}` : ""}`);
+        return;
+      }
+      throw new RuleError("usage", "voice design|designs|pick");
+    }
     case "spawn": {
       const cast = Object.fromEntries((flags.cast ?? "").split(",").filter(Boolean).map((kv) => kv.split("=").map((x) => x.trim())));
       const known = readAssets();
