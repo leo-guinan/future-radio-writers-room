@@ -2,7 +2,7 @@
 // and recompute the remaining delta. The reconcile loop calls this after every
 // meaningful action and chooses the next action from what it finds.
 
-import { listFrames, readFrame, serveFrame } from "./frames.ts";
+import { listFrames, peekFrame, readFrame } from "./frames.ts";
 import { RestrictedWorkspace } from "./executor.ts";
 import type { HumainAcceptanceTest, HumainContract, HumainTaskResult } from "../core/types.ts";
 
@@ -63,12 +63,19 @@ export function runAcceptance(t: HumainAcceptanceTest, sessionId: string, result
           : fail(`${t.target} does not compare ${t.expected}`);
       }
       case "frame.serves": {
-        const { visits } = serveFrame(t.target);
-        return { id: t.id, pass: true, detail: `${t.target} served (visit ${visits})` };
+        // Peek, never serve: verification must not inflate visitor counts.
+        const { html } = peekFrame(t.target);
+        return html.includes("<html")
+          ? { id: t.id, pass: true, detail: `${t.target} serves its page (verified without counting a visit)` }
+          : fail(`${t.target} serves no page`);
       }
       case "catalog.reused": {
         const r = results.find((x) => x.taskId === t.target && x.status === "success" && x.evidence);
         return r ? { id: t.id, pass: true, detail: `${t.target} reused catalog (${r.evidence})` } : fail(`${t.target} has no evidenced reuse result`);
+      }
+      case "task.evidence": {
+        const r = results.find((x) => x.taskId === t.target && x.status === "success" && x.evidence);
+        return r ? { id: t.id, pass: true, detail: `${t.target} completed with evidence` } : fail(`${t.target} has no evidenced success result`);
       }
       case "workspace.file": {
         const ws = RestrictedWorkspace.open(sessionId);

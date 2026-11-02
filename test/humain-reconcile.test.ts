@@ -7,11 +7,12 @@ import assert from "node:assert/strict";
 import { EventStore } from "../src/core/events.ts";
 import { Room } from "../src/core/room.ts";
 import { SessionController } from "../src/humain/session.ts";
-import { MetaVoiceTranscriber, OpenRouterSparkPlanner, SparkPlanner } from "../src/humain/adapters.ts";
+import { MetaVoiceTranscriber, OpenRouterSparkPlanner, SparkPlanner, makePlanner, makeTranscriber } from "../src/humain/adapters.ts";
 import { Watchdog } from "../src/humain/watchdog.ts";
 import { MAX_REPAIRS, executePlan } from "../src/humain/reconcile.ts";
-import { listFrames, nextFrameId, publishFrame, readFrame, serveFrame } from "../src/humain/frames.ts";
+import { allocateFrameIds, listFrames, nextFrameId, publishFrame, readFrame, serveFrame } from "../src/humain/frames.ts";
 import { loadWorks, renderComparison } from "../src/humain/frame-maker.ts";
+import { runAcceptance } from "../src/humain/observe.ts";
 
 const fresh = () => new Room(new EventStore(null));
 
@@ -54,6 +55,25 @@ test("frames persist with independent hooks and visit counts", () => {
   assert.ok(listFrames().some((f) => f.frameId === a.frameId && f.visits === 2));
   assert.throws(() => readFrame("../evil"), /Bad frame id/);
   assert.throws(() => readFrame("F-9999"), /No frame/);
+});
+
+test("frame id allocation is atomic: reservations never collide", () => {
+  const a = allocateFrameIds(2);
+  const b = allocateFrameIds(2);
+  assert.equal(new Set([...a, ...b]).size, 4);
+  assert.ok(a[0] < a[1] && b[0] < b[1]);
+  // Reservations are invisible until published.
+  assert.ok(!listFrames().some((f) => a.includes(f.frameId)));
+});
+
+test("serves acceptance check verifies without inflating visits", () => {
+  const works = loadWorks();
+  const id = nextFrameId();
+  publishFrame(id, "H-0001", "hook", works[0].work_id, works[1].work_id, renderComparison(works[0], works[1], "hook"));
+  const before = readFrame(id).visits;
+  const o = runAcceptance({ id: "A1", description: "serves", check: "frame.serves", target: id, expected: "200" }, "H-0001", []);
+  assert.equal(o.pass, true);
+  assert.equal(readFrame(id).visits, before, "verification counts no visit");
 });
 
 test("watchdog halts runs without acceptance progress, not on elapsed time", () => {
@@ -126,6 +146,24 @@ test("openrouter spark planner targets meta/muse-spark-1.3 with observed cost", 
   const r = await p.plan("an idea", { works: [] });
   assert.equal(r.costUsd, 0.0001);
   assert.ok(r.draft.tasks.length > 0, "unparseable model output falls back to offline draft");
+});
+
+test("live mode fails visibly without Meta APIs, never silently offline", () => {
+  const savedLive = process.env.HUMAIN_LIVE;
+  const savedKey = process.env.MODEL_API_KEY;
+  const savedAlias = process.env.META_MODEL_API_KEY;
+  delete process.env.MODEL_API_KEY;
+  delete process.env.META_MODEL_API_KEY;
+  process.env.HUMAIN_LIVE = "1";
+  try {
+    assert.throws(() => makePlanner(), /LIVE MODE/);
+    assert.throws(() => makeTranscriber(), /LIVE MODE/);
+  } finally {
+    if (savedLive === undefined) delete process.env.HUMAIN_LIVE;
+    else process.env.HUMAIN_LIVE = savedLive;
+    if (savedKey !== undefined) process.env.MODEL_API_KEY = savedKey;
+    if (savedAlias !== undefined) process.env.META_MODEL_API_KEY = savedAlias;
+  }
 });
 
 test("voice transcriber posts multipart audio and parses text", async () => {

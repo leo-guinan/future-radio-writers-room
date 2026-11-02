@@ -37,7 +37,7 @@ function mmss(ms) {
 
 $("open").addEventListener("click", async () => {
   try {
-    const s = await api("/api/humain/sessions", "POST", { inputWindowMin: windowMin, saveTranscript: $("saveTranscript").checked });
+    const s = await api("/api/humain/sessions", "POST", { inputWindowMin: windowMin, saveTranscript: $("saveTranscript").checked, reserveMin: Number($("reserveMin").value) });
     sessionId = s.sessionId;
     $("sessionLabel").textContent = `Session ${sessionId} · ${windowMin} min window · transcript ${s.transcriptSaved ? "saved" : "memory-only"}`;
     $("capture").hidden = false;
@@ -115,7 +115,9 @@ function render(s) {
   if (s.terminal) {
     stopLocalCapture("session over");
     stopPolling();
-    $("ledgerLine").innerHTML = `<strong>Session ${s.terminal.reason}:</strong> ${escapeHtml(s.terminal.detail)} Actual API spend: $${s.spendUsd}.`;
+    let ledger = `<strong>Session ${s.terminal.reason}:</strong> ${escapeHtml(s.terminal.detail)} Actual API spend: $${s.spendUsd}.`;
+    if (s.accounting) ledger += `<br>Time: human used ${s.accounting.humanUsedSecs}s of ${s.accounting.reserveMin * 60}s reserved (${s.accounting.humanReleasedSecs}s released) · autonomous ${s.accounting.autonomousSecs}s · daily budget ${s.accounting.humanBudgetMin} min.`;
+    $("ledgerLine").innerHTML = ledger;
     loadReplay();
     $("replayCard").hidden = false;
   }

@@ -113,10 +113,9 @@ is booked as unknown tokens, never as free. Voice is documented at $0.18/hr.
 
 - Meta-direct and voice calls need `MODEL_API_KEY`; realtime voice has never
   run against the live socket.
-- Frame ids allocate from a registry scan at contract time; two sessions
-  contracting concurrently could collide (single-user prototype).
+- Frame ids allocate atomically at contract time (lock + reservation markers).
 - Visit counts live in sidecar JSON (operational data); totals snapshot into
-  frame/checkpoint events. Verification views count as visits.
+  frame/checkpoint events. Automated verification peeks without counting.
 - No multi-session UI list; memory-only transcripts are lost on restart.
 - Frame Maker builds one page shape (comparison + hook + counter); unknown
   plan capabilities execute as `unverified`, never silently.

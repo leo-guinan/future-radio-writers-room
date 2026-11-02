@@ -42,7 +42,7 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
   return [
     ["POST", /^\/api\/humain\/sessions$/, async (req, res) => {
       const b = await body(req);
-      const s = register(SessionController.open(room, actor, Number(b.inputWindowMin), b.saveTranscript === true));
+      const s = register(SessionController.open(room, actor, Number(b.inputWindowMin), b.saveTranscript === true, b.reserveMin === undefined ? 10 : Number(b.reserveMin)));
       send(res, 201, s.state());
     }],
     ["GET", /^\/api\/humain\/sessions$/, (_q, res) => {

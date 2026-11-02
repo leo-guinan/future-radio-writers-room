@@ -148,11 +148,13 @@ Character bibles
   bible chat <character> [--from name]   Talk with a principal or an extra locally; /propose drafts a viewer note
 
 HumAIn OS (voice-first, human-time-bounded sessions; web UI at /humain)
-  humain demo [--idea "..."] [--ceiling N] [--secs N] [--voice-file f.wav]
+  humain demo [--idea "..."] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N]
                                          Run the demo end to end (simulated speech, or real
-                                         muse-voice-transcribe-1.0 with MODEL_API_KEY)
+                                         muse-voice-transcribe-1.0 with MODEL_API_KEY;
+                                         --live fails visibly without Meta APIs)
   humain replay H-0001                   Terminal replay of a session's events from the log
   humain frames                          Persistent shareable frames and their visit counts
+  humain budget                          Today's human time usage against the 60-minute budget
 
 Agnolo's screen
   scorecard                              Observed / projected / disputed / unknown, three ledgers
@@ -666,9 +668,12 @@ async function main() {
         return;
       }
       if (sub === "demo") {
+        if (flags.live) process.env.HUMAIN_LIVE = "1";
+        const { isLive } = await import("./humain/adapters.ts");
+        const { HUMAN_BUDGET_MIN } = await import("./humain/session.ts");
         const idea = flags.idea ?? "Build a webpage comparing The First Transmission and The People vs The Future with one hook and a vintage visitor counter.";
-        const s = SessionController.open(room, by, 2, flags["save-transcript"] === "true");
-        out(`Session ${s.sessionId}: 2-minute input window (simulated speech).`);
+        const s = SessionController.open(room, by, 2, flags["save-transcript"] === "true", Number(flags.reserve ?? 10));
+        out(`Session ${s.sessionId}: 2-minute input window (simulated speech). Human budget ${HUMAN_BUDGET_MIN} min/day, reserved ${s.reserveMin} min.${isLive() ? " LIVE MODE: Meta APIs or visible failure." : ""}`);
         s.startRecording("demo: simulated microphone");
         if (flags["voice-file"]) {
           if (!MetaVoiceTranscriber.available()) throw new RuleError("usage", "--voice-file needs MODEL_API_KEY for muse-voice-transcribe-1.0.");
@@ -706,6 +711,10 @@ async function main() {
         for (const r of st.results) out(`  ${r.taskId} ${r.status} — ${r.detail}`);
         for (const f of st.frames) out(`  frame ${f.frameId}: "${f.hook.slice(0, 60)}" sha256:${f.sha256.slice(0, 12)} visits:${f.visits}`);
         if (st.lastCheckpoint) out(`  checkpoint: ${st.lastCheckpoint.reason} — remaining: ${st.lastCheckpoint.remaining.join("; ") || "none"}`);
+        if (st.accounting) {
+          const a = st.accounting;
+          out(`  time: human used ${a.humanUsedSecs}s of ${a.reserveMin * 60}s reserved (${a.humanReleasedSecs}s released) · autonomous ${a.autonomousSecs}s · daily budget ${a.humanBudgetMin} min`);
+        }
         out(`Done: ${st.terminal?.detail} Spend $${st.spendUsd}. Replay: npm run room -- humain replay ${s.sessionId}`);
         return;
       }
@@ -714,7 +723,20 @@ async function main() {
         for (const f of listFrames()) out(`${f.frameId} "${f.hook.slice(0, 70)}" visits:${f.visits} sha256:${f.sha256.slice(0, 12)} /api/humain/frames/${f.frameId}`);
         return;
       }
-      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] [--voice-file f.wav] | humain replay H-0001 | humain frames");
+      if (sub === "budget") {
+        const { HUMAN_BUDGET_MIN } = await import("./humain/session.ts");
+        const today = new Date().toISOString().slice(0, 10);
+        const accts = room.store.all().filter((e) => e.type === "humain.accounting" && e.ts.startsWith(today));
+        let used = 0;
+        for (const e of accts) {
+          const a = e.payload as { sessionId: string; humanUsedSecs: number; autonomousSecs: number };
+          used += a.humanUsedSecs;
+          out(`${a.sessionId}: human ${a.humanUsedSecs}s · autonomous ${a.autonomousSecs}s`);
+        }
+        out(`Today: human ${used}s of ${HUMAN_BUDGET_MIN * 60}s budget (${Math.round(used / 60 * 10) / 10}/${HUMAN_BUDGET_MIN} min).`);
+        return;
+      }
+      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N] | humain replay H-0001 | humain frames | humain budget");
     }
     default:
       throw new RuleError("usage", `Unknown command '${cmd}'. Run \`npm run room -- help\`.`);

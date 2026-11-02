@@ -128,6 +128,23 @@ test("no human decisions during an execution run", async () => {
   rule(() => s.resolveDecision("T1", "go left", "leo"), "humain");
 });
 
+test("time accounting charges actual human time and releases the reserve", async () => {
+  const room = fresh();
+  const s = SessionController.open(room, "leo", 2, false, 10);
+  assert.equal(s.reserveMin, 10);
+  rule(() => SessionController.open(room, "leo", 2, false, 61), "humain");
+  await new Promise((r) => setTimeout(r, 1100));
+  s.closeInput("test");
+  s.stop("manual-stop", "test");
+  const a = s.state().accounting!;
+  assert.equal(a.humanBudgetMin, 60);
+  assert.equal(a.reserveMin, 10);
+  assert.ok(a.humanUsedSecs >= 1, "actual seconds charged");
+  assert.equal(a.humanUsedSecs + a.humanReleasedSecs, 600, "unused reserve released");
+  assert.equal(a.autonomousSecs, 0, "no execution ran");
+  assert.ok(room.store.all().some((e) => e.type === "humain.accounting"));
+});
+
 test("compute deadline rejects new actions", async () => {
   const room = fresh();
   const s = planned(room);

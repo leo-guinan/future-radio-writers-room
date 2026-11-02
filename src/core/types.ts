@@ -66,6 +66,7 @@ export type EventType =
   | "humain.checkpoint"
   | "humain.frame"
   | "humain.repair"
+  | "humain.accounting"
   | "humain.stopped";
 
 // ---------- Ideas: the central unit of the room ----------
@@ -426,6 +427,17 @@ export interface HumainSessionOpened {
   inputWindowMin: number; // 2 | 5 | 15 | 60
   inputDeadlineWall: string; // ISO wall-clock display copy; enforcement uses the monotonic clock
   saveTranscript: boolean; // transcripts hit the log only with explicit permission
+  reserveMin: number; // human minutes reserved for this session (released when unused)
+}
+
+/** Time accounting: human budget vs autonomous execution, recorded separately. */
+export interface HumainAccounting {
+  sessionId: string;
+  humanBudgetMin: number; // daily human budget
+  reserveMin: number;
+  humanUsedSecs: number; // actual active human time charged
+  humanReleasedSecs: number; // reserved but unused, released on completion
+  autonomousSecs: number; // machine execution, recorded separately
 }
 
 export interface HumainRecording {

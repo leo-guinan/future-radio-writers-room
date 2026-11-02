@@ -2,10 +2,11 @@
 // here, in code, outside any model prompt. State changes are appended to the same
 // event log the writers' room replays.
 
-import { Deadline } from "./clock.ts";
+import { Deadline, monotonicMs } from "./clock.ts";
 import { RuleError } from "../core/room.ts";
 import type { Room } from "../core/room.ts";
 import type {
+  HumainAccounting,
   HumainApproved,
   HumainArtifact,
   HumainCapabilities,
@@ -26,6 +27,8 @@ import type {
 
 export const INPUT_WINDOWS = [2, 5, 15, 60] as const;
 export const MAX_COMPUTE_SECS = 60 * 60;
+/** Daily human time budget, minutes. Sessions reserve a slice and release the unused rest. */
+export const HUMAN_BUDGET_MIN = 60;
 
 export type SessionPhase =
   | "listening" // input window open; recording only when the user explicitly started it
@@ -53,6 +56,7 @@ export interface SessionState {
   frames: HumainFrame[];
   repairs: HumainRepair[];
   lastCheckpoint: HumainCheckpoint | null;
+  accounting: HumainAccounting | null;
   computeRemainingMs: number | null;
   spendUsd: number;
   decisions: Record<string, string>; // taskId -> resolution
@@ -76,6 +80,10 @@ export class SessionController {
   private frames: HumainFrame[] = [];
   private repairs: HumainRepair[] = [];
   private lastCheckpoint: HumainCheckpoint | null = null;
+  private accounting: HumainAccounting | null = null;
+  private openedMono = monotonicMs();
+  private inputUsedSecs = 0;
+  private execStartMono: number | null = null;
   private spendUsd = 0;
   private decisions: Record<string, string> = {};
   private blocked: string[] = [];
@@ -89,14 +97,17 @@ export class SessionController {
     readonly actor: string,
     readonly inputWindowMin: number,
     readonly saveTranscript: boolean,
+    readonly reserveMin: number,
     inputDeadline: Deadline,
   ) {
     this.inputDeadline = inputDeadline;
   }
 
-  static open(room: Room, actor: string, inputWindowMin: number, saveTranscript: boolean): SessionController {
+  static open(room: Room, actor: string, inputWindowMin: number, saveTranscript: boolean, reserveMin = 10): SessionController {
     if (!(INPUT_WINDOWS as readonly number[]).includes(inputWindowMin))
       throw new RuleError("humain", `Pick a human input window: ${INPUT_WINDOWS.join(", ")} minutes.`);
+    if (!(reserveMin > 0) || reserveMin > HUMAN_BUDGET_MIN)
+      throw new RuleError("humain", `Reserve 1–${HUMAN_BUDGET_MIN} human minutes for the session.`);
     const n = room.store.all().filter((e) => e.type === "humain.session_opened").length + 1;
     const sessionId = `H-${String(n).padStart(4, "0")}`;
     const deadline = Deadline.in(inputWindowMin * 60_000);
@@ -105,9 +116,10 @@ export class SessionController {
       inputWindowMin,
       inputDeadlineWall: deadline.atWallIso,
       saveTranscript,
+      reserveMin,
     };
     room.store.append("humain.session_opened", actor, opened, "public");
-    return new SessionController(room, sessionId, actor, inputWindowMin, saveTranscript, deadline);
+    return new SessionController(room, sessionId, actor, inputWindowMin, saveTranscript, reserveMin, deadline);
   }
 
   /** Rebuild a controller from the log (e.g. after a restart). Memory-only transcripts are gone; the log says so. */
@@ -116,7 +128,7 @@ export class SessionController {
     const opened = events.find((e) => e.type === "humain.session_opened");
     if (!opened) throw new RuleError("humain", `No session ${sessionId}.`);
     const p = opened.payload as HumainSessionOpened;
-    const c = new SessionController(room, sessionId, opened.actor, p.inputWindowMin, p.saveTranscript, Deadline.fromWallIso(p.inputDeadlineWall));
+    const c = new SessionController(room, sessionId, opened.actor, p.inputWindowMin, p.saveTranscript, p.reserveMin ?? 10, Deadline.fromWallIso(p.inputDeadlineWall));
     for (const e of events) {
       const q = e.payload as any;
       switch (e.type) {
@@ -150,6 +162,9 @@ export class SessionController {
           break;
         case "humain.repair":
           c.repairs.push(q as HumainRepair);
+          break;
+        case "humain.accounting":
+          c.accounting = q as HumainAccounting;
           break;
         case "humain.approved":
           c.approval = q as HumainApproved;
@@ -209,6 +224,7 @@ export class SessionController {
   closeInputIfExpired(): boolean {
     if (this.phase !== "listening" || !this.inputDeadline.expired()) return false;
     this.stopRecording("input deadline reached — capture stopped, transcription connection closed");
+    this.chargeInput();
     this.phase = "input-closed";
     if (this.transcript.length === 0 && !this.plan) {
       this.terminal = { sessionId: this.sessionId, reason: "input-deadline", detail: "The input window closed with no spoken input captured." };
@@ -223,7 +239,13 @@ export class SessionController {
     this.assertActive();
     if (this.phase !== "listening") return;
     this.stopRecording(reason);
+    this.chargeInput();
     this.phase = "input-closed";
+  }
+
+  /** Charge only actual active human time (open → input close), in whole seconds. */
+  private chargeInput(): void {
+    this.inputUsedSecs = Math.max(0, Math.round((monotonicMs() - this.openedMono) / 1000));
   }
 
   get isRecording(): boolean {
@@ -383,6 +405,7 @@ export class SessionController {
   beginExecution(): void {
     this.assertActive();
     if (!this.approval || !this.contract) throw new RuleError("humain", "Execution needs an approved change contract.");
+    this.execStartMono = monotonicMs();
     this.phase = "executing";
   }
 
@@ -436,6 +459,19 @@ export class SessionController {
     this.terminal = { sessionId: this.sessionId, reason, detail };
     this.phase = "terminal";
     this.room.store.append("humain.stopped", "system", this.terminal, "public");
+    // Time accounting: charge actual human time, release the unused reserve,
+    // record autonomous execution separately.
+    const autonomousSecs = this.execStartMono === null ? 0 : Math.max(0, Math.round((monotonicMs() - this.execStartMono) / 1000));
+    const reservedSecs = this.reserveMin * 60;
+    this.accounting = {
+      sessionId: this.sessionId,
+      humanBudgetMin: HUMAN_BUDGET_MIN,
+      reserveMin: this.reserveMin,
+      humanUsedSecs: this.inputUsedSecs,
+      humanReleasedSecs: Math.max(0, reservedSecs - this.inputUsedSecs),
+      autonomousSecs,
+    };
+    this.room.store.append("humain.accounting", "system", this.accounting, "public");
   }
 
   private assertActive(): void {
@@ -464,6 +500,7 @@ export class SessionController {
       frames: [...this.frames],
       repairs: [...this.repairs],
       lastCheckpoint: this.lastCheckpoint,
+      accounting: this.accounting,
       computeRemainingMs: this.computeDeadline?.remainingMs() ?? null,
       spendUsd: Math.round(this.spendUsd * 10000) / 10000,
       decisions: { ...this.decisions },

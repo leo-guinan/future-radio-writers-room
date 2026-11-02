@@ -5,7 +5,7 @@
 // one reviewable artifact.
 
 import type { HumainAcceptanceTest, HumainCapabilities, HumainContract, HumainEstimate, HumainPlan } from "../core/types.ts";
-import { nextFrameId } from "./frames.ts";
+import { allocateFrameIds } from "./frames.ts";
 import { observeState, runAcceptance } from "./observe.ts";
 
 export function buildContract(
@@ -21,14 +21,13 @@ export function buildContract(
   const aid = () => `${sessionId}-A${++n}`;
 
   // Frame ids are assigned at contract time so acceptance tests name real targets.
-  // Sequential allocation from one scan; concurrent sessions may collide (see README).
-  const base = nextFrameId();
-  const baseNum = Number(base.slice(2));
-  let frameIdx = 0;
+  // Allocation is atomic: concurrent sessions can never receive the same id.
+  const frameOwners = plan.tasks.filter((t) => t.frame);
+  const allocated = allocateFrameIds(frameOwners.length);
+  frameOwners.forEach((t, i) => frameTasks.push({ taskId: t.taskId, frameId: allocated[i] }));
   for (const t of plan.tasks) {
     if (!t.frame) continue;
-    const frameId = `F-${String(baseNum + frameIdx++).padStart(4, "0")}`;
-    frameTasks.push({ taskId: t.taskId, frameId });
+    const frameId = frameTasks.find((f) => f.taskId === t.taskId)!.frameId;
     const { hook, workA, workB } = t.frame;
     acceptance.push(
       { id: aid(), description: `Frame ${frameId} exists in the registry`, check: "frame.exists", target: frameId, expected: frameId },
