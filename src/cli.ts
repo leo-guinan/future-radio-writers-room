@@ -709,7 +709,7 @@ async function main() {
         await executePlan(room, s, by);
         const st = s.state();
         for (const r of st.results) out(`  ${r.taskId} ${r.status} — ${r.detail}`);
-        for (const f of st.frames) out(`  frame ${f.frameId}: "${f.hook.slice(0, 60)}" sha256:${f.sha256.slice(0, 12)} visits:${f.visits}`);
+        for (const f of st.frames) out(`  frame ${f.frameId}: "${f.hook.slice(0, 60)}" sha256:${f.sha256.slice(0, 12)} human:${f.visits} unique:${f.unique} verification:${f.verification}`);
         if (st.lastCheckpoint) out(`  checkpoint: ${st.lastCheckpoint.reason} — remaining: ${st.lastCheckpoint.remaining.join("; ") || "none"}`);
         if (st.accounting) {
           const a = st.accounting;
@@ -720,7 +720,7 @@ async function main() {
       }
       if (sub === "frames") {
         const { listFrames } = await import("./humain/frames.ts");
-        for (const f of listFrames()) out(`${f.frameId} "${f.hook.slice(0, 70)}" visits:${f.visits} sha256:${f.sha256.slice(0, 12)} /api/humain/frames/${f.frameId}`);
+        for (const f of listFrames()) out(`${f.frameId} "${f.hook.slice(0, 70)}" human:${f.counts.human} unique:${f.counts.unique} verification:${f.counts.verification} sha256:${f.sha256.slice(0, 12)} /api/humain/frames/${f.frameId}`);
         return;
       }
       if (sub === "budget") {

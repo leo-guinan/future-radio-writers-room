@@ -25,6 +25,7 @@ const REUSABLE: Array<{ capability: string; files: string[]; note: string }> = [
   { capability: "cost-ledger", files: ["src/core/room.ts"], note: "three ledgers; observed/projected/disputed/unknown never blend" },
   { capability: "forecasts", files: ["src/core/room.ts"], note: "estimates booked as forecasts with due dates and resolutions" },
   { capability: "catalog-works", files: ["catalog/works.json"], note: "verified creative works with releases and checksums" },
+  { capability: "visit-classification", files: ["src/humain/frames.ts"], note: "human/unique/verification visit counts with legacy migration" },
   { capability: "showrunner-gates", files: ["src/showrunner/gates.ts", "gates.json"], note: "load-tightened gates for candidate selection" },
   { capability: "evidence-checks", files: ["src/production/loop.ts"], note: "fileSha + checklist pattern for verified claims" },
 ];

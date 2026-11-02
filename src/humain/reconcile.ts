@@ -163,7 +163,7 @@ async function runTask(
     const a = workById(works, task.frame.workA);
     const b = workById(works, task.frame.workB);
     const { meta, checks } = buildFrameToRegistry(task.frame.frameId, session.sessionId, task.frame.hook, a, b);
-    session.recordFrame({ frameId: meta.frameId, hook: meta.hook, workA: meta.workA, workB: meta.workB, path: `${meta.frameId}/index.html`, sha256: meta.sha256, visits: 0 });
+    session.recordFrame({ frameId: meta.frameId, hook: meta.hook, workA: meta.workA, workB: meta.workB, path: `${meta.frameId}/index.html`, sha256: meta.sha256, visits: 0, unique: 0, verification: 0 });
     session.recordArtifact({ taskId: task.taskId, path: `frames/${meta.frameId}/index.html`, sha256: meta.sha256, bytes: meta.bytes, label: `Frame ${meta.frameId}: ${a.title} vs ${b.title}` });
     session.recordTaskResult({
       taskId: task.taskId, status: "success",

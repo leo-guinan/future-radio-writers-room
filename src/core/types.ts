@@ -505,7 +505,9 @@ export interface HumainFrame {
   workB: string;
   path: string; // registry-relative path of the page
   sha256: string;
-  visits: number;
+  visits: number; // human views at record time
+  unique: number; // unique visitors at record time
+  verification: number; // verification views at record time
 }
 
 export interface HumainRepair {

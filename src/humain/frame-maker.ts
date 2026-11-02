@@ -81,6 +81,7 @@ export function renderComparison(a: WorkRef, b: WorkRef, hook: string): string {
     <div>You are visitor</div>
     <div class="odometer" id="odometer">000000</div>
     <div>since the static began</div>
+    <div class="server-counts" data-testid="server-counts"><strong data-c="unique">0</strong> unique souls across <strong data-c="human">0</strong> visits (<strong data-c="verify">0</strong> verification passes)</div>
   </div>
   <p class="made">Framed by HumAIn OS Frame Maker prototype. Counter is per-browser (localStorage).</p>
 <script>
