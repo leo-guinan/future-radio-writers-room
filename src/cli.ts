@@ -153,6 +153,7 @@ HumAIn OS (voice-first, human-time-bounded sessions; web UI at /humain)
                                          muse-voice-transcribe-1.0 with MODEL_API_KEY;
                                          --live fails visibly without Meta APIs)
   humain replay H-0001                   Terminal replay of a session's events from the log
+  humain evidence H-0001                 Observed/estimated/unknown costs, time, reuse evidence
   humain frames                          Persistent shareable frames and their visit counts
   humain budget                          Today's human time usage against the 60-minute budget
 
@@ -731,6 +732,46 @@ async function main() {
         out(`totals: ${frames.length} frame(s) human:${t.human} unique:${t.unique} verification:${t.verification}`);
         return;
       }
+      if (sub === "evidence") {
+        const id = need(pos[1], "session id (e.g. H-0001)");
+        const evs = room.store.all().filter((e) => e.type.startsWith("humain.") && (e.payload as any).sessionId === id);
+        if (!evs.length) throw new RuleError("usage", `No HumAIn OS events for ${id}.`);
+        const one = (t: string) => evs.filter((e) => e.type === t).at(-1)?.payload as any;
+        const money = (n: number) => `$${(Math.round(n * 10000) / 10000).toFixed(4)}`;
+        out(`Evidence for ${id} (observed ≠ estimated ≠ unknown; human ≠ machine):`);
+        const mine = room.ledger.filter((l) => l.label.includes(id) || (l.evidence ?? "").includes(id));
+        const show = (title: string, rows: typeof mine) => {
+          out(`-- ${title} --`);
+          if (!rows.length) out("  (none)");
+          for (const l of rows) out(`  ${l.ledger}/${l.kind} ${l.amount}${l.unit === "usd" ? "" : ` ${l.unit}`} ${l.unit === "usd" ? money(l.amount) : ""} [${l.status}] ${l.label}`);
+        };
+        show("OBSERVED costs (receipts with evidence)", mine.filter((l) => l.status === "observed"));
+        show("ESTIMATED costs (forecasts, never receipts)", mine.filter((l) => l.status === "projected"));
+        show("UNKNOWN costs (usage without a price)", mine.filter((l) => l.status === "unknown" || l.status === "disputed"));
+        const est = one("humain.estimate");
+        if (est) out(`  contract estimate: ${money(est.apiUsd)} API · ${est.localHours}h local · ${est.executionSeconds}s [${est.label}]`);
+        const a = one("humain.accounting");
+        out("-- TIME --");
+        if (a) {
+          out(`  human: used ${a.humanUsedSecs}s of ${a.reserveMin * 60}s reserved (${a.humanReleasedSecs}s released) · daily budget ${a.humanBudgetMin} min`);
+          out(`  autonomous: ${a.autonomousSecs}s execution (recorded separately)`);
+        } else out("  (session has not ended; no accounting yet)");
+        const caps = one("humain.capabilities");
+        const contract = one("humain.contract");
+        out("-- CAPABILITIES --");
+        if (caps) {
+          out(`  reused (${caps.reuse.length}): ${caps.reuse.map((r: any) => r.capability).join(", ") || "(none)"}`);
+          out(`  newly built (${caps.build.length}): ${caps.build.map((b: any) => b.capability).join(", ") || "(none)"}`);
+        }
+        if (contract) {
+          out(`  satisfied before execution: ${contract.satisfied.length}`);
+          out(`  missing: ${contract.missing.join("; ") || "(none)"}`);
+          out(`  acceptance: ${contract.acceptance.length} tests`);
+        }
+        const stop = one("humain.stopped");
+        if (stop) out(`outcome: ${stop.reason} — ${stop.detail}`);
+        return;
+      }
       if (sub === "budget") {
         const { HUMAN_BUDGET_MIN } = await import("./humain/session.ts");
         const today = new Date().toISOString().slice(0, 10);
@@ -744,7 +785,7 @@ async function main() {
         out(`Today: human ${used}s of ${HUMAN_BUDGET_MIN * 60}s budget (${Math.round(used / 60 * 10) / 10}/${HUMAN_BUDGET_MIN} min).`);
         return;
       }
-      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N] | humain replay H-0001 | humain frames | humain budget");
+      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N] | humain replay H-0001 | humain evidence H-0001 | humain frames | humain budget");
     }
     default:
       throw new RuleError("usage", `Unknown command '${cmd}'. Run \`npm run room -- help\`.`);

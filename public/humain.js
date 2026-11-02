@@ -9,6 +9,7 @@ let pollTimer = null;
 let recognition = null;
 let mediaStream = null;
 let mediaRecorder = null;
+let audioChunks = [];
 let lastState = null;
 
 for (const b of document.querySelectorAll(".winbtn")) {
@@ -156,22 +157,81 @@ $("record").addEventListener("click", async () => {
     await api(`/api/humain/sessions/${sessionId}/recording/stop`, "POST", { reason: "mic unavailable" }).catch(() => {});
     return;
   }
-  // Chunks are discarded: audio proves nothing and is stored nowhere.
+  // With Meta Voice checked, chunks are kept for one upload on stop; otherwise
+  // they are discarded: audio proves nothing and is stored nowhere.
+  const metaVoice = $("metaVoice").checked;
+  audioChunks = [];
   mediaRecorder = new MediaRecorder(mediaStream);
-  mediaRecorder.ondataavailable = () => {};
+  mediaRecorder.ondataavailable = (ev) => { if (metaVoice && ev.data && ev.data.size) audioChunks.push(ev.data); };
   mediaRecorder.start(1000);
-  startRecognition();
+  if (metaVoice) {
+    $("transcript").innerHTML = `<span class="muted">Recording for Meta Voice Transcribe — audio uploads once when you stop. On-device recognition is off for this take.</span>`;
+  } else {
+    startRecognition();
+  }
   const s = await api(`/api/humain/sessions/${sessionId}`);
   render(s);
 });
 
 $("stopRec").addEventListener("click", async () => {
+  const chunks = audioChunks;
+  audioChunks = [];
   stopLocalCapture("user stopped recording");
   if (sessionId) {
     const s = await api(`/api/humain/sessions/${sessionId}/recording/stop`, "POST", { reason: "user stopped recording" }).catch(() => null);
     if (s) render(s);
   }
+  // Meta Voice path: exactly one upload per take. Failures are shown, never
+  // swapped for another transcriber behind the user's back.
+  if ($("metaVoice").checked && chunks.length && sessionId) {
+    $("transcript").innerHTML = `<span class="muted">Uploading ${chunks.length} audio chunk(s) to Meta Voice Transcribe…</span>`;
+    try {
+      const wav = await chunksToWav16kMono(chunks);
+      const r = await api(`/api/humain/sessions/${sessionId}/audio`, "POST", { audioBase64: wav, mime: "audio/wav" });
+      $("transcript").innerHTML = `<span class="muted">Meta Voice Transcribe returned ${r.chunks} chunk(s). Speak more or press “Done speaking”.</span>`;
+      render(r.state);
+    } catch (e) {
+      $("transcript").innerHTML = `<span>Meta Voice Transcribe failed visibly: ${escapeHtml(e.message)}. Nothing was substituted — fix the server key or uncheck the box and record again.</span>`;
+    }
+  }
 });
+
+// Decode recorded chunks and re-encode as 16 kHz mono 16-bit WAV (base64),
+// the shape the server's Meta Voice adapter accepts.
+async function chunksToWav16kMono(chunks) {
+  const buf = await new Blob(chunks).arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  try {
+    const decoded = await ctx.decodeAudioData(buf);
+    const rate = 16000;
+    const len = Math.floor(decoded.duration * rate);
+    const off = new OfflineAudioContext(1, len, rate);
+    const src = off.createBufferSource();
+    src.buffer = decoded;
+    src.connect(off.destination);
+    src.start();
+    const rendered = await off.startRendering();
+    const pcm = rendered.getChannelData(0);
+    const wav = new ArrayBuffer(44 + pcm.length * 2);
+    const v = new DataView(wav);
+    const wstr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    wstr(0, "RIFF"); v.setUint32(4, 36 + pcm.length * 2, true); wstr(8, "WAVE"); wstr(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    wstr(36, "data"); v.setUint32(40, pcm.length * 2, true);
+    for (let i = 0; i < pcm.length; i++) {
+      const s = Math.max(-1, Math.min(1, pcm[i]));
+      v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    const bytes = new Uint8Array(wav);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    return btoa(bin);
+  } finally {
+    try { await ctx.close(); } catch (e) {}
+  }
+}
 
 function startRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;

@@ -224,3 +224,23 @@ test("rebuild from the log restores state but never reopens capture", async () =
   assert.equal(r.isRecording, false);
   rule(() => r.startRecording("after restart"), "humain");
 });
+
+test("rebuild preserves limits, decisions, spend and stays conservative on deadlines", async () => {
+  const store = new EventStore(null);
+  const room = new Room(store);
+  const s = await approved(room);
+  const id = s.sessionId;
+  s.resolveDecision(`${id}-T1`, "go left", "leo");
+  s.recordTaskResult({ taskId: `${id}-T1`, status: "success", evidence: "e", detail: "d", costUsd: 1.25, seconds: 1 });
+  const room2 = new Room(store);
+  const r = SessionController.rebuild(room2, id);
+  const st = r.state();
+  assert.deepEqual(st.decisions, { [`${id}-T1`]: "go left" });
+  assert.equal(st.spendUsd, 1.25);
+  assert.deepEqual(st.contract?.limits, { spendCeilingUsd: 5, computeDeadlineSecs: 300 });
+  assert.ok((st.computeRemainingMs ?? 0) > 0, "live compute deadline survives restart");
+  // A restart never extends authority: an already-passed wall deadline stays passed.
+  (r as any).computeDeadline = (await import("../src/humain/clock.ts")).Deadline.fromWallIso(new Date(Date.now() - 1000).toISOString());
+  rule(() => r.guardAction(0), "humain");
+  assert.equal(r.state().terminal?.reason, "compute-deadline");
+});
