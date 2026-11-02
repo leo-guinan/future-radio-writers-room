@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HumAIn OS — voice-first agent session</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+  main { max-width: 920px; margin: 1.5rem auto; padding: 0 1.2rem 4rem; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+  .card { border: 1px solid #444; border-radius: 8px; padding: 1rem; margin: 1rem 0; background: rgba(255,255,255,.03); }
+  .timer { font-size: 2.2rem; font-family: monospace; }
+  .timer.danger { color: #e5484d; }
+  .pill { display: inline-block; padding: .15rem .6rem; border-radius: 999px; border: 1px solid #666; font-size: .85rem; }
+  .pill.rec { border-color: #e5484d; color: #e5484d; }
+  .pill.closed { border-color: #888; color: #999; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { border-bottom: 1px solid #333; padding: .4rem .5rem; text-align: left; vertical-align: top; }
+  .est { color: #d8b25c; font-weight: bold; }
+  #transcript { white-space: pre-wrap; min-height: 3rem; }
+  .muted { opacity: .65; font-size: .9rem; }
+  button:disabled { opacity: .4; }
+  #events { font-family: monospace; font-size: .8rem; max-height: 260px; overflow: auto; }
+  .winbtn[aria-pressed="true"] { outline: 2px solid #d8b25c; }
+  input[type="number"] { width: 7rem; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="/">&larr; writers' room</a></p>
+  <h1>HumAIn OS <span class="muted">prototype: spoken idea &rarr; costed, executable plan</span></h1>
+
+  <section class="card" id="setup">
+    <h2>1. Human input window</h2>
+    <div class="row" role="group" aria-label="Input window minutes">
+      <button class="winbtn" data-min="2" aria-pressed="false">2 min</button>
+      <button class="winbtn" data-min="5" aria-pressed="true">5 min</button>
+      <button class="winbtn" data-min="15" aria-pressed="false">15 min</button>
+      <button class="winbtn" data-min="60" aria-pressed="false">60 min</button>
+    </div>
+    <p><label><input type="checkbox" id="saveTranscript"> Save my transcript to the event log (off = memory only, never stored)</label></p>
+    <p class="muted">Raw audio never leaves this browser and is never stored. Only transcript text is sent &mdash; and stored only with the box ticked.</p>
+    <div class="row"><button id="open">Open session</button><span id="sessionLabel" class="muted"></span></div>
+  </section>
+
+  <section class="card" id="capture" hidden>
+    <h2>2. Speak <span id="phase" class="pill">listening</span> <span id="recpill" class="pill rec" hidden>REC</span></h2>
+    <div class="timer" id="timer">--:--</div>
+    <p class="muted" id="deadlineNote">When the timer ends, capture stops, the transcription connection closes, and no more input is requested.</p>
+    <div class="row">
+      <button id="record">Start recording</button>
+      <button id="stopRec" disabled>Stop recording</button>
+      <button id="doneSpeaking">Done speaking &rarr; close input</button>
+    </div>
+    <h3>Live transcript</h3>
+    <div id="transcript" class="card"><span class="muted">Nothing heard yet.</span></div>
+    <div id="typedFallback">
+      <p class="muted">No microphone or speech recognition? Type what you would say:</p>
+      <div class="row"><input id="typed" size="60" placeholder="Build a webpage comparing&hellip;"><button id="sendTyped">Send as spoken</button></div>
+    </div>
+  </section>
+
+  <section class="card" id="planCard" hidden>
+    <h2>3. Structured plan</h2>
+    <div class="row"><button id="makePlan">Make plan from transcript</button></div>
+    <p id="hook"></p>
+    <table id="tasks"><thead><tr><th>Task</th><th>Kind</th><th>Capability</th><th>Estimate</th><th>Decision</th></tr></thead><tbody></tbody></table>
+    <h3>Capabilities</h3>
+    <h4>Reused</h4><ul id="reuse"></ul>
+    <h4>Built</h4><ul id="build"></ul>
+    <h3>Cost</h3>
+    <p><span class="est">ESTIMATE</span> <span id="estimate"></span> <span class="muted">(estimates are forecasts, never receipts)</span></p>
+  </section>
+
+  <section class="card" id="approveCard" hidden>
+    <h2>4. Approve autonomous run</h2>
+    <div class="row">
+      <label>API ceiling USD <input type="number" id="ceiling" value="5" min="0" step="0.5"></label>
+      <label>Compute deadline (s) <input type="number" id="computeSecs" value="300" min="10" max="3600"></label>
+      <button id="approve">Approve</button>
+    </div>
+  </section>
+
+  <section class="card" id="execCard" hidden>
+    <h2>5. Execute</h2>
+    <div class="row"><button id="execute">Execute approved plan</button><button id="stop">Stop / revoke</button></div>
+    <table id="results"><thead><tr><th>Task</th><th>Status</th><th>Evidence</th><th>Cost</th></tr></thead><tbody></tbody></table>
+    <p id="artifact"></p>
+    <p id="ledgerLine"></p>
+  </section>
+
+  <section class="card" id="replayCard" hidden>
+    <h2>6. Event replay</h2>
+    <div id="events"></div>
+  </section>
+</main>
+<script src="/humain.js"></script>
+</body>
+</html>

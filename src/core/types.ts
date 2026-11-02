@@ -49,7 +49,20 @@ export type EventType =
   | "daily.recorded"
   | "scene.happening"
   | "voice.designed"
-  | "voice.selected";
+  | "voice.selected"
+  | "humain.session_opened"
+  | "humain.recording_started"
+  | "humain.recording_stopped"
+  | "humain.transcript"
+  | "humain.plan"
+  | "humain.capabilities"
+  | "humain.estimate"
+  | "humain.approved"
+  | "humain.task_blocked"
+  | "humain.task_result"
+  | "humain.artifact"
+  | "humain.decision"
+  | "humain.stopped";
 
 // ---------- Ideas: the central unit of the room ----------
 
@@ -398,6 +411,111 @@ export interface SceneClosed {
   turns: number;
   motivations?: Record<string, string>; // present when revealed
   repo?: { name: string; sha: string; file: string };
+}
+
+// ---------- HumAIn OS: voice-first, human-time-bounded agent sessions ----------
+// Sessions live in the same event log; deadlines and budgets are enforced by the
+// session controller (src/humain/session.ts), never by model prompts.
+
+export interface HumainSessionOpened {
+  sessionId: string; // H-0001
+  inputWindowMin: number; // 2 | 5 | 15 | 60
+  inputDeadlineWall: string; // ISO wall-clock display copy; enforcement uses the monotonic clock
+  saveTranscript: boolean; // transcripts hit the log only with explicit permission
+}
+
+export interface HumainRecording {
+  sessionId: string;
+  reason: string;
+}
+
+export interface HumainTranscript {
+  sessionId: string;
+  n: number; // 1-based chunk number
+  text: string;
+  final: boolean;
+  source: string; // adapter id, e.g. "muse-voice-transcribe-1.0" or "browser-speech/offline"
+}
+
+export interface HumainPlanTask {
+  taskId: string; // H-0001-T1
+  title: string;
+  kind: "reuse" | "build";
+  capability: string;
+  detail: string;
+  decision?: string; // unresolved question; must clear before execution or the task blocks
+  estApiUsd: number;
+  estHours: number;
+  estSeconds: number;
+}
+
+export interface HumainPlan {
+  sessionId: string;
+  idea: string; // the spoken idea, as transcribed
+  hook: string;
+  tasks: HumainPlanTask[];
+  planner: string; // adapter id
+}
+
+export interface HumainCapabilities {
+  sessionId: string;
+  reuse: Array<{ capability: string; source: string; evidence: string }>;
+  build: Array<{ capability: string; why: string }>;
+}
+
+export interface HumainEstimate {
+  sessionId: string;
+  label: "ESTIMATE"; // estimates are forecasts, never receipts
+  apiUsd: number;
+  localHours: number;
+  executionSeconds: number;
+  forecastId: string; // the room forecast id this estimate is booked under
+}
+
+export interface HumainApproved {
+  sessionId: string;
+  spendCeilingUsd: number;
+  computeDeadlineSecs: number;
+  computeDeadlineWall: string;
+}
+
+export interface HumainTaskBlocked {
+  sessionId: string;
+  taskId: string;
+  decision: string; // the pending decision that blocked it
+}
+
+export interface HumainTaskResult {
+  sessionId: string;
+  taskId: string;
+  status: "success" | "unverified" | "failed" | "blocked";
+  evidence?: string; // sha256, test output, or artifact ref — required for "success"
+  detail: string;
+  costUsd: number | null;
+  seconds: number;
+}
+
+export interface HumainArtifact {
+  sessionId: string;
+  taskId: string;
+  path: string; // workspace-relative
+  sha256: string;
+  bytes: number;
+  label: string;
+}
+
+export interface HumainDecision {
+  sessionId: string;
+  taskId: string;
+  decision: string;
+  resolution: string;
+  by: string;
+}
+
+export interface HumainStopped {
+  sessionId: string;
+  reason: "input-deadline" | "compute-deadline" | "manual-stop" | "revoked" | "budget" | "done";
+  detail: string;
 }
 
 /** A line given a voice, just in time; the audio is cached by content. */

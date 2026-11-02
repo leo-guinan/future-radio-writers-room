@@ -22,6 +22,7 @@ import { openScene, publicScene, runScene, sceneOrThrow } from "./scenes/scenes.
 import { designDir, selectDesignedVoice } from "./scenes/abilities.ts";
 import { modelReport, publicTrial, revealTrial, runTrial, type EpisodeCards } from "./scenes/trials.ts";
 import { cacheKey, cachedPath, lineAudio, patronVoicesToday, spokenText, TTS_MODEL, voiceFor } from "./scenes/voice.ts";
+import { humainRoutes } from "./humain/routes.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TOKEN = process.env.PRODUCER_TOKEN ?? "";
@@ -448,6 +449,7 @@ const routes: Array<[string, RegExp, Handler]> = [
   }],
   ["GET", /^\/healthz$/, (_q, res) => send(res, 200, { ok: true, chain: room.store.verify() })],
 ];
+routes.push(...humainRoutes(room, PRODUCER));
 
 /**
  * The producer's console, remotely: run one CLI command on the server, against the live room.
@@ -488,7 +490,7 @@ function requireProducer(req: IncomingMessage) {
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json" };
 
 function serveStatic(path: string, res: ServerResponse) {
-  const requested = path === "/" ? "/index.html" : path === "/room" ? "/room.html" : path;
+  const requested = path === "/" ? "/index.html" : path === "/room" ? "/room.html" : path === "/humain" ? "/humain.html" : path;
   const rel = normalize(requested).replace(/^(\.\.[/\\])+/, "");
   const file = join(PUBLIC_DIR, rel);
   if (!file.startsWith(PUBLIC_DIR) || !existsSync(file)) return send(res, 404, { error: "Not found" });

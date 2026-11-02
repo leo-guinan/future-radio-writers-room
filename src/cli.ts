@@ -147,6 +147,11 @@ Character bibles
   bible show <character>                 Print the character's loadable system prompt
   bible chat <character> [--from name]   Talk with a principal or an extra locally; /propose drafts a viewer note
 
+HumAIn OS (voice-first, human-time-bounded sessions; web UI at /humain)
+  humain demo [--idea "..."] [--ceiling N] [--secs N]
+                                         Run the first demo task end to end (simulated speech, offline)
+  humain replay H-0001                   Terminal replay of a session's events from the log
+
 Agnolo's screen
   scorecard                              Observed / projected / disputed / unknown, three ledgers
   ledger add --ledger operations|historical|effort --kind expense|receipt|hours|obligation
@@ -642,6 +647,46 @@ async function main() {
     }
     case "loop":
       return out(LOOP.map((l) => `${l.stage.padEnd(9)} ${l.does}`).join("\n"));
+    case "humain": {
+      const { SessionController } = await import("./humain/session.ts");
+      const { executePlan, loadWorks } = await import("./humain/frame-maker.ts");
+      const { makePlanner } = await import("./humain/adapters.ts");
+      const { inventory } = await import("./humain/capabilities.ts");
+      const { bookEstimate, estimatePlan } = await import("./humain/estimate.ts");
+      const sub = pos[0] ?? "demo";
+      if (sub === "replay") {
+        const id = need(pos[1], "session id (e.g. H-0001)");
+        const events = room.store.all().filter((e) => e.type.startsWith("humain.") && (e.payload as any).sessionId === id);
+        if (!events.length) throw new RuleError("usage", `No HumAIn OS events for ${id}.`);
+        for (const e of events) out(`${e.seq} ${e.id} ${e.ts} ${e.type} by ${e.actor}\n    ${JSON.stringify(e.payload).slice(0, 300)}`);
+        return;
+      }
+      if (sub === "demo") {
+        const idea = flags.idea ?? "Build a webpage comparing The First Transmission and The People vs The Future with one hook and a vintage visitor counter.";
+        const s = SessionController.open(room, by, 2, flags["save-transcript"] === "true");
+        out(`Session ${s.sessionId}: 2-minute input window (simulated speech).`);
+        s.startRecording("demo: simulated microphone");
+        s.ingestTranscript(idea, true, "cli-demo/typed");
+        s.closeInput("demo: finished speaking");
+        const planner = makePlanner();
+        const { draft } = await planner.plan(s.ideaText(), { works: loadWorks() });
+        const plan = s.recordPlan({ idea: s.ideaText(), hook: draft.hook, planner: planner.id, tasks: draft.tasks.map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
+        out(`Plan (${planner.id}): hook "${plan.hook}" · ${plan.tasks.length} tasks`);
+        const inv = inventory();
+        s.recordCapabilities({ reuse: inv.reuse, build: inv.build });
+        out(`Capabilities: reuse ${inv.reuse.length} (${inv.reuse.map((r) => r.capability).join(", ")}) · build ${inv.build.length}`);
+        const est = estimatePlan(plan);
+        s.recordEstimate({ ...est, forecastId: bookEstimate(room, by, s.sessionId, est) });
+        out(`ESTIMATE: $${est.apiUsd} API · ${est.localHours}h local · ${est.executionSeconds}s (forecast, not a receipt)`);
+        s.approve(Number(flags.ceiling ?? 5), Number(flags.secs ?? 300));
+        await executePlan(room, s, by);
+        const st = s.state();
+        for (const r of st.results) out(`  ${r.taskId} ${r.status} — ${r.detail}`);
+        out(`Done: ${st.terminal?.detail} Spend $${st.spendUsd}. Replay: npm run room -- humain replay ${s.sessionId}`);
+        return;
+      }
+      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] | humain replay H-0001");
+    }
     default:
       throw new RuleError("usage", `Unknown command '${cmd}'. Run \`npm run room -- help\`.`);
   }
