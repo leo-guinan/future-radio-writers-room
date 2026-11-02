@@ -127,8 +127,8 @@ async function loadFrames() {
   try {
     const frames = await api("/api/humain/frames");
     $("frames").querySelector("tbody").innerHTML = frames.length
-      ? frames.map((f) => `<tr><td><a href="/api/humain/frames/${f.frameId}" target="_blank">${f.frameId}</a></td><td>${escapeHtml(f.hook)}</td><td>${escapeHtml(f.workA)} vs ${escapeHtml(f.workB)}</td><td>${f.visits}</td></tr>`).join("")
-      : `<tr><td colspan="4" class="muted">None yet.</td></tr>`;
+      ? frames.map((f) => `<tr><td><a href="/api/humain/frames/${f.frameId}" target="_blank">${f.frameId}</a></td><td>${escapeHtml(f.hook)}</td><td>${escapeHtml(f.workA)} vs ${escapeHtml(f.workB)}</td><td>${f.counts.human}</td><td>${f.counts.unique}</td><td>${f.counts.verification}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="muted">None yet.</td></tr>`;
   } catch (e) {}
 }
 $("refreshFrames").addEventListener("click", loadFrames);

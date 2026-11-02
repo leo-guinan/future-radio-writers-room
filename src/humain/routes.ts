@@ -2,6 +2,7 @@
 // The browser UI drives these; the CLI demo uses the same controllers directly.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createHash } from "node:crypto";
 import type { Room } from "../core/room.ts";
 import { RuleError } from "../core/room.ts";
 import { SessionController } from "./session.ts";
@@ -165,8 +166,14 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
     ["GET", /^\/api\/humain\/frames$/, (_q, res) => {
       send(res, 200, listFrames());
     }],
-    ["GET", /^\/api\/humain\/frames\/(F-\d{4})$/, (_q, res, m) => {
-      const { html } = serveFrame(m[1]); // serving increments this frame's visit count
+    ["GET", /^\/api\/humain\/frames\/(F-\d{4})$/, (req, res, m) => {
+      // Visitor identity is a hash, never a raw address. ?as=verify records an
+      // automated verification view instead of a human one.
+      const url = new URL(req.url ?? "/", "http://x");
+      const verify = url.searchParams.get("as") === "verify";
+      const ip = String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() || (req.socket.remoteAddress ?? "unknown");
+      const visitor = createHash("sha256").update(ip).digest("hex").slice(0, 16);
+      const { html } = serveFrame(m[1], verify ? { verify: true } : { visitor });
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
       res.end(html);
     }],

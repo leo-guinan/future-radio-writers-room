@@ -8,12 +8,12 @@ import type { HumainAcceptanceTest, HumainContract, HumainTaskResult } from "../
 
 export interface ObservedState {
   facts: string[]; // observed facts, each carrying its evidence
-  frames: Array<{ frameId: string; hook: string; visits: number; sha256: string }>;
+  frames: Array<{ frameId: string; hook: string; counts: { human: number; unique: number; verification: number }; sha256: string }>;
   workspaceFiles: string[];
 }
 
 export function observeState(sessionId: string): ObservedState {
-  const frames = listFrames().map((f) => ({ frameId: f.frameId, hook: f.hook, visits: f.visits, sha256: f.sha256 }));
+  const frames = listFrames().map((f) => ({ frameId: f.frameId, hook: f.hook, counts: f.counts, sha256: f.sha256 }));
   let workspaceFiles: string[] = [];
   try {
     workspaceFiles = RestrictedWorkspace.open(sessionId).list();
@@ -21,7 +21,7 @@ export function observeState(sessionId: string): ObservedState {
     workspaceFiles = [];
   }
   const facts = [
-    `registry holds ${frames.length} frame(s)${frames.length ? `: ${frames.map((f) => `${f.frameId} "${f.hook.slice(0, 40)}" (${f.visits} visits, sha256:${f.sha256.slice(0, 12)})`).join("; ")}` : " (evidence: frames registry scan)"}`,
+    `registry holds ${frames.length} frame(s)${frames.length ? `: ${frames.map((f) => `${f.frameId} "${f.hook.slice(0, 40)}" (${f.counts.human} human/${f.counts.unique} unique/${f.counts.verification} verification, sha256:${f.sha256.slice(0, 12)})`).join("; ")}` : " (evidence: frames registry scan)"}`,
     `workspace ${sessionId} holds ${workspaceFiles.length} file(s)${workspaceFiles.length ? `: ${workspaceFiles.join(", ")}` : ""} (evidence: workspace list)`,
   ];
   return { facts, frames, workspaceFiles };

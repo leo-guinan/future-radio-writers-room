@@ -46,13 +46,13 @@ test("frames persist with independent hooks and visit counts", () => {
   const a = publishFrame(nextFrameId(), "H-0001", "First hook", works[0].work_id, works[1].work_id, renderComparison(works[0], works[1], "First hook"));
   const b = publishFrame(nextFrameId(), "H-0001", "Second hook", works[1].work_id, works[0].work_id, renderComparison(works[1], works[0], "Second hook"));
   assert.notEqual(a.frameId, b.frameId);
-  serveFrame(a.frameId);
-  serveFrame(a.frameId);
-  serveFrame(b.frameId);
-  assert.equal(readFrame(a.frameId).visits, 2);
-  assert.equal(readFrame(b.frameId).visits, 1);
+  serveFrame(a.frameId, { visitor: "alice" });
+  serveFrame(a.frameId, { visitor: "alice" });
+  serveFrame(b.frameId, { visitor: "bob" });
+  assert.deepEqual(readFrame(a.frameId).counts, { human: 2, unique: 1, verification: 0 });
+  assert.deepEqual(readFrame(b.frameId).counts, { human: 1, unique: 1, verification: 0 });
   assert.equal(readFrame(a.frameId).meta.hook, "First hook");
-  assert.ok(listFrames().some((f) => f.frameId === a.frameId && f.visits === 2));
+  assert.ok(listFrames().some((f) => f.frameId === a.frameId && f.counts.human === 2));
   assert.throws(() => readFrame("../evil"), /Bad frame id/);
   assert.throws(() => readFrame("F-9999"), /No frame/);
 });
@@ -70,10 +70,10 @@ test("serves acceptance check verifies without inflating visits", () => {
   const works = loadWorks();
   const id = nextFrameId();
   publishFrame(id, "H-0001", "hook", works[0].work_id, works[1].work_id, renderComparison(works[0], works[1], "hook"));
-  const before = readFrame(id).visits;
+  const before = readFrame(id).counts;
   const o = runAcceptance({ id: "A1", description: "serves", check: "frame.serves", target: id, expected: "200" }, "H-0001", []);
   assert.equal(o.pass, true);
-  assert.equal(readFrame(id).visits, before, "verification counts no visit");
+  assert.deepEqual(readFrame(id).counts, before, "verification counts no visit");
 });
 
 test("watchdog halts runs without acceptance progress, not on elapsed time", () => {
@@ -170,7 +170,7 @@ test("voice transcriber posts multipart audio and parses text", async () => {
   let seen: { url: string; init: any } | null = null;
   const fetchImpl = (async (url: string, init: any) => {
     seen = { url, init };
-    return { ok: true, json: async () => ({ text: "hello radio", cost_usd: 0.001 }) };
+    return { ok: true, json: async () => ({ transcript: "hello radio", audioDurationMs: 1200, sessionId: "s1" }) };
   }) as unknown as typeof fetch;
   const t = new MetaVoiceTranscriber("test-key", "https://api.meta.ai/v1/asr/transcribe", fetchImpl);
   const r = await t.transcribe(Buffer.from("RIFFfake-wav"), "audio/wav");
@@ -178,5 +178,5 @@ test("voice transcriber posts multipart audio and parses text", async () => {
   assert.equal(seen!.init.headers.authorization, "Bearer test-key");
   assert.ok(seen!.init.body instanceof FormData);
   assert.deepEqual(r.chunks, [{ text: "hello radio", final: true }]);
-  assert.equal(r.costUsd, 0.001);
+  assert.equal(r.costUsd, null, "the cookbook response carries no cost field");
 });
