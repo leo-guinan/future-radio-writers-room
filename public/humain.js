@@ -89,6 +89,18 @@ function render(s) {
     $("estimate").textContent = `$${s.estimate.apiUsd} API · ${s.estimate.localHours}h local · ${s.estimate.executionSeconds}s execution (forecast ${s.estimate.forecastId})`;
     $("approveCard").hidden = false;
   }
+  if (s.contract) {
+    const c = s.contract;
+    $("contract").innerHTML =
+      `<p><strong>Desired:</strong> ${escapeHtml(c.desired)}</p>` +
+      `<p><strong>Observed:</strong></p><ul>${c.observed.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ul>` +
+      `<p><strong>Already satisfied:</strong> ${c.satisfied.length ? "" : "&mdash; (delta is real work)"}</p><ul>${c.satisfied.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ul>` +
+      `<p><strong>Required modifications:</strong></p><ul>${c.modifications.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ul>` +
+      `<p><strong>Missing capabilities:</strong> ${c.missing.map(escapeHtml).join("; ") || "&mdash;"}</p>` +
+      `<p><strong>Acceptance (${c.acceptance.length}):</strong></p><ul>${c.acceptance.map((a) => `<li>${a.id}: ${escapeHtml(a.description)}</li>`).join("")}</ul>` +
+      `<p><strong>Limits:</strong> ceiling ${c.limits.spendCeilingUsd === null ? "unset" : "$" + c.limits.spendCeilingUsd} · compute ${c.limits.computeDeadlineSecs === null ? "unset" : c.limits.computeDeadlineSecs + "s"}</p>`;
+  }
+  if (s.frames && s.frames.length) loadFrames();
   if (s.approval) {
     $("approveCard").querySelector("button").disabled = true;
     $("execCard").hidden = false;
@@ -108,6 +120,17 @@ function render(s) {
     $("replayCard").hidden = false;
   }
 }
+
+async function loadFrames() {
+  try {
+    const frames = await api("/api/humain/frames");
+    $("frames").querySelector("tbody").innerHTML = frames.length
+      ? frames.map((f) => `<tr><td><a href="/api/humain/frames/${f.frameId}" target="_blank">${f.frameId}</a></td><td>${escapeHtml(f.hook)}</td><td>${escapeHtml(f.workA)} vs ${escapeHtml(f.workB)}</td><td>${f.visits}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="muted">None yet.</td></tr>`;
+  } catch (e) {}
+}
+$("refreshFrames").addEventListener("click", loadFrames);
+loadFrames();
 
 async function loadReplay() {
   const events = await api(`/api/humain/sessions/${sessionId}/events`);

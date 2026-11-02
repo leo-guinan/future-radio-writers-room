@@ -11,7 +11,9 @@ import { OfflinePlanner } from "../src/humain/adapters.ts";
 import { inventory } from "../src/humain/capabilities.ts";
 import { bookEstimate, estimatePlan, resolveEstimate } from "../src/humain/estimate.ts";
 import { RestrictedWorkspace, WorkspaceDenied } from "../src/humain/executor.ts";
-import { buildFrame, executePlan, loadWorks, renderComparison } from "../src/humain/frame-maker.ts";
+import { buildFrame, loadWorks, renderComparison } from "../src/humain/frame-maker.ts";
+import { executePlan } from "../src/humain/reconcile.ts";
+import { buildContract } from "../src/humain/contract.ts";
 
 const fresh = () => new Room(new EventStore(null));
 const denied = (fn: () => unknown) => assert.throws(fn, (e: unknown) => e instanceof WorkspaceDenied);
@@ -108,20 +110,21 @@ test("approved plan executes in the workspace with evidence and actuals", async 
   const plan = s.recordPlan({ idea: s.ideaText(), hook: draft.hook, planner: planner.id, tasks: draft.tasks.map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
   s.recordCapabilities({ reuse: [], build: [] });
   const est = estimatePlan(plan);
-  s.recordEstimate({ ...est, forecastId: bookEstimate(room, "leo", s.sessionId, est) });
+  const recorded = s.recordEstimate({ ...est, forecastId: bookEstimate(room, "leo", s.sessionId, est) });
+  const { contract, frameTasks } = buildContract(s.sessionId, plan, { sessionId: s.sessionId, reuse: [], build: [] }, recorded);
+  assert.ok(contract.acceptance.length >= 10, "two frames × five acceptance tests");
+  s.recordContract(contract, frameTasks);
   s.approve(5, 300);
   await executePlan(room, s, "leo");
   const st = s.state();
   assert.equal(st.terminal?.reason, "done");
-  assert.ok(st.results.length === plan.tasks.length);
   for (const r of st.results) assert.equal(r.status, "success");
   for (const r of st.results) assert.ok(r.evidence, `${r.taskId} has evidence`);
-  assert.ok(st.artifacts.length >= 1);
-  const ws = RestrictedWorkspace.open(s.sessionId);
-  assert.ok(ws.readFile("frame/index.html").includes("visitor-counter"));
+  assert.equal(st.frames.length, 2, "two persistent frames published");
+  assert.notEqual(st.frames[0].hook, st.frames[1].hook, "independent hooks");
   const actuals = room.ledger.filter((l) => l.status === "observed" && l.label.startsWith("ACTUAL"));
   assert.ok(actuals.length >= 1, "actuals booked as observed entries");
-  ws.destroy();
+  assert.ok(room.forecasts.get(recorded.forecastId)?.resolution, "estimate forecast resolved against actuals");
 });
 
 test("pending decisions become blocked tasks, never silent work", async () => {
@@ -135,10 +138,17 @@ test("pending decisions become blocked tasks, never silent work", async () => {
   });
   s.recordCapabilities({ reuse: [], build: [] });
   s.recordEstimate({ apiUsd: 0, localHours: 0.1, executionSeconds: 5, forecastId: "F-001" });
+  s.recordContract(
+    { desired: "an idea", observed: [], satisfied: [], modifications: [`${s.sessionId}-T1 needs a human`], missing: [], acceptance: [{ id: `${s.sessionId}-A1`, description: "t", check: "catalog.reused", target: `${s.sessionId}-T1`, expected: "success+evidence" }], limits: { spendCeilingUsd: null, computeDeadlineSecs: null } },
+    [],
+  );
   s.approve(5, 300);
   await executePlan(room, s, "leo");
   const st = s.state();
   assert.deepEqual(st.blocked, [`${s.sessionId}-T1`]);
   assert.equal(st.results[0].status, "blocked");
   assert.ok(room.store.all().some((e) => e.type === "humain.task_blocked"));
+  assert.equal(st.terminal?.reason, "blocked", "run halts for missing approval, not success");
+  assert.ok(st.lastCheckpoint, "checkpoint preserved");
+  assert.ok(st.lastCheckpoint!.remaining.some((r) => r.includes("A1")), "remaining requirements preserved");
 });

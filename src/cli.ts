@@ -148,9 +148,11 @@ Character bibles
   bible chat <character> [--from name]   Talk with a principal or an extra locally; /propose drafts a viewer note
 
 HumAIn OS (voice-first, human-time-bounded sessions; web UI at /humain)
-  humain demo [--idea "..."] [--ceiling N] [--secs N]
-                                         Run the first demo task end to end (simulated speech, offline)
+  humain demo [--idea "..."] [--ceiling N] [--secs N] [--voice-file f.wav]
+                                         Run the demo end to end (simulated speech, or real
+                                         muse-voice-transcribe-1.0 with MODEL_API_KEY)
   humain replay H-0001                   Terminal replay of a session's events from the log
+  humain frames                          Persistent shareable frames and their visit counts
 
 Agnolo's screen
   scorecard                              Observed / projected / disputed / unknown, three ledgers
@@ -649,10 +651,12 @@ async function main() {
       return out(LOOP.map((l) => `${l.stage.padEnd(9)} ${l.does}`).join("\n"));
     case "humain": {
       const { SessionController } = await import("./humain/session.ts");
-      const { executePlan, loadWorks } = await import("./humain/frame-maker.ts");
-      const { makePlanner } = await import("./humain/adapters.ts");
+      const { loadWorks } = await import("./humain/frame-maker.ts");
+      const { executePlan } = await import("./humain/reconcile.ts");
+      const { MetaVoiceTranscriber, makePlanner } = await import("./humain/adapters.ts");
       const { inventory } = await import("./humain/capabilities.ts");
       const { bookEstimate, estimatePlan } = await import("./humain/estimate.ts");
+      const { buildContract } = await import("./humain/contract.ts");
       const sub = pos[0] ?? "demo";
       if (sub === "replay") {
         const id = need(pos[1], "session id (e.g. H-0001)");
@@ -666,26 +670,51 @@ async function main() {
         const s = SessionController.open(room, by, 2, flags["save-transcript"] === "true");
         out(`Session ${s.sessionId}: 2-minute input window (simulated speech).`);
         s.startRecording("demo: simulated microphone");
-        s.ingestTranscript(idea, true, "cli-demo/typed");
+        if (flags["voice-file"]) {
+          if (!MetaVoiceTranscriber.available()) throw new RuleError("usage", "--voice-file needs MODEL_API_KEY for muse-voice-transcribe-1.0.");
+          const { readFileSync: readAudio } = await import("node:fs");
+          const t = new MetaVoiceTranscriber();
+          const { chunks, costUsd } = await t.transcribe(readAudio(flags["voice-file"]), "audio/wav");
+          for (const c of chunks) s.ingestTranscript(c.text, c.final, t.id);
+          out(`Voice: ${chunks.length} chunk(s) via ${t.id} (cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
+          if (typeof costUsd === "number" && costUsd > 0)
+            room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: costUsd, unit: "usd", status: "observed", label: `muse-voice-transcribe-1.0 ${s.sessionId}`, evidence: s.sessionId }, "producer");
+        } else {
+          s.ingestTranscript(idea, true, "cli-demo/typed");
+        }
         s.closeInput("demo: finished speaking");
         const planner = makePlanner();
-        const { draft } = await planner.plan(s.ideaText(), { works: loadWorks() });
+        const { draft, costUsd, usage } = await planner.plan(s.ideaText(), { works: loadWorks() });
         const plan = s.recordPlan({ idea: s.ideaText(), hook: draft.hook, planner: planner.id, tasks: draft.tasks.map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
-        out(`Plan (${planner.id}): hook "${plan.hook}" · ${plan.tasks.length} tasks`);
+        out(`Plan (${planner.id}): hook "${plan.hook}" · ${plan.tasks.length} tasks (tokens in/out ${usage.input}/${usage.output}, cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
+        if (typeof costUsd === "number" && costUsd > 0)
+          room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: costUsd, unit: "usd", status: "observed", label: `${planner.id} plan ${s.sessionId}`, evidence: s.sessionId }, "producer");
+        else if (!planner.id.startsWith("offline/") && usage.input + usage.output > 0)
+          room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: usage.input + usage.output, unit: "tokens", status: "unknown", label: `${planner.id} plan ${s.sessionId} (unpriced)`, evidence: s.sessionId }, "producer");
         const inv = inventory();
         s.recordCapabilities({ reuse: inv.reuse, build: inv.build });
         out(`Capabilities: reuse ${inv.reuse.length} (${inv.reuse.map((r) => r.capability).join(", ")}) · build ${inv.build.length}`);
         const est = estimatePlan(plan);
-        s.recordEstimate({ ...est, forecastId: bookEstimate(room, by, s.sessionId, est) });
+        const recorded = s.recordEstimate({ ...est, forecastId: bookEstimate(room, by, s.sessionId, est) });
         out(`ESTIMATE: $${est.apiUsd} API · ${est.localHours}h local · ${est.executionSeconds}s (forecast, not a receipt)`);
+        const { contract, frameTasks } = buildContract(s.sessionId, plan, { sessionId: s.sessionId, reuse: inv.reuse, build: inv.build }, recorded);
+        s.recordContract(contract, frameTasks);
+        out(`Contract: desired vs observed (${contract.observed.length} facts), satisfied ${contract.satisfied.length}, modifications ${contract.modifications.length}, acceptance ${contract.acceptance.length} tests`);
         s.approve(Number(flags.ceiling ?? 5), Number(flags.secs ?? 300));
         await executePlan(room, s, by);
         const st = s.state();
         for (const r of st.results) out(`  ${r.taskId} ${r.status} — ${r.detail}`);
+        for (const f of st.frames) out(`  frame ${f.frameId}: "${f.hook.slice(0, 60)}" sha256:${f.sha256.slice(0, 12)} visits:${f.visits}`);
+        if (st.lastCheckpoint) out(`  checkpoint: ${st.lastCheckpoint.reason} — remaining: ${st.lastCheckpoint.remaining.join("; ") || "none"}`);
         out(`Done: ${st.terminal?.detail} Spend $${st.spendUsd}. Replay: npm run room -- humain replay ${s.sessionId}`);
         return;
       }
-      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] | humain replay H-0001");
+      if (sub === "frames") {
+        const { listFrames } = await import("./humain/frames.ts");
+        for (const f of listFrames()) out(`${f.frameId} "${f.hook.slice(0, 70)}" visits:${f.visits} sha256:${f.sha256.slice(0, 12)} /api/humain/frames/${f.frameId}`);
+        return;
+      }
+      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] [--voice-file f.wav] | humain replay H-0001 | humain frames");
     }
     default:
       throw new RuleError("usage", `Unknown command '${cmd}'. Run \`npm run room -- help\`.`);

@@ -6,10 +6,13 @@ import type { Room } from "../core/room.ts";
 import { RuleError } from "../core/room.ts";
 import { SessionController } from "./session.ts";
 import { getSession, listSessions, register } from "./store.ts";
-import { makePlanner, makeTranscriber } from "./adapters.ts";
+import { MetaVoiceTranscriber, makePlanner, makeTranscriber } from "./adapters.ts";
 import { inventory } from "./capabilities.ts";
 import { bookEstimate, estimatePlan } from "./estimate.ts";
-import { executePlan, loadWorks } from "./frame-maker.ts";
+import { buildContract } from "./contract.ts";
+import { executePlan } from "./reconcile.ts";
+import { loadWorks } from "./frame-maker.ts";
+import { listFrames, readFrame, serveFrame } from "./frames.ts";
 import { RestrictedWorkspace } from "./executor.ts";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, m: RegExpMatchArray) => Promise<void> | void;
@@ -76,7 +79,7 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
       if (!idea) throw new RuleError("humain", "Nothing was said. Speak first, then plan.");
       const works = loadWorks();
       const planner = makePlanner();
-      const { draft, costUsd } = await planner.plan(idea, { works });
+      const { draft, costUsd, usage } = await planner.plan(idea, { works });
       const plan = s.recordPlan({
         idea,
         hook: draft.hook,
@@ -87,11 +90,18 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
       s.recordCapabilities({ reuse: inv.reuse, build: inv.build });
       const est = estimatePlan(plan);
       const forecastId = bookEstimate(room, actor, m[1], est);
-      s.recordEstimate({ ...est, forecastId });
+      const recorded = s.recordEstimate({ ...est, forecastId });
+      const { contract, frameTasks } = buildContract(m[1], plan, { sessionId: m[1], reuse: inv.reuse, build: inv.build }, recorded);
+      s.recordContract(contract, frameTasks);
       if (typeof costUsd === "number" && costUsd > 0)
         room.addLedgerEntry(actor, {
           ledger: "operations", kind: "expense", amount: costUsd, unit: "usd",
           status: "observed", label: `${planner.id} plan ${m[1]}`, evidence: m[1],
+        }, "producer");
+      else if (!planner.id.startsWith("offline/") && usage.input + usage.output > 0)
+        room.addLedgerEntry(actor, {
+          ledger: "operations", kind: "expense", amount: usage.input + usage.output, unit: "tokens",
+          status: "unknown", label: `${planner.id} plan ${m[1]} (unpriced)`, evidence: m[1],
         }, "producer");
       send(res, 201, s.state());
     }],
@@ -125,13 +135,40 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
       const s = getSession(room, m[1]);
       const art = s.state().artifacts.at(-1);
       if (!art) throw new RuleError("humain", "No artifact yet.");
-      const ws = RestrictedWorkspace.open(m[1]);
-      const html = ws.readFile(art.path);
+      const reg = art.path.match(/^frames\/(F-\d{4})\/index\.html$/);
+      const html = reg ? readFrame(reg[1]).html : RestrictedWorkspace.open(m[1]).readFile(art.path);
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
       res.end(html);
     }],
     ["GET", /^\/api\/humain\/works$/, (_q, res) => {
       send(res, 200, loadWorks());
+    }],
+    ["POST", /^\/api\/humain\/sessions\/(H-\d{4})\/audio$/, async (req, res, m) => {
+      // Server-side transcription via muse-voice-transcribe-1.0. The key never
+      // leaves the server; audio is transcribed and dropped, never stored.
+      if (!MetaVoiceTranscriber.available())
+        throw new RuleError("humain", "Server transcription is not configured (MODEL_API_KEY). Use on-device speech or typed input.");
+      const s = getSession(room, m[1]);
+      const b = await body(req, 4_194_304);
+      const raw = String(b.audioBase64 ?? "");
+      if (!raw) throw new RuleError("request", "audioBase64 is required (mono 16-bit PCM WAV).");
+      const t = new MetaVoiceTranscriber();
+      const { chunks, costUsd } = await t.transcribe(Buffer.from(raw, "base64"), String(b.mime ?? "audio/wav"));
+      for (const c of chunks) s.ingestTranscript(c.text, c.final, t.id);
+      if (typeof costUsd === "number" && costUsd > 0)
+        room.addLedgerEntry(actor, {
+          ledger: "operations", kind: "expense", amount: costUsd, unit: "usd",
+          status: "observed", label: `muse-voice-transcribe-1.0 ${m[1]}`, evidence: m[1],
+        }, "producer");
+      send(res, 201, { chunks: chunks.length, state: s.state() });
+    }],
+    ["GET", /^\/api\/humain\/frames$/, (_q, res) => {
+      send(res, 200, listFrames());
+    }],
+    ["GET", /^\/api\/humain\/frames\/(F-\d{4})$/, (_q, res, m) => {
+      const { html } = serveFrame(m[1]); // serving increments this frame's visit count
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(html);
     }],
   ];
 }

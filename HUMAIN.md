@@ -18,25 +18,44 @@ For the room's characters, `cp .env.example .env` is still optional.
 Terminal-only path (simulated speech, same controllers):
 
 ```bash
-npm run room -- humain demo --idea "Build a webpage comparing The First Transmission and E10 with one hook and a vintage visitor counter."
+npm run room -- humain demo --idea "Two frames: E01 vs E10, hook quote Midnight versus noon."
 npm run room -- humain replay H-0001
+npm run room -- humain frames
 ```
 
 Tests: `npm test` (humain suites: `test/humain-session.test.ts`,
-`test/humain-frame.test.ts`). Typecheck: `npm run typecheck`.
+`test/humain-frame.test.ts`, `test/humain-reconcile.test.ts`).
+Typecheck: `npm run typecheck`.
 
 ## The loop
+
+The human has a time budget; the machine has a resource budget; the objective
+is verified state reconciliation.
 
 1. Pick a human input window: 2, 5, 15 or 60 minutes.
 2. Press record (explicit start; microphone via `getUserMedia`).
 3. Live transcript appears (on-device speech recognition; typed fallback
-   included for browsers without it).
+   included; server-side `muse-voice-transcribe-1.0` when `MODEL_API_KEY` is set).
 4. Close input (or the deadline closes it): capture stops, the transcription
    connection closes, no more input is requested — and recording never restarts.
-5. Make plan: structured tasks, capability reuse/build table, labeled ESTIMATE.
-6. Approve with an API spend ceiling (USD) and compute deadline (seconds).
-7. Execute in a restricted workspace; results, costs, tests, decisions and
-   artifacts append to `data/events.jsonl`, replayable in the UI or terminal.
+5. Make plan: the system inspects actual state and produces an explicit change
+   contract — desired state, observed state, requirements already satisfied,
+   reusable capabilities, required modifications, missing capabilities,
+   acceptance tests, estimated costs, and (at approval) spending limits.
+6. Approve the contract with an API spend ceiling (USD) and compute deadline.
+7. Execute until acceptance tests pass, spending authority is exhausted,
+   necessary approval is missing, a safety boundary is reached, or no further
+   progress is viable. After each action the loop re-inspects actual state and
+   recomputes the remaining delta; failed tests trigger bounded repair (2
+   attempts); a progress-based watchdog halts runaway runs; halts preserve a
+   checkpoint with all remaining requirements. No human attention is requested
+   mid-run — pending decisions block their tasks.
+8. Results, costs, tests, decisions, frames and artifacts append to
+   `data/events.jsonl`, replayable in the UI or terminal.
+
+Frames are persistent and shareable: `GET /api/humain/frames` lists them,
+`GET /api/humain/frames/F-0001` serves one (each view increments its
+independent visit count, including verification views).
 
 ## What was reused vs built
 
@@ -49,8 +68,11 @@ entries; actuals as observed entries with evidence.
 Built new in `src/humain/`: monotonic clock (`clock.ts`), trusted session
 controller (`session.ts`), provider adapters (`adapters.ts`), capability
 inventory (`capabilities.ts`), estimator (`estimate.ts`), restricted workspace
-(`executor.ts`), Frame Maker (`frame-maker.ts`), HTTP routes (`routes.ts`).
-UI: `public/humain.html` + `public/humain.js`. CLI: `humain demo|replay`.
+(`executor.ts`), Frame Maker (`frame-maker.ts`), persistent frame registry
+(`frames.ts`), observed-state checks (`observe.ts`), change contracts
+(`contract.ts`), progress watchdog (`watchdog.ts`), reconcile loop
+(`reconcile.ts`), HTTP routes (`routes.ts`).
+UI: `public/humain.html` + `public/humain.js`. CLI: `humain demo|replay|frames`.
 
 ## Safety properties (enforced in code, not prompts)
 
@@ -66,19 +88,36 @@ UI: `public/humain.html` + `public/humain.js`. CLI: `humain demo|replay`.
 
 ## Meta integrations (adapters)
 
-- Transcription: `muse-voice-transcribe-1.0` when `META_VOICE_API_KEY` +
-  `META_VOICE_URL` are set; otherwise on-device/typed input at $0.
-- Planning: `muse-spark-1.3` when `META_SPARK_API_KEY` + `META_SPARK_URL` are
-  set; otherwise a deterministic rule-based planner at $0.
+Documented Meta Model API (`https://api.meta.ai/v1`), Bearer `MODEL_API_KEY`,
+server-side only — keys never reach the browser or the disposable workspace:
+
+- Transcription: `muse-voice-transcribe-1.0` file endpoint
+  (`POST /asr/transcribe`, multipart) plus a realtime WebSocket client
+  (`wss://…/asr/realtime`, credential in the JSON handshake). Without a key,
+  on-device/typed input at $0. Server audio ingest: `POST
+  /api/humain/sessions/:id/audio` (base64 WAV, transcribed and dropped, never
+  stored) or `humain demo --voice-file f.wav` (mono 16-bit PCM WAV).
+- Planning: `muse-spark-1.3` via `POST /chat/completions` (OpenAI-compatible).
+  Without a Meta key, `meta/muse-spark-1.3` via OpenRouter when
+  `OPENROUTER_API_KEY` is set (same weights, alternate route, labeled
+  honestly); otherwise the deterministic rule-based planner at $0.
 - Image generation: second-stage stub (`MetaImageGen`); activates when
   `META_IMAGE_URL` is set. Not wired into the demo.
 
+Observed pricing: OpenRouter `meta/muse-spark-1.3` at $1.25/MTok in,
+$4.25/MTok out (OpenRouter's listing, 2026-11-02); Meta direct pricing is not
+published in the sources checked, so Meta-direct usage without a reported cost
+is booked as unknown tokens, never as free. Voice is documented at $0.18/hr.
+
 ## Missing / not yet real
 
-- Live Meta endpoints are configured, not provisioned: no keys or URLs exist
-  yet, so the Meta adapters have never run against real services.
-- No multi-session UI list, no session resume across server restarts beyond
-  log rebuild (memory-only transcripts are lost on restart, by design).
+- Meta-direct and voice calls need `MODEL_API_KEY`; realtime voice has never
+  run against the live socket.
+- Frame ids allocate from a registry scan at contract time; two sessions
+  contracting concurrently could collide (single-user prototype).
+- Visit counts live in sidecar JSON (operational data); totals snapshot into
+  frame/checkpoint events. Verification views count as visits.
+- No multi-session UI list; memory-only transcripts are lost on restart.
 - Frame Maker builds one page shape (comparison + hook + counter); unknown
   plan capabilities execute as `unverified`, never silently.
-- No mining or cryptocurrency payments, per the brief.
+- No mining, cryptocurrency, or desktop distribution, per the brief.

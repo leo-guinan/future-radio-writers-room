@@ -30,6 +30,10 @@ async function approved(room: Room): Promise<SessionController> {
   s.recordPlan({ idea: s.ideaText(), hook: draft.hook, planner: planner.id, tasks: draft.tasks.map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
   s.recordCapabilities({ reuse: [], build: [] });
   s.recordEstimate({ apiUsd: 0, localHours: 0.9, executionSeconds: 60, forecastId: "F-001" });
+  s.recordContract(
+    { desired: "test", observed: [], satisfied: [], modifications: [], missing: [], acceptance: [{ id: `${s.sessionId}-A1`, description: "t", check: "workspace.file", target: `${s.sessionId}-T1`, expected: "frame/index.html" }], limits: { spendCeilingUsd: null, computeDeadlineSecs: null } },
+    [],
+  );
   s.approve(5, 300);
   return s;
 }
@@ -102,13 +106,26 @@ test("planning needs closed input and a non-empty plan", () => {
   rule(() => s.recordPlan({ idea: "an idea", hook: "y", planner: "p", tasks: [{ taskId: "t", title: "t", kind: "build", capability: "c", detail: "d", estApiUsd: 0, estHours: 0, estSeconds: 0 }] }), "humain");
 });
 
-test("approval needs a plan, estimate, ceiling and compute deadline", async () => {
+test("approval needs a plan, estimate, contract, ceiling and compute deadline", async () => {
   const room = fresh();
   const s = planned(room);
   rule(() => s.approve(5, 60), "humain"); // no plan yet
+  const planner = new OfflinePlanner();
+  const { draft } = await planner.plan(s.ideaText(), { works: loadWorks() });
+  s.recordPlan({ idea: s.ideaText(), hook: draft.hook, planner: planner.id, tasks: draft.tasks.map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
+  s.recordCapabilities({ reuse: [], build: [] });
+  s.recordEstimate({ apiUsd: 0, localHours: 1, executionSeconds: 5, forecastId: "F-001" });
+  rule(() => s.approve(5, 60), "humain"); // no contract yet
   const s2 = await approved(fresh());
   assert.ok(s2.currentApproval);
   assert.equal(s2.state().phase, "approved");
+  assert.deepEqual(s2.state().contract?.limits, { spendCeilingUsd: 5, computeDeadlineSecs: 300 });
+});
+
+test("no human decisions during an execution run", async () => {
+  const s = await approved(fresh());
+  s.beginExecution();
+  rule(() => s.resolveDecision("T1", "go left", "leo"), "humain");
 });
 
 test("compute deadline rejects new actions", async () => {
@@ -119,6 +136,10 @@ test("compute deadline rejects new actions", async () => {
   s.recordPlan({ idea: s.ideaText(), hook: draft.hook, planner: planner.id, tasks: draft.tasks.map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
   s.recordCapabilities({ reuse: [], build: [] });
   s.recordEstimate({ apiUsd: 0, localHours: 1, executionSeconds: 5, forecastId: "F-001" });
+  s.recordContract(
+    { desired: "test", observed: [], satisfied: [], modifications: [], missing: [], acceptance: [{ id: `${s.sessionId}-A1`, description: "t", check: "workspace.file", target: `${s.sessionId}-T1`, expected: "frame/index.html" }], limits: { spendCeilingUsd: null, computeDeadlineSecs: null } },
+    [],
+  );
   s.approve(5, 1);
   s.guardAction(0); // inside the deadline
   await new Promise((r) => setTimeout(r, 1100));

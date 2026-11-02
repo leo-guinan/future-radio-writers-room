@@ -62,6 +62,10 @@ export type EventType =
   | "humain.task_result"
   | "humain.artifact"
   | "humain.decision"
+  | "humain.contract"
+  | "humain.checkpoint"
+  | "humain.frame"
+  | "humain.repair"
   | "humain.stopped";
 
 // ---------- Ideas: the central unit of the room ----------
@@ -444,9 +448,62 @@ export interface HumainPlanTask {
   capability: string;
   detail: string;
   decision?: string; // unresolved question; must clear before execution or the task blocks
+  frame?: { frameId?: string; hook: string; workA: string; workB: string }; // frame-maker spec (work ids; frameId assigned at contract)
+  acceptance?: string[]; // acceptance test ids that verify this task
   estApiUsd: number;
   estHours: number;
   estSeconds: number;
+}
+
+export interface HumainAcceptanceTest {
+  id: string; // H-0001-A1
+  description: string;
+  check: string; // machine check id, e.g. "frame.exists", "frame.hook", "frame.serves"
+  target: string; // what it checks, e.g. a frame id
+  expected: string;
+}
+
+/** The change contract: desired vs observed state, delta, and how done is proven. */
+export interface HumainContract {
+  sessionId: string;
+  desired: string;
+  observed: string[]; // observed facts, each with its evidence
+  satisfied: string[]; // requirements already satisfied (with evidence)
+  modifications: string[]; // required modifications (task ids + titles)
+  missing: string[]; // missing capabilities
+  acceptance: HumainAcceptanceTest[];
+  limits: { spendCeilingUsd: number | null; computeDeadlineSecs: number | null };
+}
+
+export interface HumainCheckpoint {
+  sessionId: string;
+  reason: string;
+  remaining: string[]; // requirement/task ids still open
+  passed: string[]; // acceptance test ids passing
+  failed: string[]; // acceptance test ids failing
+  spendUsd: number;
+  state: string; // short observed-state summary
+}
+
+export interface HumainFrame {
+  frameId: string; // F-0001
+  sessionId: string;
+  hook: string;
+  workA: string; // work ids
+  workB: string;
+  path: string; // registry-relative path of the page
+  sha256: string;
+  visits: number;
+}
+
+export interface HumainRepair {
+  sessionId: string;
+  taskId: string;
+  attempt: number; // 1-based
+  maxAttempts: number;
+  trigger: string; // which acceptance test failed
+  action: string; // what the repair tried
+  outcome: "fixed" | "still-failing";
 }
 
 export interface HumainPlan {
@@ -514,7 +571,7 @@ export interface HumainDecision {
 
 export interface HumainStopped {
   sessionId: string;
-  reason: "input-deadline" | "compute-deadline" | "manual-stop" | "revoked" | "budget" | "done";
+  reason: "input-deadline" | "compute-deadline" | "manual-stop" | "revoked" | "budget" | "blocked" | "stalled" | "safety" | "done";
   detail: string;
 }
 

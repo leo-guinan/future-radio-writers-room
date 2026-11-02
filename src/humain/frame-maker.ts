@@ -4,9 +4,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Room } from "../core/room.ts";
-import type { SessionController } from "./session.ts";
 import { RestrictedWorkspace } from "./executor.ts";
+import { publishFrame, type FrameMeta } from "./frames.ts";
 
 export interface WorkRef {
   work_id: string;
@@ -122,81 +121,30 @@ export function buildFrame(ws: RestrictedWorkspace, a: WorkRef, b: WorkRef, hook
   return { file: "frame/index.html", sha256, bytes, checks };
 }
 
-/** Run the approved plan: gate every task, block undecided tasks, book actuals. */
-export async function executePlan(room: Room, session: SessionController, actor: string): Promise<void> {
-  const plan = session.currentPlan;
-  if (!plan) throw new Error("No plan to execute.");
-  const started = Date.now();
-  const ws = RestrictedWorkspace.create(session.sessionId);
-  const works = loadWorks();
-  try {
-    for (const task of plan.tasks) {
-      session.guardAction(task.estApiUsd); // deadline + ceiling, before every task
-      if (task.decision && !session.state().decisions[task.taskId]) {
-        session.blockTask(task.taskId, task.decision);
-        continue;
-      }
-      const t0 = Date.now();
-      if (task.capability === "frame-maker" || task.capability === "visitor-counter" || task.capability === "catalog-works") {
-        const [a, b] = worksFor(plan, works);
-        if (task.capability === "catalog-works") {
-          session.recordTaskResult({
-            taskId: task.taskId, status: "success",
-            evidence: `catalog works ${a.work_id}, ${b.work_id}`,
-            detail: `Reused catalog entries ${a.work_id} and ${b.work_id}.`,
-            costUsd: 0, seconds: Math.round((Date.now() - t0) / 1000),
-          });
-        } else {
-          const frame = buildFrame(ws, a, b, plan.hook);
-          session.recordArtifact({ taskId: task.taskId, path: frame.file, sha256: frame.sha256, bytes: frame.bytes, label: `Comparison page: ${a.title} vs ${b.title}` });
-          session.recordTaskResult({
-            taskId: task.taskId, status: "success",
-            evidence: `sha256 ${frame.sha256}; ${frame.checks.join(", ")}`,
-            detail: `Built ${frame.file} (${frame.bytes} bytes). Checks: ${frame.checks.join(", ")}.`,
-            costUsd: 0, seconds: Math.round((Date.now() - t0) / 1000),
-          });
-        }
-      } else if (task.capability === "evidence-checks") {
-        const files = ws.list();
-        const ok = files.includes("frame/index.html");
-        session.recordTaskResult({
-          taskId: task.taskId, status: ok ? "success" : "failed",
-          evidence: ok ? `workspace files: ${files.join(", ")}` : undefined,
-          detail: ok ? `Verified workspace: ${files.join(", ")}.` : "frame/index.html missing from workspace.",
-          costUsd: 0, seconds: Math.round((Date.now() - t0) / 1000),
-        });
-      } else {
-        // Unknown capability: no silent success. Record what happened, claim nothing.
-        session.recordTaskResult({
-          taskId: task.taskId, status: "unverified",
-          detail: `No executor for capability '${task.capability}'. Left unverified.`,
-          costUsd: 0, seconds: Math.round((Date.now() - t0) / 1000),
-        });
-      }
-    }
-    // Actuals: observed entries with evidence, on the same ledgers as everything else.
-    const secs = Math.round((Date.now() - started) / 1000);
-    const hours = Math.round((secs / 3600) * 100) / 100;
-    room.addLedgerEntry(actor, {
-      ledger: "operations", kind: "expense", amount: session.state().spendUsd, unit: "usd",
-      status: "observed", label: `ACTUAL ${session.sessionId} API spend`,
-      evidence: session.sessionId,
-    }, "producer");
-    if (hours > 0)
-      room.addLedgerEntry(actor, {
-        ledger: "effort", kind: "hours", amount: hours, unit: "hours",
-        status: "observed", label: `ACTUAL ${session.sessionId} local effort`, who: actor,
-      }, "producer");
-    session.finish(`Executed ${plan.tasks.length} tasks in ${secs}s. Workspace: ${ws.dir}`);
-  } catch (e: any) {
-    if (e?.rule === "humain") throw e; // deadline/budget stops propagate as-is
-    session.recordTaskResult({ taskId: plan.tasks[session.state().results.length]?.taskId ?? "unknown", status: "failed", detail: String(e?.message ?? e), costUsd: 0, seconds: 0 });
-    session.stop("manual-stop", `Execution halted: ${e?.message ?? e}`);
-    throw e;
-  }
+/** Publish a frame to the persistent registry with evidence checks. */
+export function buildFrameToRegistry(
+  frameId: string,
+  sessionId: string,
+  hook: string,
+  a: WorkRef,
+  b: WorkRef,
+): { meta: FrameMeta; checks: string[] } {
+  const html = renderComparison(a, b, hook);
+  if (!html.includes(esc(hook))) throw new Error("Evidence check failed: hook missing from page.");
+  if (!html.includes('data-testid="visitor-counter"')) throw new Error("Evidence check failed: counter missing.");
+  if (!html.includes(`data-work="${a.work_id}"`) || !html.includes(`data-work="${b.work_id}"`))
+    throw new Error("Evidence check failed: both works missing.");
+  const meta = publishFrame(frameId, sessionId, hook, a.work_id, b.work_id, html);
+  return { meta, checks: ["hook present", "visitor counter present", "both works present", `sha256:${meta.sha256.slice(0, 12)}`] };
 }
 
-function worksFor(plan: { tasks: Array<{ detail: string }> }, works: WorkRef[]): [WorkRef, WorkRef] {
+export function workById(works: WorkRef[], workId: string): WorkRef {
+  const found = works.find((w) => w.work_id === workId);
+  if (!found) throw new Error(`Unknown work ${workId} in catalog.`);
+  return found;
+}
+
+export function worksFor(plan: { tasks: Array<{ detail: string }> }, works: WorkRef[]): [WorkRef, WorkRef] {
   const text = plan.tasks.map((t) => t.detail).join(" ");
   const found = works.filter((w) => text.includes(w.work_id));
   const fallback: WorkRef = { work_id: "unknown", title: "An unmade episode", kind: "episode" };

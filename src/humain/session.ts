@@ -9,10 +9,14 @@ import type {
   HumainApproved,
   HumainArtifact,
   HumainCapabilities,
+  HumainCheckpoint,
+  HumainContract,
   HumainDecision,
   HumainEstimate,
+  HumainFrame,
   HumainPlan,
   HumainPlanTask,
+  HumainRepair,
   HumainSessionOpened,
   HumainStopped,
   HumainTaskBlocked,
@@ -44,7 +48,11 @@ export interface SessionState {
   plan: HumainPlan | null;
   capabilities: HumainCapabilities | null;
   estimate: HumainEstimate | null;
+  contract: HumainContract | null;
   approval: HumainApproved | null;
+  frames: HumainFrame[];
+  repairs: HumainRepair[];
+  lastCheckpoint: HumainCheckpoint | null;
   computeRemainingMs: number | null;
   spendUsd: number;
   decisions: Record<string, string>; // taskId -> resolution
@@ -63,7 +71,11 @@ export class SessionController {
   private plan: HumainPlan | null = null;
   private capabilities: HumainCapabilities | null = null;
   private estimate: HumainEstimate | null = null;
+  private contract: HumainContract | null = null;
   private approval: HumainApproved | null = null;
+  private frames: HumainFrame[] = [];
+  private repairs: HumainRepair[] = [];
+  private lastCheckpoint: HumainCheckpoint | null = null;
   private spendUsd = 0;
   private decisions: Record<string, string> = {};
   private blocked: string[] = [];
@@ -127,9 +139,22 @@ export class SessionController {
         case "humain.estimate":
           c.estimate = q as HumainEstimate;
           break;
+        case "humain.contract":
+          c.contract = q as HumainContract;
+          break;
+        case "humain.checkpoint":
+          c.lastCheckpoint = q as HumainCheckpoint;
+          break;
+        case "humain.frame":
+          c.frames.push(q as HumainFrame);
+          break;
+        case "humain.repair":
+          c.repairs.push(q as HumainRepair);
+          break;
         case "humain.approved":
           c.approval = q as HumainApproved;
           c.computeDeadline = Deadline.fromWallIso(q.computeDeadlineWall);
+          if (c.contract) c.contract = { ...c.contract, limits: { spendCeilingUsd: q.spendCeilingUsd, computeDeadlineSecs: q.computeDeadlineSecs } };
           c.phase = "approved";
           break;
         case "humain.task_blocked":
@@ -256,10 +281,30 @@ export class SessionController {
     return full;
   }
 
-  /** The user approves autonomous execution with a hard spend ceiling and compute deadline. */
+  /** Record the change contract. Frame ids assigned here are written back onto the plan tasks. */
+  recordContract(contract: Omit<HumainContract, "sessionId">, frameTasks: Array<{ taskId: string; frameId: string }>): HumainContract {
+    this.assertActive();
+    if (!this.plan || !this.estimate) throw new RuleError("humain", "Contract needs a plan and an estimate first.");
+    if (!contract.acceptance.length) throw new RuleError("humain", "A contract needs at least one acceptance test: done must be provable.");
+    for (const { taskId, frameId } of frameTasks) {
+      const t = this.plan.tasks.find((x) => x.taskId === taskId);
+      if (t?.frame) t.frame = { ...t.frame, frameId };
+    }
+    // Ownership: each task verifies through the acceptance tests targeting it.
+    for (const t of this.plan.tasks) {
+      const targets = new Set([t.taskId, t.frame?.frameId].filter(Boolean) as string[]);
+      t.acceptance = contract.acceptance.filter((a) => targets.has(a.target)).map((a) => a.id);
+    }
+    const full: HumainContract = { ...contract, sessionId: this.sessionId };
+    this.contract = full;
+    this.room.store.append("humain.contract", "system", full, "public");
+    return full;
+  }
+
+  /** The user approves autonomous execution of the change contract with a hard spend ceiling and compute deadline. */
   approve(spendCeilingUsd: number, computeDeadlineSecs: number): HumainApproved {
     this.assertActive();
-    if (!this.plan || !this.estimate) throw new RuleError("humain", "Approve a planned, estimated session.");
+    if (!this.plan || !this.estimate || !this.contract) throw new RuleError("humain", "Approve a planned, estimated, contracted session.");
     if (!(spendCeilingUsd >= 0) || !Number.isFinite(spendCeilingUsd)) throw new RuleError("humain", "The spending ceiling must be a non-negative number.");
     if (!(computeDeadlineSecs > 0) || computeDeadlineSecs > MAX_COMPUTE_SECS)
       throw new RuleError("humain", `The compute deadline must be 1–${MAX_COMPUTE_SECS} seconds.`);
@@ -271,6 +316,7 @@ export class SessionController {
       computeDeadlineWall: this.computeDeadline.atWallIso,
     };
     this.approval = approval;
+    if (this.contract) this.contract = { ...this.contract, limits: { spendCeilingUsd, computeDeadlineSecs } };
     this.phase = "approved";
     this.room.store.append("humain.approved", this.actor, approval, "public");
     return approval;
@@ -278,6 +324,7 @@ export class SessionController {
 
   resolveDecision(taskId: string, resolution: string, by: string): void {
     this.assertActive();
+    if (this.phase === "executing") throw new RuleError("humain", "No human attention during an execution run. The task blocks instead.");
     if (!resolution.trim()) throw new RuleError("humain", "A resolution says what was decided.");
     const d: HumainDecision = { sessionId: this.sessionId, taskId, decision: this.plan?.tasks.find((t) => t.taskId === taskId)?.decision ?? "", resolution: resolution.trim(), by };
     this.decisions[taskId] = d.resolution;
@@ -332,15 +379,52 @@ export class SessionController {
     this.room.store.append("humain.artifact", "system", full, "public");
   }
 
+  /** Execution begins. From here no human attention is requested until the run ends. */
+  beginExecution(): void {
+    this.assertActive();
+    if (!this.approval || !this.contract) throw new RuleError("humain", "Execution needs an approved change contract.");
+    this.phase = "executing";
+  }
+
+  recordFrame(f: Omit<HumainFrame, "sessionId">): void {
+    this.assertActive();
+    const full: HumainFrame = { ...f, sessionId: this.sessionId };
+    this.frames.push(full);
+    this.room.store.append("humain.frame", "system", full, "public");
+  }
+
+  recordRepair(r: Omit<HumainRepair, "sessionId">): void {
+    this.assertActive();
+    const full: HumainRepair = { ...r, sessionId: this.sessionId };
+    this.repairs.push(full);
+    this.room.store.append("humain.repair", "system", full, "public");
+  }
+
+  /** Preserve a checkpoint with all remaining requirements when execution cannot continue. */
+  checkpoint(c: Omit<HumainCheckpoint, "sessionId" | "spendUsd">): HumainCheckpoint {
+    const full: HumainCheckpoint = { ...c, sessionId: this.sessionId, spendUsd: Math.round(this.spendUsd * 10000) / 10000 };
+    this.lastCheckpoint = full;
+    this.room.store.append("humain.checkpoint", "system", full, "public");
+    return full;
+  }
+
   // ---------------- terminal ----------------
 
-  /** Manual stop and revocation always work, from any non-terminal state. */
-  stop(reason: "manual-stop" | "revoked", detail: string): void {
+  /**
+   * Halt the session. Manual stop and revocation always work, from any
+   * non-terminal state; the executor also halts on blocked / stalled / safety,
+   * always after preserving a checkpoint.
+   */
+  stop(reason: "manual-stop" | "revoked" | "blocked" | "stalled" | "safety", detail: string): void {
     if (this.terminal) return;
     this.stopRecording(`${reason}: ${detail}`);
     this.finishTerminal(reason, detail);
   }
 
+  /**
+   * Finish successfully. The executor calls this only when every acceptance
+   * test passes; elapsed time is never completion by itself.
+   */
   finish(detail: string): void {
     this.assertActive();
     this.finishTerminal("done", detail);
@@ -375,7 +459,11 @@ export class SessionController {
       plan: this.plan,
       capabilities: this.capabilities,
       estimate: this.estimate,
+      contract: this.contract,
       approval: this.approval,
+      frames: [...this.frames],
+      repairs: [...this.repairs],
+      lastCheckpoint: this.lastCheckpoint,
       computeRemainingMs: this.computeDeadline?.remainingMs() ?? null,
       spendUsd: Math.round(this.spendUsd * 10000) / 10000,
       decisions: { ...this.decisions },
@@ -392,6 +480,10 @@ export class SessionController {
 
   get currentPlan(): HumainPlan | null {
     return this.plan;
+  }
+
+  get currentContract(): HumainContract | null {
+    return this.contract;
   }
 
   get currentApproval(): HumainApproved | null {
