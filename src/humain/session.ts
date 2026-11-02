@@ -84,6 +84,7 @@ export class SessionController {
   private openedMono = monotonicMs();
   private inputUsedSecs = 0;
   private execStartMono: number | null = null;
+  private execStartWallMs: number | null = null;
   private spendUsd = 0;
   private decisions: Record<string, string> = {};
   private blocked: string[] = [];
@@ -198,7 +199,13 @@ export class SessionController {
     // A restart never reopens input or recording: capture stays stopped.
     c.recording = false;
     if (c.inputDeadline.expired() && c.phase === "listening") c.phase = "input-closed";
-    if (c.phase === "listening" && c.transcript.length && !p.saveTranscript) c.phase = c.phase; // memory transcripts, still listenable
+    // Derive time charges from event timestamps so a rebuilt controller that
+    // finishes the session accounts the real elapsed time, not zeros.
+    const openedTs = Date.parse(opened.ts);
+    const firstAfterInput = events.find((e) => e.type === "humain.plan" || e.type === "humain.contract" || e.type === "humain.stopped");
+    if (firstAfterInput) c.inputUsedSecs = Math.max(0, Math.round((Date.parse(firstAfterInput.ts) - openedTs) / 1000));
+    const approvedEv = events.find((e) => e.type === "humain.approved");
+    if (approvedEv) c.execStartWallMs = Date.parse(approvedEv.ts);
     return c;
   }
 
@@ -461,7 +468,11 @@ export class SessionController {
     this.room.store.append("humain.stopped", "system", this.terminal, "public");
     // Time accounting: charge actual human time, release the unused reserve,
     // record autonomous execution separately.
-    const autonomousSecs = this.execStartMono === null ? 0 : Math.max(0, Math.round((monotonicMs() - this.execStartMono) / 1000));
+    const autonomousSecs = this.execStartMono !== null
+      ? Math.max(0, Math.round((monotonicMs() - this.execStartMono) / 1000))
+      : this.execStartWallMs !== null
+        ? Math.max(0, Math.round((Date.now() - this.execStartWallMs) / 1000))
+        : 0;
     const reservedSecs = this.reserveMin * 60;
     this.accounting = {
       sessionId: this.sessionId,

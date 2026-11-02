@@ -145,6 +145,27 @@ test("time accounting charges actual human time and releases the reserve", async
   assert.ok(room.store.all().some((e) => e.type === "humain.accounting"));
 });
 
+test("rebuilt controllers derive time charges from event timestamps", async () => {
+  const store = new EventStore(null);
+  const room = new Room(store);
+  const s = SessionController.open(room, "leo", 2, false, 10);
+  await new Promise((r) => setTimeout(r, 1100));
+  s.ingestTranscript("an idea", true, "test");
+  s.closeInput("test");
+  s.recordPlan({ idea: "an idea", hook: "h", planner: "test", tasks: [{ taskId: `${s.sessionId}-T1`, title: "t", kind: "build", capability: "c", detail: "d", estApiUsd: 0, estHours: 0, estSeconds: 0 }] });
+  s.recordCapabilities({ reuse: [], build: [] });
+  s.recordEstimate({ apiUsd: 0, localHours: 0, executionSeconds: 0, forecastId: "F-001" });
+  s.recordContract({ desired: "d", observed: [], satisfied: [], modifications: [], missing: [], acceptance: [{ id: `${s.sessionId}-A1`, description: "t", check: "task.evidence", target: `${s.sessionId}-T1`, expected: "e" }], limits: { spendCeilingUsd: null, computeDeadlineSecs: null } }, []);
+  s.approve(5, 300);
+  await new Promise((r) => setTimeout(r, 1100));
+  const room2 = new Room(store);
+  const r = SessionController.rebuild(room2, s.sessionId);
+  r.stop("manual-stop", "test"); // finish from the rebuilt controller, another process
+  const a = r.state().accounting!;
+  assert.ok(a.humanUsedSecs >= 1, `human time derived, got ${a.humanUsedSecs}`);
+  assert.ok(a.autonomousSecs >= 1, `autonomous time derived, got ${a.autonomousSecs}`);
+});
+
 test("compute deadline rejects new actions", async () => {
   const room = fresh();
   const s = planned(room);
