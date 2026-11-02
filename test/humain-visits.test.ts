@@ -68,6 +68,42 @@ test("served pages carry live counts; legacy pages serve unchanged", () => {
   assert.equal(injectCounts("<p>no spans</p>", counts), "<p>no spans</p>");
 });
 
+test("frames totals endpoint sums classified counts without recounting", async () => {
+  const id = setup();
+  serveFrame(id, { visitor: "a" });
+  serveFrame(id, { visitor: "a" });
+  serveFrame(id, { verify: true });
+  const room = new Room(new EventStore(null));
+  const routes = humainRoutes(room, "leo");
+  const req = Readable.from([]);
+  Object.assign(req, { method: "GET", url: "/api/humain/frames/totals", headers: {}, socket: {} });
+  let payload = "";
+  const res = { writeHead: () => {}, end: (d: string) => (payload = d) };
+  for (const [m, re, h] of routes) {
+    const mt = "/api/humain/frames/totals".match(re);
+    if (mt && m === "GET") {
+      await h(req as any, res as any, mt);
+      break;
+    }
+  }
+  const t = JSON.parse(payload) as { frames: number; human: number; unique: number; verification: number };
+  assert.ok(t.frames >= 1 && t.human >= 2 && t.unique >= 1 && t.verification >= 1);
+  const frames = (await (async () => {
+    let p = "";
+    const r2 = { writeHead: () => {}, end: (d: string) => (p = d) };
+    for (const [m, re, h] of routes) {
+      const mt = "/api/humain/frames".match(re);
+      if (mt && m === "GET" && re.source === "^\\/api\\/humain\\/frames$") {
+        await h(req as any, r2 as any, mt);
+        break;
+      }
+    }
+    return JSON.parse(p) as Array<{ counts: { human: number; unique: number; verification: number } }>;
+  })());
+  const sum = (k: "human" | "unique" | "verification") => frames.reduce((s, f) => s + f.counts[k], 0);
+  assert.deepEqual({ human: t.human, unique: t.unique, verification: t.verification }, { human: sum("human"), unique: sum("unique"), verification: sum("verification") });
+});
+
 test("frames route hashes visitors and honors ?as=verify", async () => {
   const id = setup();
   const room = new Room(new EventStore(null));

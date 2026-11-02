@@ -126,9 +126,10 @@ function render(s) {
 async function loadFrames() {
   try {
     const frames = await api("/api/humain/frames");
-    $("frames").querySelector("tbody").innerHTML = frames.length
-      ? frames.map((f) => `<tr><td><a href="/api/humain/frames/${f.frameId}" target="_blank">${f.frameId}</a></td><td>${escapeHtml(f.hook)}</td><td>${escapeHtml(f.workA)} vs ${escapeHtml(f.workB)}</td><td>${f.counts.human}</td><td>${f.counts.unique}</td><td>${f.counts.verification}</td></tr>`).join("")
-      : `<tr><td colspan="6" class="muted">None yet.</td></tr>`;
+    const totals = await api("/api/humain/frames/totals").catch(() => null);
+    const rows = frames.map((f) => `<tr><td><a href="/api/humain/frames/${f.frameId}" target="_blank">${f.frameId}</a></td><td>${escapeHtml(f.hook)}</td><td>${escapeHtml(f.workA)} vs ${escapeHtml(f.workB)}</td><td>${f.counts.human}</td><td>${f.counts.unique}</td><td>${f.counts.verification}</td></tr>`);
+    if (totals) rows.push(`<tr><td colspan="3"><strong>Totals (${totals.frames} frames)</strong></td><td><strong>${totals.human}</strong></td><td><strong>${totals.unique}</strong></td><td><strong>${totals.verification}</strong></td></tr>`);
+    $("frames").querySelector("tbody").innerHTML = rows.length ? rows.join("") : `<tr><td colspan="6" class="muted">None yet.</td></tr>`;
   } catch (e) {}
 }
 $("refreshFrames").addEventListener("click", loadFrames);

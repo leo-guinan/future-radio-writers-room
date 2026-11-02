@@ -166,6 +166,17 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
     ["GET", /^\/api\/humain\/frames$/, (_q, res) => {
       send(res, 200, listFrames());
     }],
+    ["GET", /^\/api\/humain\/frames\/totals$/, (_q, res) => {
+      // Totals reuse the registry's classified counts; no recounting here.
+      const frames = listFrames();
+      const totals = { frames: frames.length, human: 0, unique: 0, verification: 0 };
+      for (const f of frames) {
+        totals.human += f.counts.human;
+        totals.unique += f.counts.unique;
+        totals.verification += f.counts.verification;
+      }
+      send(res, 200, totals);
+    }],
     ["GET", /^\/api\/humain\/frames\/(F-\d{4})$/, (req, res, m) => {
       // Visitor identity is a hash, never a raw address. ?as=verify records an
       // automated verification view instead of a human one.

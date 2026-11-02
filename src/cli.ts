@@ -720,7 +720,15 @@ async function main() {
       }
       if (sub === "frames") {
         const { listFrames } = await import("./humain/frames.ts");
-        for (const f of listFrames()) out(`${f.frameId} "${f.hook.slice(0, 70)}" human:${f.counts.human} unique:${f.counts.unique} verification:${f.counts.verification} sha256:${f.sha256.slice(0, 12)} /api/humain/frames/${f.frameId}`);
+        const frames = listFrames();
+        for (const f of frames) out(`${f.frameId} "${f.hook.slice(0, 70)}" human:${f.counts.human} unique:${f.counts.unique} verification:${f.counts.verification} sha256:${f.sha256.slice(0, 12)} /api/humain/frames/${f.frameId}`);
+        const t = { human: 0, unique: 0, verification: 0 };
+        for (const f of frames) {
+          t.human += f.counts.human;
+          t.unique += f.counts.unique;
+          t.verification += f.counts.verification;
+        }
+        out(`totals: ${frames.length} frame(s) human:${t.human} unique:${t.unique} verification:${t.verification}`);
         return;
       }
       if (sub === "budget") {
