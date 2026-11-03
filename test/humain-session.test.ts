@@ -244,3 +244,39 @@ test("rebuild preserves limits, decisions, spend and stays conservative on deadl
   rule(() => r.guardAction(0), "humain");
   assert.equal(r.state().terminal?.reason, "compute-deadline");
 });
+
+test("rebuild restores task acceptance ownership so execution survives restart", async () => {
+  const store = new EventStore(null);
+  const room = new Room(store);
+  const s = SessionController.open(room, "leo", 2, false);
+  s.ingestTranscript("an idea", true, "test");
+  s.closeInput("test");
+  s.recordPlan({
+    idea: "an idea", hook: "h", planner: "test",
+    tasks: [
+      { taskId: `${s.sessionId}-T1`, title: "frame", kind: "build", capability: "frame.build", detail: "d", frame: { frameId: "F-0099", hook: "h", workA: "a", workB: "b" }, estApiUsd: 0, estHours: 0, estSeconds: 0 },
+      { taskId: `${s.sessionId}-T2`, title: "reuse", kind: "reuse", capability: "catalog-works", detail: "d", estApiUsd: 0, estHours: 0, estSeconds: 0 },
+    ],
+  });
+  s.recordCapabilities({ reuse: [], build: [] });
+  s.recordEstimate({ apiUsd: 0, localHours: 0, executionSeconds: 0, forecastId: "F-001" });
+  s.recordContract(
+    {
+      desired: "d", observed: [], satisfied: [], modifications: [], missing: [],
+      acceptance: [
+        { id: `${s.sessionId}-A1`, description: "frame", check: "frame.exists", target: "F-0099", expected: "F-0099" },
+        { id: `${s.sessionId}-A2`, description: "reuse", check: "catalog.reused", target: `${s.sessionId}-T2`, expected: "e" },
+      ],
+      limits: { spendCeilingUsd: null, computeDeadlineSecs: null },
+    },
+    [{ taskId: `${s.sessionId}-T1`, frameId: "F-0099" }],
+  );
+  s.approve(5, 300);
+  const liveOwned = s.currentPlan!.tasks.map((t) => (t.acceptance ?? []).length);
+  assert.deepEqual(liveOwned, [1, 1]);
+  const room2 = new Room(store);
+  const r = SessionController.rebuild(room2, s.sessionId);
+  const rebuiltOwned = r.currentPlan!.tasks.map((t) => (t.acceptance ?? []).length);
+  assert.deepEqual(rebuiltOwned, [1, 1], "ownership survives the restart");
+  assert.equal(r.currentPlan!.tasks[0].frame?.frameId, "F-0099", "frame id survives on the logged plan");
+});

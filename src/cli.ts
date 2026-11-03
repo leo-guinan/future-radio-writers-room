@@ -691,6 +691,12 @@ async function main() {
         s.closeInput("demo: finished speaking");
         const planner = makePlanner();
         const { draft, costUsd, usage } = await planner.plan(s.ideaText(), { works: loadWorks() });
+        const { allocateFrameIds: allocDemoFrames } = await import("./humain/frames.ts");
+        const demoFrameDrafts = draft.tasks.filter((t) => t.frame);
+        const demoAllocated = allocDemoFrames(demoFrameDrafts.length);
+        demoFrameDrafts.forEach((t, i) => {
+          t.frame = { ...t.frame!, frameId: demoAllocated[i] };
+        });
         const plan = s.recordPlan({ idea: s.ideaText(), hook: draft.hook, planner: planner.id, tasks: draft.tasks.map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
         out(`Plan (${planner.id}): hook "${plan.hook}" · ${plan.tasks.length} tasks (tokens in/out ${usage.input}/${usage.output}, cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
         if (typeof costUsd === "number" && costUsd > 0)

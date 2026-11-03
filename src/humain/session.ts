@@ -206,6 +206,14 @@ export class SessionController {
     if (firstAfterInput) c.inputUsedSecs = Math.max(0, Math.round((Date.parse(firstAfterInput.ts) - openedTs) / 1000));
     const approvedEv = events.find((e) => e.type === "humain.approved");
     if (approvedEv) c.execStartWallMs = Date.parse(approvedEv.ts);
+    // Rebuild task->acceptance ownership exactly as recordContract assigns it.
+    // Without this, a restart orphans every acceptance test and execution stalls.
+    if (c.plan && c.contract) {
+      for (const t of c.plan.tasks) {
+        const targets = new Set([t.taskId, t.frame?.frameId].filter(Boolean) as string[]);
+        t.acceptance = c.contract.acceptance.filter((a) => targets.has(a.target)).map((a) => a.id);
+      }
+    }
     return c;
   }
 

@@ -20,11 +20,15 @@ export function buildContract(
   let n = 0;
   const aid = () => `${sessionId}-A${++n}`;
 
-  // Frame ids are assigned at contract time so acceptance tests name real targets.
-  // Allocation is atomic: concurrent sessions can never receive the same id.
+  // Frame ids normally arrive pre-assigned on the plan (so the logged plan
+  // carries them across restarts). Anything missing is allocated atomically here.
   const frameOwners = plan.tasks.filter((t) => t.frame);
-  const allocated = allocateFrameIds(frameOwners.length);
-  frameOwners.forEach((t, i) => frameTasks.push({ taskId: t.taskId, frameId: allocated[i] }));
+  const needIds = frameOwners.filter((t) => !t.frame!.frameId);
+  const allocated = allocateFrameIds(needIds.length);
+  needIds.forEach((t, i) => {
+    t.frame = { ...t.frame!, frameId: allocated[i] };
+  });
+  frameOwners.forEach((t) => frameTasks.push({ taskId: t.taskId, frameId: t.frame!.frameId! }));
   for (const t of plan.tasks) {
     if (!t.frame) continue;
     const frameId = frameTasks.find((f) => f.taskId === t.taskId)!.frameId;

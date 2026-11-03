@@ -13,7 +13,7 @@ import { bookEstimate, estimatePlan } from "./estimate.ts";
 import { buildContract } from "./contract.ts";
 import { executePlan } from "./reconcile.ts";
 import { loadWorks } from "./frame-maker.ts";
-import { listFrames, readFrame, serveFrame } from "./frames.ts";
+import { allocateFrameIds, listFrames, readFrame, serveFrame } from "./frames.ts";
 import { RestrictedWorkspace } from "./executor.ts";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, m: RegExpMatchArray) => Promise<void> | void;
@@ -81,6 +81,13 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
       const works = loadWorks();
       const planner = makePlanner();
       const { draft, costUsd, usage } = await planner.plan(idea, { works });
+      // Frame ids are assigned BEFORE the plan is recorded, so the logged plan
+      // carries them and a restarted controller rebuilds task ownership exactly.
+      const frameDrafts = draft.tasks.filter((t) => t.frame);
+      const allocated = allocateFrameIds(frameDrafts.length);
+      frameDrafts.forEach((t, i) => {
+        t.frame = { ...t.frame!, frameId: allocated[i] };
+      });
       const plan = s.recordPlan({
         idea,
         hook: draft.hook,
