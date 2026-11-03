@@ -69,3 +69,23 @@ Guest (Omarchy terminal):
 `fixtures/` holds the recorded H-0001/H-0002 log and frame F-0001 from
 the 2026-11-02 live run (36K, secret-scanned). `install.sh` stages them
 only into an empty data dir and never overwrites history.
+
+## Verified 2026-11-02 (Try Omarchy 1.2.0, Omarchy guest, aarch64)
+
+- Clean install: clone + `npm ci` + typecheck + 42/42 humain tests.
+- Server launch, `/healthz` chain verify, all read-only humain routes.
+- Browser mic path (headless Chromium, file-fed fake mic): MediaRecorder
+  → WAV export → `/audio` → live `muse-voice-transcribe-1.0` → ingested
+  chunk (sessions H-0005, H-0006). Visible failure without a server key
+  (API 400) and as a browser dialog on a closed session.
+- Full live loop (Spark `muse-spark-1.3` direct): H-0009 done 7/7.
+- Restart reconstruction: SIGKILL mid-approved-session → all limits,
+  decisions, spend, ownership preserved → H-0010 executed to done 7/7.
+  (This caught and fixed a real bug: restarts orphaned task ownership.)
+- Time accounting: H-0010 charged 23s human of 600s reserved, 0s
+  autonomous (sub-second execution rounds to 0).
+- Recording: `demo/omarchy/recordings/demo-20261103-074826.log`.
+
+Person-led, not agent-verified: physical microphone take, host-browser
+access via the 8787 forward (needs `sudo ufw allow 8787/tcp` in the
+guest — the stock firewall blocks it).
