@@ -302,7 +302,8 @@ export class SparkPlanner implements Planner {
       headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
         model: "muse-spark-1.3",
-        max_tokens: 8000, // reasoning tokens share this budget; content needs room after them
+        max_tokens: 32000, // reasoning shares this budget: a live run spent ~8.3k reasoning tokens, so 8000 left no content
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: REVISE_SYSTEM_PROMPT },
           { role: "user", content: reviseUserPrompt(transcript, cut, critiques) },
