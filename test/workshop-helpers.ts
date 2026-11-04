@@ -23,6 +23,9 @@ export function testConfig(over: Partial<WorkshopConfig> = {}): WorkshopConfig {
     heartbeatIntervalSecs: 60,
     heartbeatWindowSecs: 90,
     heartbeatSkewSecs: 900,
+    blockBonus: 10,
+    workshareCapPerDay: 5,
+    rewardAmount: null,
     pledge: {
       text: "pledge",
       ifWin: { participants: 0.5, nextContest: 0.5 },

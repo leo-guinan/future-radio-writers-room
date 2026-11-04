@@ -159,28 +159,26 @@ test("heartbeat signature check", async () => {
 });
 
 test("reward projection reports a null operator share as not set", () => {
+  // v2 superseded the score-based projection: weights now come from workshares
+  // and builds, operators from sqrt attribution. Null share still reads "not set".
   const ctx = testCtx();
   addPlayer(ctx, { xId: "1", handle: "ada", createdAt: "2020-01-01T00:00:00Z" });
   addPlayer(ctx, { xId: "2", handle: "grace", createdAt: "2020-01-01T00:00:00Z" });
-  addPlayer(ctx, { xId: "3", handle: "bob", createdAt: "2020-01-01T00:00:00Z" });
-  const a = addIdea(ctx, { author: "1", kind: "game", title: "A", pitch: "p", incentive: "i" });
-  const aid = (a.payload as any).id;
-  setVotes(ctx, "2", { [aid]: 5 });
-  setVotes(ctx, "3", { [aid]: 4 });
-  const r = deriveRewards(ctx.store.all(), ctx.config);
+  const r = deriveRewards(ctx.store.all(), ctx.config, NOW);
   assert.equal(r.status, "projected");
   assert.equal(r.operatorShareOfParticipants, null);
   assert.equal(r.operatorShareNote, "not set");
-  assert.equal(r.operatorPool, null);
-  assert.ok(r.splits.every((s) => s.operatorShare === null));
-  // Ada: 1 + 9 = 10 points; Grace and Bob: 0. Pro rata over 10.
-  assert.deepEqual(r.splits.map((s) => [s.handle, s.points, s.shareOfParticipants]), [["ada", 10, 1], ["bob", 0, 0], ["grace", 0, 0]]);
-  // With the share set, operators earn from their pool and the label flips when won.
-  const ctx2 = testCtx({}, { pledge: { ...testConfig().pledge, nodeOperatorShareOfParticipants: 0.2, prizeOutcome: "won" } });
+  assert.equal(r.pools, null); // no R, no share: shares only, no amounts
+  assert.ok(r.players.every((s) => s.amount === null));
+  assert.ok(r.formula.includes("sqrt(attributed players"));
+  assert.deepEqual(r.inputs, { R: null, nextContest: 0.5, operatorShare: null, blockBonus: 10, closesAt: ctx.config.closesAt });
+  // With the share set and R known, pools appear and the label flips when won.
+  const ctx2 = testCtx({}, { rewardAmount: 1000, pledge: { ...testConfig().pledge, nodeOperatorShareOfParticipants: 0.2, prizeOutcome: "won" } });
   addPlayer(ctx2, { xId: "1", handle: "ada", createdAt: "2020-01-01T00:00:00Z" });
-  const r2 = deriveRewards(ctx2.store.all(), ctx2.config);
+  const r2 = deriveRewards(ctx2.store.all(), ctx2.config, NOW);
   assert.equal(r2.status, "final");
-  assert.equal(r2.operatorPool, 0.1); // 0.5 participants × 0.2
+  assert.deepEqual(r2.pools, { R: 1000, P: 500, O: 100, W: 400, nextContest: 500, operatorUnallocated: 100 });
+  assert.deepEqual(r2.totals, { players: 0, nodes: 0, nextContest: 500, unallocated: 500, sum: 1000 });
 });
 
 test("auth routes return 503 without credentials", async () => {
