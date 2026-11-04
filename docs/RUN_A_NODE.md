@@ -7,19 +7,29 @@ page, and sends a signed heartbeat every 60 seconds.
 ## 1. Link your X account and register
 
 Sign in at the coordinator in a browser (`/workshop` → Sign in with X), then
-register the node (replace `ada`'s cookie step with your own browser session):
+register the node. Registration carries your energy declaration and payout
+profile, signed with the node key (use your browser's session cookie):
 
 ```bash
-# 1. Start the node once to create its keypair; it prints its public key.
-DATA_DIR=./node-data npm run workshop:node -- --upstream http://localhost:8787
+# 1. Print a signed registration body (creates the node keypair on first run).
+DATA_DIR=./node-data npm run workshop:node -- print-register \
+  --url http://YOUR_HOST:8788 \
+  --watts 65 --source "rooftop solar" --evidence https://YOUR_PLUG_LOG \
+  --budget-wh 5000 \
+  --qi 0.5 --quai 0.3 --fiat 0.2 --schedule now > reg.json
 
-# 2. Register (operator = your signed-in session; use your browser's cookie):
+# 2. Register (fractions must sum to 1; schedule: now, lump_at:<date>, or
+#    stream:<n>x<P1D|P7D|P30D>). Your payout profile can change until close.
 curl -X POST http://localhost:8787/api/workshop/nodes/register \
   -H 'content-type: application/json' \
   -H 'cookie: workshop_session=PASTE_YOURS' \
-  -d '{"url":"http://YOUR_HOST:8788","publicKey":PASTE_PRINTED_JWK}'
+  -d @reg.json
 # → {"nodeId":"N-0001", ...}
 ```
+
+Watts and source are self-attested: the evidence link is recorded for audit,
+not verified. The energy budget is your lease: it ends when your receipted Wh
+reaches it.
 
 ## 2. Run it
 
