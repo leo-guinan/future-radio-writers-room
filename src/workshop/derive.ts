@@ -193,6 +193,56 @@ export interface RewardSplit {
   operatorShare: number | null; // pro rata by uptime points, from the operator pool; null when share not set
 }
 
+export interface StatusCtx {
+  store: { all(): readonly RoomEvent[]; head: string };
+  config: WorkshopConfig;
+  now: () => number;
+  mode: "coordinator" | "node";
+  upstream?: string;
+  verified?: () => boolean;
+}
+
+export interface StatusView {
+  open: boolean;
+  opensAt: string;
+  closesAt: string;
+  countdownMs: number;
+  pledge: WorkshopConfig["pledge"];
+  counts: { players: number; ideas: number; votePoints: number; builds: number; nodes: number };
+  head: string;
+  seq: number;
+  mode: "coordinator" | "node";
+  upstream?: string;
+  verified?: boolean;
+}
+
+/** Status: window, countdown, pledge, counts, chain head. Shared by HTTP + MCP. */
+export function deriveStatus(ctx: StatusCtx): StatusView {
+  const events = ctx.store.all();
+  const { byVoter } = deriveVotes(events);
+  let votePoints = 0;
+  for (const alloc of byVoter.values()) for (const w of Object.values(alloc)) votePoints += w;
+  const closesMs = Date.parse(ctx.config.closesAt);
+  return {
+    open: ctx.now() < closesMs,
+    opensAt: ctx.config.opensAt,
+    closesAt: ctx.config.closesAt,
+    countdownMs: Math.max(0, closesMs - ctx.now()),
+    pledge: ctx.config.pledge,
+    counts: {
+      players: events.filter((e) => e.type === "workshop.player").length,
+      ideas: events.filter((e) => e.type === "workshop.idea").length,
+      votePoints,
+      builds: events.filter((e) => e.type === "workshop.build").length,
+      nodes: events.filter((e) => e.type === "workshop.node_registered").length,
+    },
+    head: ctx.store.head,
+    seq: events.length,
+    mode: ctx.mode,
+    ...(ctx.mode === "node" ? { upstream: ctx.upstream, verified: ctx.verified ? ctx.verified() : false } : {}),
+  };
+}
+
 export interface RewardsView {
   status: "projected" | "final";
   prizeOutcome: "pending" | "won" | "lost";

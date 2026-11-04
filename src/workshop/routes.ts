@@ -19,8 +19,9 @@ import {
   setVotes,
   type WorkshopCtx,
 } from "./log.ts";
-import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveVotes } from "./derive.ts";
+import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveStatus, deriveVotes } from "./derive.ts";
 import { authConfigured, authEnv, beginAuth, requestSession, sessionCookieHeader, signSession, takeVerifier, verifyCode } from "./auth.ts";
+import { mcpHttpHandler } from "./mcp.ts";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, m: RegExpMatchArray) => Promise<void> | void;
 
@@ -69,29 +70,7 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
     ["GET", /^\/api\/workshop$/, (_q, res) => {
       tick();
       assertServing(ctx);
-      const events = ctx.store.all();
-      const { byVoter } = deriveVotes(events);
-      let votePoints = 0;
-      for (const alloc of byVoter.values()) for (const w of Object.values(alloc)) votePoints += w;
-      const closesMs = Date.parse(ctx.config.closesAt);
-      send(res, 200, {
-        open: ctx.now() < closesMs,
-        opensAt: ctx.config.opensAt,
-        closesAt: ctx.config.closesAt,
-        countdownMs: Math.max(0, closesMs - ctx.now()),
-        pledge: ctx.config.pledge,
-        counts: {
-          players: events.filter((e) => e.type === "workshop.player").length,
-          ideas: events.filter((e) => e.type === "workshop.idea").length,
-          votePoints,
-          builds: events.filter((e) => e.type === "workshop.build").length,
-          nodes: events.filter((e) => e.type === "workshop.node_registered").length,
-        },
-        head: ctx.store.head,
-        seq: events.length,
-        mode: ctx.mode,
-        ...(ctx.mode === "node" ? { upstream: ctx.upstream, verified: ctx.verified ? ctx.verified() : false } : {}),
-      });
+      send(res, 200, deriveStatus(ctx));
     }],
     ["GET", /^\/api\/workshop\/ideas$/, (req, res) => {
       tick();
@@ -226,5 +205,6 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
       res.writeHead(302, { location: "/workshop", "set-cookie": sessionCookieHeader(signSession(authEnv().secret, profile, ctx.now()), secure) });
       res.end();
     }],
+    ["POST", /^\/mcp$/, mcpHttpHandler(ctx)],
   ];
 }
