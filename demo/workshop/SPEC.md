@@ -273,3 +273,33 @@ weight is fixed. Every other share of the player pool is earned by engagement.
 - Leo's weight stays 1 after he submits many workshares and has a build.
 - The producer node's operator weight stays 1.
 - Pool arithmetic still sums exactly to `R`, with the producer included.
+
+---
+
+# v4: energy-bound nodes (see `EXPERIMENT.md`)
+
+- **`POST /api/workshop/nodes/register`** gains new fields:
+  - `energy: {watts, source, evidenceUrl, budgetWh}`;
+  - `payout: {qi, quai, fiat, schedule}`, where the three fractions sum to 1 and `schedule` is one
+    of `now`, `lump_at:<ISO date>` or `stream:<n>x<P1D|P7D|P30D>`.
+
+  The body is signed with the node key.
+- **`POST /api/workshop/nodes/payout`** sets `payout.profile.set` (auth, signed). It is final at close.
+- **Hourly derived `energy.receipt` per node:** Wh = watts × hours up (from verified heartbeats),
+  plus the work counts. The receipt is derived and then **appended** to the log, so it is fixed at
+  creation.
+- **Energy TTL.** A node's lease ends when its receipted Wh reaches `budgetWh` (`node.lease.ended`,
+  reason `energy_budget`) or when the event closes.
+- **Generation requests are priced in workshares.** `POST /api/workshop/generate {ideaId}` spends
+  `generateCostWorkshares` (in config) from the requester's counted workshares. It never charges
+  money.
+- **`GET /api/workshop/settlement`** returns, per operator: the computed share, the payout profile,
+  and the schedule rendered as dated amounts. Until the prize outcome is known it is labelled
+  `obligation`, never `paid`. Nothing executes transfers.
+- **MCP:** add `energy_receipts(node)` and `settlement()`.
+- **Tests:**
+  - payout fractions must sum to 1;
+  - the energy-budget TTL ends the lease;
+  - receipt Wh comes from heartbeats only, never from claims;
+  - spending workshares on generation reduces player weight correctly;
+  - settlement is reproducible from the log on a node.
