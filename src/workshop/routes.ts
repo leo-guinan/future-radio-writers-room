@@ -28,7 +28,10 @@ import {
   maybeReceipt,
   raiseFlag,
   registerNode,
+  registryMessage,
   reportPeerAudit,
+  reportPretender,
+  revokeNode,
   requestGeneration,
   resolveAttributionTarget,
   resolveChallenge,
@@ -39,7 +42,7 @@ import {
   voidWorkshare,
   type WorkshopCtx,
 } from "./log.ts";
-import { deriveAudits, deriveChallenges, deriveFlags, deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveSettlementPhase, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
+import { checkReferee, deriveAudits, deriveChallenges, deriveFlags, deriveIdeas, deriveNodes, derivePlayers, derivePretenders, deriveReferees, deriveRewards, deriveScoreboard, deriveSettlementPhase, deriveStatus, deriveVotes, deriveWorkshares, type RefereeEntry } from "./derive.ts";
 import { authConfigured, authEnv, beginAuth, requestSession, sessionCookieHeader, signSession, takeVerifier, verifyCode } from "./auth.ts";
 import { mcpHttpHandler } from "./mcp.ts";
 
@@ -357,6 +360,48 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
       if (!isProducer(ctx, req)) throw new WorkshopError("producer_required", "Producer token required.", 401);
       const ev = finalizeSettlement(ctx, "producer");
       send(res, 201, { hash: (ev.payload as any).hash, eventId: ev.id });
+    }],
+    ["POST", /^\/api\/workshop\/nodes\/([^/]+)\/revoke$/, async (req, res, m) => {
+      tick();
+      assertCoordinator(ctx);
+      if (!isProducer(ctx, req)) throw new WorkshopError("producer_required", "Producer token required.", 401);
+      const b = await body(req);
+      const ev = revokeNode(ctx, { nodeId: decodeURIComponent(m[1]), reason: String(b.reason ?? ""), by: "producer" });
+      send(res, 201, { nodeId: (ev.payload as any).nodeId, eventId: ev.id });
+    }],
+    ["GET", /^\/api\/workshop\/referees$/, (_q, res) => {
+      tick();
+      assertServing(ctx);
+      if (ctx.mode === "node") {
+        if (!ctx.registryCache) throw new WorkshopError("registry_unavailable", "This node has not mirrored a verified registry yet.", 503);
+        return send(res, 200, ctx.registryCache);
+      }
+      if (!ctx.config.registryPublicKey || !ctx.registrySign) throw new WorkshopError("registry_unavailable", "The referee registry is not configured.", 503);
+      const entries = deriveReferees(ctx.store.all(), ctx.config, ctx.now());
+      const seq = ctx.store.all().length;
+      send(res, 200, { entries, seq, signature: ctx.registrySign(registryMessage(entries, seq)).toString("base64") });
+    }],
+    ["GET", /^\/api\/workshop\/referees\/check$/, (req, res) => {
+      tick();
+      assertServing(ctx);
+      const q = new URL(req.url ?? "/", "http://x").searchParams.get("q") ?? "";
+      const entries = ctx.mode === "node" ? ((ctx.registryCache?.entries as RefereeEntry[] | undefined) ?? null) : deriveReferees(ctx.store.all(), ctx.config, ctx.now());
+      if (!entries) throw new WorkshopError("registry_unavailable", "This node has not mirrored a verified registry yet.", 503);
+      send(res, 200, checkReferee(ctx.store.all(), entries, q));
+    }],
+    ["GET", /^\/api\/workshop\/pretenders$/, (_q, res) => {
+      tick();
+      assertServing(ctx);
+      send(res, 200, derivePretenders(ctx.store.all()));
+    }],
+    ["POST", /^\/api\/workshop\/pretenders$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const r = await reportPretender(ctx, { url: String(b.url ?? ""), reporter: s.xId }, ctx.fetchImpl ?? globalThis.fetch);
+      if (r.confirmed) send(res, 201, { confirmed: true, url: (r.event!.payload as any).url, eventId: r.event!.id });
+      else send(res, 200, { confirmed: false, reason: r.reason });
     }],
     ["POST", /^\/api\/workshop\/generate$/, async (req, res) => {
       tick();

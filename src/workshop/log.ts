@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { EventStore, sha256, canonical } from "../core/events.ts";
 import type { RoomEvent } from "../core/types.ts";
 import type { WorkshopConfig } from "./config.ts";
-import { countAttributionsTo, deriveFlags, deriveScoreboard, parseSchedule, settlementSnapshot } from "./derive.ts";
+import { countAttributionsTo, deriveFlags, derivePretenders, deriveScoreboard, operatesAuthorizedNode, parseSchedule, settlementSnapshot } from "./derive.ts";
 
 export class WorkshopError extends Error {
   constructor(
@@ -876,7 +876,11 @@ export function appealFlag(ctx: WorkshopCtx, a: { id: string; reason: string; xI
   const mine = flag.subjectKind === "player" && (flag.subject === a.xId || flag.subject === `handle:${a.handle.toLowerCase()}`);
   if (!mine) throw new WorkshopError("not_your_flag", "Only the flagged subject can appeal.", 403);
   if (!a.reason.trim()) throw new WorkshopError("bad_appeal", "A reason is required.", 400);
-  return ctx.store.append("flag.appealed", `x:${a.xId}`, { id: a.id, reason: a.reason.trim().slice(0, 500), at: new Date(ctx.now()).toISOString() }, "public", new Date(ctx.now()).toISOString());
+  const appeal = ctx.store.append("flag.appealed", `x:${a.xId}`, { id: a.id, reason: a.reason.trim().slice(0, 500), at: new Date(ctx.now()).toISOString() }, "public", new Date(ctx.now()).toISOString());
+  // A pretender who became real clears on appeal: run a node, post the fingerprint, pass audits.
+  if (flag.signal === "pretender_claim" && operatesAuthorizedNode(ctx.store.all(), a.xId))
+    ctx.store.append("flag.resolved", "system", { id: a.id, decision: "cleared", note: "The account now operates an authorized node.", at: new Date(ctx.now()).toISOString() }, "public", new Date(ctx.now()).toISOString());
+  return appeal;
 }
 
 /** The producer resolves a flag publicly. Cleared restores the weight; upheld forfeits it. */
@@ -1064,4 +1068,69 @@ export function finalizeSettlement(ctx: WorkshopCtx, by: string): RoomEvent {
   const open = openChallenges(ctx.store);
   if (open.length) throw new WorkshopError("challenges_open", `${open.length} challenge(s) still open: ${open.join(", ")}.`, 409, { open });
   return ctx.store.append("settlement.finalized", by, { hash: (latest.payload as any).hash as string, at: new Date(ctx.now()).toISOString() }, "public", new Date(ctx.now()).toISOString());
+}
+
+// ---------------------------------------------------------------- v6: referee registry and pretenders
+
+/** What the coordinator signs over the registry: the entries plus the event seq they were derived at. */
+export const registryMessage = (entries: unknown, seq: number): Buffer => Buffer.from(canonical({ entries, seq }), "utf8");
+
+/** The producer revokes a node with a stated reason. Revocation is permanent. */
+export function revokeNode(ctx: WorkshopCtx, r: { nodeId: string; reason: string; by: string }): RoomEvent {
+  assertCoordinator(ctx);
+  if (!registrationOf(ctx.store, r.nodeId)) throw new WorkshopError("unknown_node", `No node ${r.nodeId}. Register first.`, 404);
+  if (revocationOf(ctx.store, r.nodeId)) throw new WorkshopError("already_revoked", "That node is already revoked.", 409);
+  if (!r.reason.trim()) throw new WorkshopError("bad_revoke", "A stated reason is required.", 400);
+  return ctx.store.append(
+    "node.revoked",
+    r.by,
+    { nodeId: r.nodeId, reason: r.reason.trim().slice(0, 500), at: new Date(ctx.now()).toISOString() },
+    "public",
+    new Date(ctx.now()).toISOString(),
+  );
+}
+
+const REFEREE_CLAIM = /node|validator|referee/i;
+
+/**
+ * Report a thread account claiming to be a node, validator or referee. The
+ * coordinator checks the reply's author via oEmbed and the registry: confirmed
+ * only when the author operates no authorized node. A confirmed report earns
+ * the reporter a bounty from the validation reserve and lists the reply URL
+ * with the fact "not an authorized referee" — no accusation beyond that.
+ */
+export async function reportPretender(
+  ctx: WorkshopCtx,
+  p: { url: string; reporter: string },
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<{ confirmed: boolean; reason: string | null; event: RoomEvent | null }> {
+  assertCoordinator(ctx);
+  const url = p.url.trim();
+  if (!tweetIdFromUrl(url)) throw new WorkshopError("bad_url", "Report the URL of the thread reply (…/status/<id>).", 400);
+  if (derivePretenders(ctx.store.all()).some((x) => x.url === url && x.status !== "cleared"))
+    throw new WorkshopError("already_confirmed", "That reply is already listed.", 409);
+  let meta: any;
+  try {
+    const res = await fetchImpl(`${OEMBED_URL}${encodeURIComponent(url)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    meta = await res.json();
+  } catch (e: any) {
+    throw new WorkshopError("oembed_failed", `X oEmbed verification failed: ${e?.message ?? e}`, 502);
+  }
+  const author = handleFromAuthorUrl(String(meta?.author_url ?? ""));
+  if (!author) throw new WorkshopError("oembed_failed", "X oEmbed returned no author.", 502);
+  if (!REFEREE_CLAIM.test(String(meta?.html ?? ""))) return { confirmed: false, reason: "no_claim", event: null };
+  const authorizedOperators = new Set<string>();
+  for (const e of ctx.store.all()) {
+    if (e.type !== "workshop.node_registered") continue;
+    const r = e.payload as { nodeId: string; operator: string };
+    if (authorizationOf(ctx.store, r.nodeId) && !revocationOf(ctx.store, r.nodeId)) authorizedOperators.add(r.operator);
+  }
+  const authorXId = ctx.store.all().find((e) => e.type === "workshop.player" && (e.payload as { handle: string }).handle.toLowerCase() === author.toLowerCase())?.payload as { xId: string } | undefined;
+  if (authorXId && authorizedOperators.has(authorXId.xId)) return { confirmed: false, reason: "authorized_referee", event: null };
+  const at = new Date(ctx.now()).toISOString();
+  const subject = `handle:${author.toLowerCase()}`;
+  const event = ctx.store.append("pretender.confirmed", `x:${p.reporter}`, { url, authorHandle: author, authorHash: subjectHash(subject), reporter: p.reporter, at }, "public", at);
+  raiseFlag(ctx, { subject, subjectKind: "player", signal: "pretender_claim", evidence: { url, authorHandle: author }, reporter: p.reporter }, `x:${p.reporter}`);
+  return { confirmed: true, reason: null, event };
 }

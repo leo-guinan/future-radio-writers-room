@@ -11,7 +11,7 @@ import { generateKeyPairSync, createPrivateKey, sign } from "node:crypto";
 import { EventStore, sha256, canonical } from "../core/events.ts";
 import type { RoomEvent } from "../core/types.ts";
 import { loadWorkshopConfig } from "./config.ts";
-import { WorkshopError, heartbeatMessage, registrationMessage, type EnergyDeclaration, type PayoutProfile, type WorkshopCtx } from "./log.ts";
+import { WorkshopError, heartbeatMessage, registrationMessage, registryMessage, verifyNodeSig, type EnergyDeclaration, type PayoutProfile, type WorkshopCtx } from "./log.ts";
 import { workshopRoutes } from "./routes.ts";
 
 export interface NodeOptions {
@@ -109,6 +109,28 @@ export async function sendHeartbeat(
   if (!res.ok) throw new Error(`Heartbeat refused: HTTP ${res.status} ${String(await res.text().catch(() => "")).slice(0, 160)}`);
 }
 
+export interface MirroredRegistry {
+  entries: unknown[];
+  seq: number;
+  signature: string;
+}
+
+/** Pull the signed referee registry and refuse it unless the signature verifies against the pinned key. */
+export async function fetchVerifiedRegistry(
+  upstream: string,
+  pinnedKey: Record<string, unknown>,
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<MirroredRegistry> {
+  const res = await fetchImpl(`${upstream}/api/workshop/referees`);
+  if (!res.ok) throw new Error(`Registry pull failed: HTTP ${res.status}`);
+  const reg = (await res.json()) as MirroredRegistry;
+  if (!reg || !Array.isArray(reg.entries) || typeof reg.seq !== "number" || typeof reg.signature !== "string")
+    throw new WorkshopError("registry_bad_signature", "Upstream registry is malformed.", 503);
+  if (!verifyNodeSig(pinnedKey, registryMessage(reg.entries, reg.seq), reg.signature))
+    throw new WorkshopError("registry_bad_signature", "Upstream registry signature does not verify against the pinned key.", 503);
+  return reg;
+}
+
 /** Build the signed registration body to POST at the coordinator (print-register). */
 export function buildRegistration(
   signFn: (msg: Buffer) => Buffer,
@@ -141,6 +163,16 @@ export async function startNode(opts: NodeOptions, fetchImpl: typeof fetch = glo
         verified = true;
         console.log(`node: upstream chain verified (${store.all().length} events, head ${store.head.slice(0, 12)}). Serving.`);
       } else if (added) console.log(`node: pulled ${added} event(s), head ${store.head.slice(0, 12)}.`);
+      if (config.registryPublicKey) {
+        try {
+          ctx.registryCache = await fetchVerifiedRegistry(opts.upstream, config.registryPublicKey, fetchImpl);
+        } catch (e: any) {
+          if (e instanceof WorkshopError && e.code === "registry_bad_signature") {
+            ctx.registryCache = null; // a bad registry is refused, never served
+            console.error(`node: REFUSING REGISTRY: ${e.message}`);
+          } else console.error(`node: registry pull failed (${e?.message ?? e}); serving last verified registry.`);
+        }
+      }
     } catch (e: any) {
       if (e instanceof WorkshopError && e.code === "chain_unverified") {
         verified = false; // a broken chain revokes serving immediately

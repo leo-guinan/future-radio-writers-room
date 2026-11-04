@@ -927,6 +927,122 @@ export interface SettlementPhase {
   settlement: SettlementView;
 }
 
+export interface RefereeEntry {
+  nodeId: string;
+  fingerprint: string;
+  operatorXId: string;
+  operatorHandle: string;
+  authorizedBy: string;
+  status: "authorized" | "suspended" | "revoked";
+  audit: { lastPass: string | null; passRate24h: number | null };
+}
+
+/**
+ * The referee registry, derived: one entry per authorized node. Status comes
+ * only from the log (audits suspend, producer revocations revoke). The
+ * coordinator signs these entries; nodes mirror the signed registry verbatim.
+ */
+export function deriveReferees(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): RefereeEntry[] {
+  const players = derivePlayers(events, config);
+  const auth = deriveAuthorized(events);
+  const revoked = deriveRevoked(events);
+  const regs = new Map<string, { operator: string; publicKey: Record<string, unknown> }>();
+  for (const e of events) {
+    if (e.type !== "workshop.node_registered") continue;
+    const r = e.payload as { nodeId: string; operator: string; publicKey: Record<string, unknown> };
+    if (!regs.has(r.nodeId)) regs.set(r.nodeId, { operator: r.operator, publicKey: r.publicKey });
+  }
+  const out: RefereeEntry[] = [];
+  for (const [nodeId, url] of auth) {
+    const reg = regs.get(nodeId);
+    if (!reg) continue; // authorized implies registered; the log is the log
+    const audits = deriveAudits(events, nodeId);
+    const passes = audits.filter((a) => a.result === "pass");
+    const day = audits.filter((a) => Date.parse(a.at) >= nowMs - 86_400_000);
+    out.push({
+      nodeId,
+      fingerprint: sha256(canonical(reg.publicKey)),
+      operatorXId: reg.operator,
+      operatorHandle: players.get(reg.operator)?.handle ?? reg.operator,
+      authorizedBy: url,
+      status: revoked.has(nodeId) ? "revoked" : nodeSuspended(events, nodeId) ? "suspended" : "authorized",
+      audit: {
+        lastPass: passes.length ? passes[passes.length - 1].at : null,
+        passRate24h: day.length ? Math.round((day.filter((a) => a.result === "pass").length / day.length) * 10000) / 10000 : null,
+      },
+    });
+  }
+  out.sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+  return out;
+}
+
+export type RefereeStatus = "AUTHORIZED" | "SUSPENDED" | "REVOKED" | "NOT_AUTHORIZED";
+
+export interface RefereeCheck {
+  q: string;
+  status: RefereeStatus;
+  reason: string;
+  entry: RefereeEntry | null;
+  evidence: { authorizedBy?: string; lastPass?: string | null; passRate24h?: number | null; revokedReason?: string };
+}
+
+/**
+ * Check a referee claim against registry entries (live on the coordinator,
+ * mirrored on a node). Matches node id, fingerprint (full or ≥8 prefix),
+ * operator handle, operator X id, or node URL (resolved through registrations).
+ */
+export function checkReferee(events: readonly RoomEvent[], entries: RefereeEntry[], qRaw: string): RefereeCheck {
+  const q = qRaw.trim();
+  const noEntry: RefereeCheck = { q, status: "NOT_AUTHORIZED", reason: "No registry entry matches.", entry: null, evidence: {} };
+  if (!q) return noEntry;
+  let entry =
+    entries.find((e) => e.nodeId === q) ??
+    entries.find((e) => e.fingerprint === q.toLowerCase() || (q.length >= 8 && e.fingerprint.startsWith(q.toLowerCase()))) ??
+    entries.find((e) => e.operatorHandle.toLowerCase() === q.toLowerCase()) ??
+    entries.find((e) => e.operatorXId === q) ??
+    null;
+  if (!entry && /^https?:\/\//.test(q)) {
+    const reg = events.find((e) => e.type === "workshop.node_registered" && (e.payload as any).url.replace(/\/$/, "") === q.replace(/\/$/, ""));
+    if (reg) entry = entries.find((e) => e.nodeId === (reg.payload as any).nodeId) ?? null;
+  }
+  if (!entry) return noEntry;
+  const revoked = events.find((e) => e.type === "node.revoked" && (e.payload as any).nodeId === entry.nodeId)?.payload as { reason: string } | undefined;
+  if (entry.status === "revoked")
+    return { q, status: "REVOKED", reason: `Revoked by the producer: ${revoked?.reason ?? "no reason given"}.`, entry, evidence: { authorizedBy: entry.authorizedBy, ...(revoked ? { revokedReason: revoked.reason } : {}) } };
+  if (entry.status === "suspended")
+    return { q, status: "SUSPENDED", reason: "Failing audits: three straight failures with no pass since.", entry, evidence: { authorizedBy: entry.authorizedBy, lastPass: entry.audit.lastPass, passRate24h: entry.audit.passRate24h } };
+  return { q, status: "AUTHORIZED", reason: "Authorized recruiter with passing audits.", entry, evidence: { authorizedBy: entry.authorizedBy, lastPass: entry.audit.lastPass, passRate24h: entry.audit.passRate24h } };
+}
+
+export interface PretenderView {
+  url: string;
+  authorHash: string;
+  reportedAt: string;
+  status: "not an authorized referee" | "cleared";
+}
+
+/** Confirmed pretenders, by reply URL. Cleared once the account operates an authorized node. */
+export function derivePretenders(events: readonly RoomEvent[]): PretenderView[] {
+  const clearedByUrl = new Set<string>();
+  const raisedUrl = new Map<string, string>();
+  for (const e of events) {
+    if (e.type === "flag.raised" && (e.payload as any).signal === "pretender_claim")
+      raisedUrl.set((e.payload as any).id as string, ((e.payload as any).evidence as any)?.url as string);
+  }
+  for (const e of events) {
+    if (e.type === "flag.resolved" && (e.payload as any).decision === "cleared" && raisedUrl.has((e.payload as any).id as string))
+      clearedByUrl.add(raisedUrl.get((e.payload as any).id as string)!);
+  }
+  const out: PretenderView[] = [];
+  for (const e of events) {
+    if (e.type !== "pretender.confirmed") continue;
+    const p = e.payload as { url: string; authorHash: string; at: string };
+    if (out.some((x) => x.url === p.url)) continue;
+    out.push({ url: p.url, authorHash: p.authorHash, reportedAt: p.at, status: clearedByUrl.has(p.url) ? "cleared" : "not an authorized referee" });
+  }
+  return out;
+}
+
 /** Settlement with its lifecycle: proposed at close, challenged in the window, final when the window ends with all resolved. */
 export function deriveSettlementPhase(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): SettlementPhase {
   const proposals = events.filter((e) => e.type === "settlement.proposed");

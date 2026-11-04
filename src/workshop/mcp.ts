@@ -5,7 +5,7 @@
 import { createInterface } from "node:readline";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { assertServing, energyReceiptsOf, WorkshopError, type WorkshopCtx } from "./log.ts";
-import { deriveAudits, deriveChallenges, deriveFlags, deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveSettlementPhase, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
+import { checkReferee, deriveAudits, deriveChallenges, deriveFlags, deriveIdeas, deriveNodes, derivePlayers, deriveReferees, deriveRewards, deriveScoreboard, deriveSettlementPhase, deriveStatus, deriveVotes, deriveWorkshares, type RefereeEntry } from "./derive.ts";
 
 export function asOf(ctx: WorkshopCtx): { seq: number; time: string } {
   const last = ctx.store.all().at(-1);
@@ -154,6 +154,15 @@ export function workshopTools(): Record<string, ToolDef> {
       description: "Settlement challenges with their resolutions.",
       inputSchema: { type: "object", properties: {} },
       call: (ctx) => deriveChallenges(ctx.store.all()),
+    },
+    check_referee: {
+      description: "Check a referee claim (handle, node id, fingerprint or node URL): AUTHORIZED, SUSPENDED, REVOKED or NOT_AUTHORIZED, with reason and evidence.",
+      inputSchema: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
+      call: (ctx, args) => {
+        const entries = ctx.mode === "node" ? ((ctx.registryCache?.entries as RefereeEntry[] | undefined) ?? null) : deriveReferees(ctx.store.all(), ctx.config, ctx.now());
+        if (!entries) throw new WorkshopError("registry_unavailable", "This node has not mirrored a verified registry yet.", 503);
+        return checkReferee(ctx.store.all(), entries, String(args?.q ?? ""));
+      },
     },
     how_to_play: {
       description: "Sign-in URL and the rules. Writes need X sign-in in a browser.",
