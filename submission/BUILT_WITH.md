@@ -1,6 +1,6 @@
 # Built with Meta's coding harness: HumAIn OS was written by Muse Code on Muse Spark
 
-Every HumAIn OS commit on `review/humain-os-prototype` was made in a single **Muse Code** session.
+Every HumAIn OS commit up to the Nov 3 verification stamp was made in a single **Muse Code** session.
 The coding model was Meta's **`muse-spark-1.3-contributor`**. The full redacted session export is
 public, so anyone can check this.
 
@@ -36,6 +36,22 @@ public, so anyone can check this.
 | `c3657ff` | Nov 3 07:50 | Clean-VM verification stamp |
 
 `d8cde72` (node_modules symlink cleanup, Nov 2 16:43) is also in the same window.
+
+## Added on Nov 4: cut revision, built in a second Muse Code session
+
+| Commit | What |
+|---|---|
+| `c044dec` | Cut revision domain: validateEdits, applyEdits, diff, contract builder |
+| `5e5ddac` | Strict-live Spark cut planner (planRevise), with canned-reply tests |
+| `3fba712` | Revise session mode: cut target, cut.edit executor, routes and CLI |
+| `dca47d7` | Camera-facing revise UI: cut banner, large-type results panel |
+| `9613aab` | Fixture run: a canned Spark revision executes to take 2 on disk |
+
+Muse Code wrote these 5 commits in about 14 minutes, from a written prompt.
+
+One follow-up commit is **not** from Muse Code: `c785cf1` raises the planner's token budget after
+the first live run returned empty content. Claude made that fix. It changes one line plus adding a
+`response_format` field.
 
 ## Why this matters for the entry
 
