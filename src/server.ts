@@ -23,6 +23,9 @@ import { designDir, selectDesignedVoice } from "./scenes/abilities.ts";
 import { modelReport, publicTrial, revealTrial, runTrial, type EpisodeCards } from "./scenes/trials.ts";
 import { cacheKey, cachedPath, lineAudio, patronVoicesToday, spokenText, TTS_MODEL, voiceFor } from "./scenes/voice.ts";
 import { humainRoutes } from "./humain/routes.ts";
+import { loadWorkshopConfig } from "./workshop/config.ts";
+import { ensureOpened, openWorkshop, type WorkshopCtx, WorkshopError } from "./workshop/log.ts";
+import { workshopRoutes } from "./workshop/routes.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TOKEN = process.env.PRODUCER_TOKEN ?? "";
@@ -451,6 +454,17 @@ const routes: Array<[string, RegExp, Handler]> = [
 ];
 routes.push(...humainRoutes(room, PRODUCER));
 
+// The Art Bus Workshop coordinator: separate hash-chained log, same process.
+const workshopCtx: WorkshopCtx = {
+  store: openWorkshop(),
+  config: loadWorkshopConfig(),
+  now: () => Date.now(),
+  mode: "coordinator",
+  producerToken: TOKEN,
+};
+ensureOpened(workshopCtx);
+routes.push(...workshopRoutes(workshopCtx));
+
 /**
  * The producer's console, remotely: run one CLI command on the server, against the live room.
  * Everything it does lands in the same log patrons are watching. Producer token required.
@@ -490,7 +504,7 @@ function requireProducer(req: IncomingMessage) {
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json" };
 
 function serveStatic(path: string, res: ServerResponse) {
-  const requested = path === "/" ? "/index.html" : path === "/room" ? "/room.html" : path === "/humain" ? "/humain.html" : path;
+  const requested = path === "/" ? "/index.html" : path === "/room" ? "/room.html" : path === "/humain" ? "/humain.html" : path === "/workshop" ? "/workshop.html" : path;
   const rel = normalize(requested).replace(/^(\.\.[/\\])+/, "");
   const file = join(PUBLIC_DIR, rel);
   if (!file.startsWith(PUBLIC_DIR) || !existsSync(file)) return send(res, 404, { error: "Not found" });
@@ -511,6 +525,7 @@ export const server = createServer(async (req, res) => {
     if (req.method === "GET" && !url.pathname.startsWith("/api/")) return serveStatic(url.pathname, res);
     send(res, 404, { error: "Not found" });
   } catch (e) {
+    if (e instanceof WorkshopError) return send(res, e.status, { error: e.message, code: e.code });
     if (e instanceof RuleError) {
       const status = e.rule === "auth" ? 401 : e.rule === "limits" ? 429 : 400;
       return send(res, status, { error: e.message, rule: e.rule });

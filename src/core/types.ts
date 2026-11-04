@@ -67,7 +67,15 @@ export type EventType =
   | "humain.frame"
   | "humain.repair"
   | "humain.accounting"
-  | "humain.stopped";
+  | "humain.stopped"
+  | "workshop.opened"
+  | "workshop.player"
+  | "workshop.idea"
+  | "workshop.votes"
+  | "workshop.build"
+  | "workshop.node_registered"
+  | "workshop.heartbeat"
+  | "workshop.closed";
 
 // ---------- Ideas: the central unit of the room ----------
 
