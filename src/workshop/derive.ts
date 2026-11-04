@@ -452,20 +452,20 @@ export function deriveBountyClaims(events: readonly RoomEvent[], config: Worksho
   for (const e of events) {
     if (e.type === "node.audit") {
       const a = e.payload as { result: string; via: string; reporterNode?: string };
-      if (a.result === "fail" && a.via === "peer" && a.reporterNode && operatorOf.has(a.reporterNode))
+      if (a.result === "fail" && a.via === "peer" && a.reporterNode && operatorOf.has(a.reporterNode) && config.auditBountyPoints > 0)
         out.push({ reporter: operatorOf.get(a.reporterNode)!, kind: "peer_audit", dollars: config.auditBountyPoints, ref: `${a.reporterNode}→${(e.payload as any).nodeId}@${(e.payload as any).at}` });
     } else if (e.type === "challenge.resolved") {
       const r = e.payload as { id: string; decision: string };
-      if (r.decision === "accepted" && challengerOf.has(r.id))
+      if (r.decision === "accepted" && challengerOf.has(r.id) && config.challengeBountyPoints > 0)
         out.push({ reporter: challengerOf.get(r.id)!, kind: "challenge", dollars: config.challengeBountyPoints, ref: r.id });
     } else if (e.type === "flag.resolved") {
       const r = e.payload as { id: string; decision: string };
       const f = raised.get(r.id);
-      if (r.decision === "upheld" && f?.reporter && f.signal !== "pretender_claim")
+      if (r.decision === "upheld" && f?.reporter && f.signal !== "pretender_claim" && config.abuseBountyPoints > 0)
         out.push({ reporter: f.reporter, kind: "abuse", dollars: config.abuseBountyPoints, ref: r.id });
     } else if (e.type === "pretender.confirmed") {
       const p = e.payload as { reporter: string; url: string };
-      out.push({ reporter: p.reporter, kind: "pretender", dollars: config.pretenderBountyPoints, ref: p.url });
+      if (config.pretenderBountyPoints > 0) out.push({ reporter: p.reporter, kind: "pretender", dollars: config.pretenderBountyPoints, ref: p.url });
     }
   }
   return out;
@@ -696,7 +696,8 @@ export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConf
   const vCents = money ? Math.round(pCents * config.validationReserve) : 0;
   const claims = money ? deriveBountyClaims(events, config) : [];
   const claimCents = claims.map((c) => Math.round(c.dollars * 100));
-  const paidClaimCents = money && vCents > 0 ? splitCents(vCents, claimCents) : claimCents.map(() => 0);
+  const claimTotal = claimCents.reduce((s, c) => s + c, 0);
+  const paidClaimCents = !money ? claimCents.map(() => 0) : claimTotal <= vCents ? claimCents : splitCents(vCents, claimCents);
   const paidVCents = paidClaimCents.reduce((s, c) => s + c, 0);
   const unusedVCents = vCents - paidVCents; // unused reserve returns to the players
   const wSplitCents = pCents - oCents - vCents + unusedVCents;

@@ -5,7 +5,7 @@ import { addIdea, addPlayer, attributePlayer, attributionOf, hasPlayer } from ".
 import { deriveNodes, deriveRewards } from "../src/workshop/derive.ts";
 import { handleMcpMessage } from "../src/workshop/mcp.ts";
 import { workshopRoutes } from "../src/workshop/routes.ts";
-import { NOW, asPlayer, call, registerTestNode, setXEnv, testConfig, testCtx, xMock } from "./workshop-helpers.ts";
+import { NOW, asPlayer, authorizeTestNode, call, registerTestNode, setXEnv, testConfig, testCtx, xMock } from "./workshop-helpers.ts";
 
 const leoConfig = () => ({ producerNode: { ...testConfig().producerNode, allow: ["leo"] } });
 const IN_WINDOW = "2026-11-05T12:00:00Z";
@@ -83,6 +83,7 @@ test("the producer node's operator weight stays 1", async () => {
   const ctx = testCtx({ now: () => nowMs }, leoConfig());
   asPlayer(ctx, "leo", "leo");
   registerTestNode(ctx, "leo", "http://producer.example", "producer");
+  authorizeTestNode(ctx, "producer"); // v5: even the producer node authorizes
   attributePlayer(ctx, "leo", "producer");
   const t0 = nowMs;
   for (let m = 0; m <= 60; m++) {

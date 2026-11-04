@@ -183,8 +183,8 @@ test("reward projection reports a null operator share as not set", () => {
   addPlayer(ctx2, { xId: "1", handle: "ada", createdAt: "2020-01-01T00:00:00Z" });
   const r2 = deriveRewards(ctx2.store.all(), ctx2.config, NOW);
   assert.equal(r2.status, "final");
-  assert.deepEqual(r2.pools, { R: 1000, P: 500, O: 100, W: 400, nextContest: 500, operatorUnallocated: 100 });
-  assert.deepEqual(r2.totals, { players: 0, nodes: 0, nextContest: 500, unallocated: 500, sum: 1000 });
+  assert.deepEqual(r2.pools, { R: 1000, P: 500, O: 100, W: 375, V: 25, nextContest: 500, operatorUnallocated: 100, reserveUnused: 25 });
+  assert.deepEqual(r2.totals, { players: 0, nodes: 0, bounties: 0, nextContest: 500, unallocated: 500, sum: 1000 });
 });
 
 test("auth routes return 503 without credentials", async () => {

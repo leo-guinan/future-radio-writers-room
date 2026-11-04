@@ -6,7 +6,7 @@ import { derivePayoutProfiles, deriveSettlement } from "../src/workshop/derive.t
 import { handleMcpMessage } from "../src/workshop/mcp.ts";
 import { buildRegistration, pullOnce } from "../src/workshop/node.ts";
 import { workshopRoutes } from "../src/workshop/routes.ts";
-import { asPlayer, call, registerTestNode, signedRegistration, testConfig, testCtx, testEnergy, testNodeKey, testPayout } from "./workshop-helpers.ts";
+import { asPlayer, authorizeTestNode, call, registerTestNode, signedRegistration, testConfig, testCtx, testEnergy, testNodeKey, testPayout } from "./workshop-helpers.ts";
 
 const oembedMock = (handle: string) =>
   (async () => ({ ok: true, json: async () => ({ author_url: `https://x.com/${handle}` }) })) as unknown as typeof fetch;
@@ -139,6 +139,7 @@ test("settlement is reproducible from the log on a node", async () => {
   const key = testNodeKey();
   const payout = { qi: 0.5, quai: 0.25, fiat: 0.25, schedule: "stream:2xP7D" };
   const { nodeId } = registerNode(ctx, { operator: "1", ...signedRegistration(key, "http://n.example", testEnergy(), payout) });
+  authorizeTestNode(ctx, nodeId); // v5: settlement shares need authorization
   for (const p of ["2", "3", "4"]) attributePlayer(ctx, p, nodeId);
   for (let m = 0; m <= 60; m++) {
     const at = new Date(nowMs + m * 60_000).toISOString();

@@ -5,7 +5,7 @@ import { WorkshopError, addIdea, addPlayer, attributePlayer, attributionOf } fro
 import { deriveNodes, deriveRewards, deriveWorkshares } from "../src/workshop/derive.ts";
 import { handleMcpMessage } from "../src/workshop/mcp.ts";
 import { workshopRoutes } from "../src/workshop/routes.ts";
-import { NOW, asPlayer, call, registerTestNode, testConfig, testCtx } from "./workshop-helpers.ts";
+import { NOW, asPlayer, authorizeTestNode, call, registerTestNode, testConfig, testCtx } from "./workshop-helpers.ts";
 
 const EPOCH = 1288834974657n;
 /** Snowflake id authored at iso (seq disambiguates same-ms tweets). */
@@ -123,6 +123,8 @@ test("the sqrt node weight and the uptime threshold are applied", () => {
   for (let i = 2; i <= 14; i++) asPlayer(ctx, String(i), `p${i}`);
   const { nodeId: n1 } = registerTestNode(ctx, "1", "http://n1.example");
   const { nodeId: n2 } = registerTestNode(ctx, "1", "http://n2.example");
+  authorizeTestNode(ctx, n1); // v5: operator credit needs authorization; this test is about uptime
+  authorizeTestNode(ctx, n2);
   for (let i = 2; i <= 5; i++) attributePlayer(ctx, String(i), n1); // 4 players
   for (let i = 6; i <= 14; i++) attributePlayer(ctx, String(i), n2); // 9 players
   const t0 = nowMs;
@@ -168,7 +170,7 @@ test("the pool arithmetic sums exactly to R", () => {
   assert.deepEqual(r.players.map((p) => [p.handle, p.weight]), [["ada", 12], ["bob", 1], ["cy", 0]]);
   assert.equal(r.totals!.sum, 1000); // exact
   assert.equal(r.totals!.players + r.totals!.nodes + r.totals!.nextContest + r.totals!.unallocated, 1000);
-  assert.deepEqual(r.pools, { R: 1000, P: 500, O: 100, W: 400, nextContest: 500, operatorUnallocated: 100 });
+  assert.deepEqual(r.pools, { R: 1000, P: 500, O: 100, W: 375, V: 25, nextContest: 500, operatorUnallocated: 100, reserveUnused: 25 });
 });
 
 test("pledge loads from config as plain text", () => {
