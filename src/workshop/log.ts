@@ -32,6 +32,9 @@ export interface WorkshopCtx {
   producerToken: string;
   verified?: () => boolean; // node mode: serve gate (false = refuse everything)
   fetchImpl?: typeof fetch; // outbound HTTP (oEmbed, X); injected in tests
+  registrySign?: (msg: Buffer) => Buffer; // coordinator: signs the referee registry (private key never leaves the process)
+  nodeSign?: (msg: Buffer) => Buffer; // node: answers audit challenges with the node key
+  registryCache?: { entries: unknown[]; seq: number; signature: string } | null; // node: mirrored signed registry
 }
 
 export const WORKSHOP_LOG_PATH = () => join(process.env.DATA_DIR ?? join(process.cwd(), "data"), "workshop", "events.jsonl");

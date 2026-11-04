@@ -82,7 +82,18 @@ export type EventType =
   | "energy.receipt"
   | "payout.profile.set"
   | "node.lease.ended"
-  | "generation.requested";
+  | "generation.requested"
+  | "node.authorized"
+  | "node.audit"
+  | "node.revoked"
+  | "flag.raised"
+  | "flag.appealed"
+  | "flag.resolved"
+  | "challenge.filed"
+  | "challenge.resolved"
+  | "settlement.proposed"
+  | "settlement.finalized"
+  | "pretender.confirmed";
 
 // ---------- Ideas: the central unit of the room ----------
 

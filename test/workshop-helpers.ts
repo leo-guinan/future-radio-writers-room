@@ -30,6 +30,15 @@ export function testConfig(over: Partial<WorkshopConfig> = {}): WorkshopConfig {
     generateCostWorkshares: 3,
     producerNode: { nodeId: "producer", allow: [], maxPlayers: 1, fixedPlayerWeight: 1, operatorWeight: 1 },
     noViaPolicy: "reject",
+    validationReserve: 0.05,
+    challengeWindowDays: 14,
+    auditBountyPoints: 10,
+    challengeBountyPoints: 10,
+    abuseBountyPoints: 10,
+    pretenderBountyPoints: 10,
+    attributionBurstThreshold: 20,
+    newAccountClusterThreshold: 10,
+    registryPublicKey: null,
     pledge: {
       text: "pledge",
       ifWin: { participants: 0.5, nextContest: 0.5 },
@@ -120,6 +129,17 @@ export function registerTestNode(ctx: WorkshopCtx, operator: string, url = "http
   const key = testNodeKey();
   const { nodeId: assigned } = registerNode(ctx, { operator, ...signedRegistration(key, url, testEnergy(), testPayout(), nodeId) });
   return { key, nodeId: assigned };
+}
+
+/** Authorize a node directly on the log (the authorize route's oEmbed path is covered by its own tests). */
+export function authorizeTestNode(ctx: WorkshopCtx, nodeId: string, url = "https://x.com/op/status/1"): void {
+  ctx.store.append("node.authorized", "system", { nodeId, url, at: new Date(NOW).toISOString() }, "public", new Date(NOW).toISOString());
+}
+
+/** A registry keypair: pinned public JWK for config, sign fn for the coordinator ctx. */
+export function testRegistryKey(): { publicJwk: Record<string, unknown>; sign: (msg: Buffer) => Buffer } {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  return { publicJwk: publicKey.export({ format: "jwk" }) as unknown as Record<string, unknown>, sign: (msg) => sign(null, msg, privateKey) };
 }
 
 /** Mock X token + user endpoints for the OAuth callback path. */

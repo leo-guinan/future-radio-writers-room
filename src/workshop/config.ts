@@ -28,6 +28,15 @@ export interface WorkshopConfig {
     operatorWeight: number; // producer node operator weight when qualified
   };
   noViaPolicy: "reject" | "unassigned";
+  validationReserve: number; // 0–1 slice of the participants' pool P for validator bounties; unused returns to players
+  challengeWindowDays: number; // days after each settlement proposal during which challenges can be filed
+  auditBountyPoints: number; // dollars from the reserve per confirmed peer audit
+  challengeBountyPoints: number; // dollars from the reserve per accepted challenge
+  abuseBountyPoints: number; // dollars from the reserve per upheld abuse report
+  pretenderBountyPoints: number; // dollars from the reserve per confirmed pretender report
+  attributionBurstThreshold: number; // sign-ins via one node within an hour that raise a flag
+  newAccountClusterThreshold: number; // post-opens accounts via one node that raise a flag
+  registryPublicKey: Record<string, unknown> | null; // pinned registry key; null = no referee registry
   pledge: {
     text: string; // verbatim from the Third Take episode
     ifWin: { participants: number; nextContest: number };
@@ -64,6 +73,17 @@ export function loadWorkshopConfig(path = DEFAULT_CONFIG_PATH()): WorkshopConfig
   if (typeof pn.fixedPlayerWeight !== "number" || pn.fixedPlayerWeight < 0 || typeof pn.operatorWeight !== "number" || pn.operatorWeight < 0)
     throw new Error("Workshop config: producerNode weights must be non-negative numbers.");
   if (c.noViaPolicy !== "reject" && c.noViaPolicy !== "unassigned") throw new Error('Workshop config: noViaPolicy must be "reject" or "unassigned".');
+  if (typeof c.validationReserve !== "number" || c.validationReserve < 0 || c.validationReserve > 1)
+    throw new Error("Workshop config: validationReserve must be a 0–1 fraction.");
+  if (!Number.isInteger(c.challengeWindowDays) || c.challengeWindowDays <= 0)
+    throw new Error("Workshop config: challengeWindowDays must be a positive integer.");
+  for (const k of ["auditBountyPoints", "challengeBountyPoints", "abuseBountyPoints", "pretenderBountyPoints"] as const)
+    if (typeof c[k] !== "number" || c[k] < 0 || !Number.isFinite(c[k])) throw new Error(`Workshop config: ${k} must be a non-negative dollar amount.`);
+  for (const k of ["attributionBurstThreshold", "newAccountClusterThreshold"] as const)
+    if (!Number.isInteger((c as any)[k]) || (c as any)[k] <= 0) throw new Error(`Workshop config: ${k} must be a positive integer.`);
+  const rk = c.registryPublicKey;
+  if (rk !== null && (typeof rk !== "object" || (rk as any).kty !== "OKP" || (rk as any).crv !== "Ed25519" || typeof (rk as any).x !== "string"))
+    throw new Error("Workshop config: registryPublicKey must be null or an Ed25519 public JWK.");
   if (typeof c.pledge?.text !== "string" || !c.pledge.text) throw new Error("Workshop config: pledge.text is required.");
   if (!["pending", "won", "lost"].includes(c.pledge.prizeOutcome)) throw new Error("Workshop config: pledge.prizeOutcome must be pending, won or lost.");
   const share = c.pledge.nodeOperatorShareOfParticipants;
