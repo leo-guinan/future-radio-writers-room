@@ -89,5 +89,7 @@ export function loadWorkshopConfig(path = DEFAULT_CONFIG_PATH()): WorkshopConfig
   const share = c.pledge.nodeOperatorShareOfParticipants;
   if (share !== null && (typeof share !== "number" || share < 0 || share > 1))
     throw new Error("Workshop config: pledge.nodeOperatorShareOfParticipants must be null or a 0–1 fraction.");
+  if (share !== null && share + c.validationReserve > 1)
+    throw new Error("Workshop config: nodeOperatorShareOfParticipants + validationReserve must leave room for W (≤ 1).");
   return c;
 }

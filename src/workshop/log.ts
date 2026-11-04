@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { EventStore, sha256, canonical } from "../core/events.ts";
 import type { RoomEvent } from "../core/types.ts";
 import type { WorkshopConfig } from "./config.ts";
-import { countAttributionsTo, deriveScoreboard, parseSchedule } from "./derive.ts";
+import { countAttributionsTo, deriveFlags, deriveScoreboard, parseSchedule, settlementSnapshot } from "./derive.ts";
 
 export class WorkshopError extends Error {
   constructor(
@@ -645,4 +645,394 @@ export function requestGeneration(ctx: WorkshopCtx, g: { player: string; ideaId:
     new Date(ctx.now()).toISOString(),
   );
   return { event, id, spent: cost, remaining: balance - cost };
+}
+
+// ---------------------------------------------------------------- v5: validated validators
+
+/** A node's key fingerprint: what the operator posts in the thread to earn recruitment rights. */
+export const nodeFingerprint = (publicKey: Record<string, unknown>): string => sha256(canonical(publicKey));
+
+/** Pseudonymous subject id for the flags list (the subject is named only once appealed or resolved). */
+export const subjectHash = (subject: string): string => sha256(subject).slice(0, 16);
+
+/** Latest registration for a node, if any. */
+function registrationOf(store: EventStore, nodeId: string): any | null {
+  return store
+    .all()
+    .filter((e) => e.type === "workshop.node_registered" && (e.payload as any).nodeId === nodeId)
+    .at(-1)?.payload as any ?? null;
+}
+
+/** First node.authorized wins; later ones are ignored. */
+export function authorizationOf(store: EventStore, nodeId: string): string | null {
+  const e = store.all().find((e) => e.type === "node.authorized" && (e.payload as any).nodeId === nodeId);
+  return e ? ((e.payload as any).url as string) : null;
+}
+
+/** First node.revoked wins; revocation is permanent. */
+export function revocationOf(store: EventStore, nodeId: string): { reason: string; at: string } | null {
+  const e = store.all().find((e) => e.type === "node.revoked" && (e.payload as any).nodeId === nodeId);
+  return e ? { reason: (e.payload as any).reason as string, at: (e.payload as any).at as string } : null;
+}
+
+/**
+ * Authorize a node as a recruiter. The operator posts a reply in the thread
+ * containing the node's key fingerprint; oEmbed must confirm the author and
+ * the text must contain the fingerprint. Governance, so it stays open after
+ * close: late evidence is what the challenge window is for.
+ */
+export async function authorizeNode(
+  ctx: WorkshopCtx,
+  a: { nodeId: string; url: string; byOperator: string; byHandle: string },
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<RoomEvent> {
+  assertCoordinator(ctx);
+  const reg = registrationOf(ctx.store, a.nodeId);
+  if (!reg) throw new WorkshopError("unknown_node", `No node ${a.nodeId}. Register first.`, 404);
+  if (reg.operator !== a.byOperator) throw new WorkshopError("not_your_node", "Only the node's operator can authorize it.", 403);
+  if (revocationOf(ctx.store, a.nodeId)) throw new WorkshopError("node_revoked", "This node was revoked by the producer.", 409);
+  if (authorizationOf(ctx.store, a.nodeId)) throw new WorkshopError("already_authorized", "This node is already an authorized recruiter.", 409);
+  const url = a.url.trim();
+  if (!tweetIdFromUrl(url)) throw new WorkshopError("bad_url", "Authorize with the URL of the operator's thread reply (…/status/<id>).", 400);
+  let meta: any;
+  try {
+    const res = await fetchImpl(`${OEMBED_URL}${encodeURIComponent(url)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    meta = await res.json();
+  } catch (e: any) {
+    throw new WorkshopError("oembed_failed", `X oEmbed verification failed: ${e?.message ?? e}`, 502);
+  }
+  const author = handleFromAuthorUrl(String(meta?.author_url ?? ""));
+  if (!author || author.toLowerCase() !== a.byHandle.toLowerCase())
+    throw new WorkshopError("author_mismatch", "That reply is not the operator's: its author does not match.", 403);
+  if (!String(meta?.html ?? "").includes(nodeFingerprint(reg.publicKey)))
+    throw new WorkshopError("missing_fingerprint", "That reply does not contain the node's key fingerprint.", 400);
+  return ctx.store.append("node.authorized", `x:${a.byOperator}`, { nodeId: a.nodeId, url, at: new Date(ctx.now()).toISOString() }, "public", new Date(ctx.now()).toISOString());
+}
+
+// ---------------------------------------------------------------- v5: audits
+
+/** What a node signs when challenged: its id, the event seq, that event's hash, its chain head. */
+export const auditMessage = (nodeId: string, k: number, hash: string, head: string): Buffer =>
+  Buffer.from(canonical({ nodeId, k, hash, head }), "utf8");
+
+export interface AuditProof {
+  nodeId: string;
+  k: number;
+  hash: string;
+  head: string;
+  sig: string;
+}
+
+/** A reported head is honest when it is genesis or an event hash on this chain (a lagging node is still honest). */
+function headIsHonest(events: readonly RoomEvent[], head: string): boolean {
+  return head === "genesis" || events.some((e) => e.hash === head);
+}
+
+/**
+ * One coordinator spot check against a live node: fetch its signed proof for
+ * event k and compare against this chain. Anything wrong — timeout, bad
+ * signature, wrong hash, unknown head — is a fail. Logs node.audit either way.
+ */
+export async function runAudit(ctx: WorkshopCtx, nodeId: string, k?: number, fetchImpl: typeof fetch = globalThis.fetch): Promise<{ event: RoomEvent; pass: boolean }> {
+  assertCoordinator(ctx);
+  const reg = registrationOf(ctx.store, nodeId);
+  if (!reg) throw new WorkshopError("unknown_node", `No node ${nodeId}. Register first.`, 404);
+  const events = ctx.store.all();
+  const seq = k ?? (events.length ? 1 + Math.floor(Math.random() * events.length) : 0);
+  const target = events.find((e) => e.seq === seq);
+  if (!target) throw new WorkshopError("bad_audit", `No event with seq ${seq} on this chain.`, 400);
+  let proof: AuditProof | null = null;
+  try {
+    const res = await fetchImpl(`${reg.url.replace(/\/$/, "")}/api/workshop/audit-proof?k=${seq}`, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    proof = (await res.json()) as AuditProof;
+  } catch {
+    proof = null; // silence is a fail
+  }
+  const pass =
+    proof !== null &&
+    proof.nodeId === nodeId &&
+    proof.k === seq &&
+    typeof proof.sig === "string" &&
+    verifyNodeSig(reg.publicKey, auditMessage(nodeId, seq, proof.hash, proof.head), proof.sig) &&
+    proof.hash === target.hash &&
+    headIsHonest(events, proof.head);
+  const event = ctx.store.append(
+    "node.audit",
+    "system",
+    { nodeId, result: pass ? "pass" : "fail", k: seq, via: "coordinator", at: new Date(ctx.now()).toISOString() },
+    "public",
+    new Date(ctx.now()).toISOString(),
+  );
+  return { event, pass };
+}
+
+/**
+ * A peer node reports another's signed audit answer. The coordinator confirms
+ * it against its own chain: a correct report of a failing node earns the
+ * reporter a bounty (see deriveBountyClaims); a wrong report just records the
+ * target's signed pass. The signature must verify against the target's key,
+ * so reports can't be fabricated.
+ */
+export function reportPeerAudit(
+  ctx: WorkshopCtx,
+  r: { reporterNode: string; target: string; k: number; hash: string; head: string; sig: string; byOperator: string },
+): { event: RoomEvent; confirmed: boolean } {
+  assertCoordinator(ctx);
+  const reporter = registrationOf(ctx.store, r.reporterNode);
+  if (!reporter) throw new WorkshopError("unknown_node", `No node ${r.reporterNode}. Register first.`, 404);
+  if (reporter.operator !== r.byOperator) throw new WorkshopError("not_your_node", "Only the reporting node's operator can file its audits.", 403);
+  const treg = registrationOf(ctx.store, r.target);
+  if (!treg) throw new WorkshopError("unknown_node", `No node ${r.target}. Register first.`, 404);
+  const events = ctx.store.all();
+  const target = events.find((e) => e.seq === r.k);
+  if (!target) throw new WorkshopError("bad_audit", `No event with seq ${r.k} on this chain.`, 400);
+  if (typeof r.sig !== "string" || !verifyNodeSig(treg.publicKey, auditMessage(r.target, r.k, r.hash, r.head), r.sig))
+    throw new WorkshopError("bad_signature", "That answer is not signed by the target node's key.", 400);
+  const healthy = r.hash === target.hash && headIsHonest(events, r.head);
+  const event = ctx.store.append(
+    "node.audit",
+    `x:${r.byOperator}`,
+    { nodeId: r.target, result: healthy ? "pass" : "fail", k: r.k, via: "peer", reporterNode: r.reporterNode, at: new Date(ctx.now()).toISOString() },
+    "public",
+    new Date(ctx.now()).toISOString(),
+  );
+  return { event, confirmed: !healthy };
+}
+
+// ---------------------------------------------------------------- v5: flags, quarantine, appeals
+
+export interface FlagInput {
+  subject: string; // player x id, node id, or "handle:<x handle>" for thread-only subjects
+  subjectKind: "player" | "node";
+  signal: string; // attribution_burst | new_account_cluster | audit_fail_growth | canary:* | abuse_report | pretender_claim
+  evidence: unknown;
+  reporter?: string; // x id of a signed-in reporter; system detections have none
+}
+
+/** File a flag. Quarantine, not deletion: the weight is held while the flag is open or upheld. */
+export function raiseFlag(ctx: WorkshopCtx, f: FlagInput, by: string): RoomEvent {
+  assertCoordinator(ctx);
+  if (!f.subject || typeof f.subject !== "string") throw new WorkshopError("bad_flag", "A subject is required.", 400);
+  if (f.subjectKind !== "player" && f.subjectKind !== "node") throw new WorkshopError("bad_flag", 'subjectKind must be "player" or "node".', 400);
+  if (!f.signal || typeof f.signal !== "string") throw new WorkshopError("bad_flag", "A signal is required.", 400);
+  if (f.evidence === undefined) throw new WorkshopError("bad_flag", "Evidence is required.", 400);
+  return ctx.store.append(
+    "flag.raised",
+    by,
+    { id: nextId(ctx.store, "flag.raised", "F"), subject: f.subject, subjectKind: f.subjectKind, signal: f.signal, evidence: f.evidence, reporter: f.reporter ?? null, at: new Date(ctx.now()).toISOString() },
+    "public",
+    new Date(ctx.now()).toISOString(),
+  );
+}
+
+function flagById(store: EventStore, id: string): any | null {
+  return store.all().find((e) => e.type === "flag.raised" && (e.payload as any).id === id)?.payload as any ?? null;
+}
+
+export function flagResolved(store: EventStore, id: string): { decision: string; note: string } | null {
+  const e = store.all().find((e) => e.type === "flag.resolved" && (e.payload as any).id === id);
+  return e ? { decision: (e.payload as any).decision as string, note: (e.payload as any).note as string } : null;
+}
+
+/** The flagged subject appeals. Only the subject's own session can file it. */
+export function appealFlag(ctx: WorkshopCtx, a: { id: string; reason: string; xId: string; handle: string }): RoomEvent {
+  assertCoordinator(ctx);
+  const flag = flagById(ctx.store, a.id);
+  if (!flag) throw new WorkshopError("unknown_flag", `No flag ${a.id}.`, 404);
+  if (flagResolved(ctx.store, a.id)) throw new WorkshopError("flag_resolved", "That flag is already resolved.", 409);
+  if (ctx.store.all().some((e) => e.type === "flag.appealed" && (e.payload as any).id === a.id))
+    throw new WorkshopError("already_appealed", "That flag already has an appeal.", 409);
+  const mine = flag.subjectKind === "player" && (flag.subject === a.xId || flag.subject === `handle:${a.handle.toLowerCase()}`);
+  if (!mine) throw new WorkshopError("not_your_flag", "Only the flagged subject can appeal.", 403);
+  if (!a.reason.trim()) throw new WorkshopError("bad_appeal", "A reason is required.", 400);
+  return ctx.store.append("flag.appealed", `x:${a.xId}`, { id: a.id, reason: a.reason.trim().slice(0, 500), at: new Date(ctx.now()).toISOString() }, "public", new Date(ctx.now()).toISOString());
+}
+
+/** The producer resolves a flag publicly. Cleared restores the weight; upheld forfeits it. */
+export function resolveFlag(ctx: WorkshopCtx, r: { id: string; decision: string; note: string; by: string }): RoomEvent {
+  assertCoordinator(ctx);
+  const flag = flagById(ctx.store, r.id);
+  if (!flag) throw new WorkshopError("unknown_flag", `No flag ${r.id}.`, 404);
+  if (flagResolved(ctx.store, r.id)) throw new WorkshopError("flag_resolved", "That flag is already resolved.", 409);
+  if (r.decision !== "upheld" && r.decision !== "cleared") throw new WorkshopError("bad_flag", 'decision must be "upheld" or "cleared".', 400);
+  if (!r.note.trim()) throw new WorkshopError("bad_flag", "A public note is required.", 400);
+  return ctx.store.append(
+    "flag.resolved",
+    r.by,
+    { id: r.id, decision: r.decision, note: r.note.trim().slice(0, 500), at: new Date(ctx.now()).toISOString() },
+    "public",
+    new Date(ctx.now()).toISOString(),
+  );
+}
+
+/**
+ * Coordinator gaming detection, run on the request tick. Bursts of sign-ins
+ * through one node, clusters of post-opens accounts, and nodes that keep
+ * recruiting while their audits fail. Each (subject, signal) raises once while
+ * active; only resolutions clear. The remaining signals (duplicate text,
+ * off-thread URLs, fixed schedules) arrive as signed-in abuse reports, since
+ * they need thread context the log doesn't have.
+ */
+export function detectGaming(ctx: WorkshopCtx): RoomEvent[] {
+  if (ctx.mode !== "coordinator") return [];
+  const out: RoomEvent[] = [];
+  const events = ctx.store.all();
+  const active = new Set<string>();
+  for (const f of deriveFlags(events)) {
+    if (f.status !== "cleared") active.add(`${f.subjectKind}:${flagSubjectOf(events, f.id)}:${f.signal}`);
+  }
+  const raise = (subject: string, subjectKind: "player" | "node", signal: string, evidence: unknown): void => {
+    if (active.has(`${subjectKind}:${subject}:${signal}`)) return;
+    active.add(`${subjectKind}:${subject}:${signal}`);
+    out.push(raiseFlag(ctx, { subject, subjectKind, signal, evidence }, "system"));
+  };
+  // Sign-ins per node per UTC hour.
+  const bursts = new Map<string, { nodeId: string; hour: string; count: number }>();
+  for (const e of events) {
+    if (e.type !== "player.attributed") continue;
+    const nodeId = (e.payload as any).nodeId as string;
+    if (nodeId === "unassigned") continue;
+    const hour = new Date(floorHour(Date.parse(e.ts))).toISOString();
+    const k = `${nodeId}:${hour}`;
+    const b = bursts.get(k) ?? { nodeId, hour, count: 0 };
+    b.count++;
+    bursts.set(k, b);
+  }
+  for (const b of bursts.values()) {
+    if (b.count > ctx.config.attributionBurstThreshold) raise(b.nodeId, "node", "attribution_burst", { hour: b.hour, attributions: b.count });
+  }
+  // Post-opens accounts per node.
+  const opensMs = Date.parse(ctx.config.opensAt);
+  const created = new Map<string, string>();
+  for (const e of events) {
+    if (e.type !== "workshop.player") continue;
+    const p = e.payload as { xId: string; createdAt: string };
+    if (!created.has(p.xId)) created.set(p.xId, p.createdAt);
+  }
+  const clusters = new Map<string, number>();
+  for (const e of events) {
+    if (e.type !== "player.attributed") continue;
+    const a = e.payload as { player: string; nodeId: string };
+    if (a.nodeId === "unassigned") continue;
+    if (Date.parse(created.get(a.player) ?? "") > opensMs) clusters.set(a.nodeId, (clusters.get(a.nodeId) ?? 0) + 1);
+  }
+  for (const [nodeId, count] of clusters) {
+    if (count > ctx.config.newAccountClusterThreshold) raise(nodeId, "node", "new_account_cluster", { postOpensAccounts: count });
+  }
+  // Nodes recruiting while their audits fail.
+  const auditsByNode = new Map<string, { result: string; at: string }[]>();
+  for (const e of events) {
+    if (e.type !== "node.audit") continue;
+    const a = e.payload as { nodeId: string; result: string; at: string };
+    const list = auditsByNode.get(a.nodeId) ?? [];
+    list.push({ result: a.result, at: a.at });
+    auditsByNode.set(a.nodeId, list);
+  }
+  for (const [nodeId, list] of auditsByNode) {
+    list.sort((x, y) => x.at.localeCompare(y.at));
+    const latest = list.at(-1)!;
+    if (latest.result !== "fail") continue;
+    const grown = events.some((e) => e.type === "player.attributed" && (e.payload as any).nodeId === nodeId && e.ts > latest.at);
+    if (grown) raise(nodeId, "node", "audit_fail_growth", { failedAt: latest.at });
+  }
+  return out;
+}
+
+function flagSubjectOf(events: readonly RoomEvent[], id: string): string {
+  return (events.find((e) => e.type === "flag.raised" && (e.payload as any).id === id)?.payload as any)?.subject ?? "";
+}
+
+// ---------------------------------------------------------------- v5: proposed, challenged, final settlement
+
+function proposalEvents(store: EventStore): RoomEvent[] {
+  return store.all().filter((e) => e.type === "settlement.proposed");
+}
+
+export function latestProposal(store: EventStore): RoomEvent | null {
+  return proposalEvents(store).at(-1) ?? null;
+}
+
+export function finalizationOf(store: EventStore): RoomEvent | null {
+  return store.all().find((e) => e.type === "settlement.finalized") ?? null;
+}
+
+export function openChallenges(store: EventStore): string[] {
+  const resolved = new Set(store.all().filter((e) => e.type === "challenge.resolved").map((e) => (e.payload as any).id as string));
+  return store
+    .all()
+    .filter((e) => e.type === "challenge.filed" && !resolved.has((e.payload as any).id as string))
+    .map((e) => (e.payload as any).id as string);
+}
+
+/** At close the coordinator proposes the settlement: formula, every input, amounts owed, hash. */
+export function maybePropose(ctx: WorkshopCtx): RoomEvent | null {
+  if (ctx.mode !== "coordinator") return null;
+  if (!isClosed(ctx.config, ctx.now())) return null;
+  if (latestProposal(ctx.store)) return null;
+  const snap = settlementSnapshot(ctx.store.all(), ctx.config, ctx.now());
+  const at = new Date(ctx.now()).toISOString();
+  return ctx.store.append("settlement.proposed", "system", { at, formula: snap.formula, inputs: snap.inputs, operators: snap.operators, hash: snap.hash }, "public", at);
+}
+
+/** Anyone signed in can challenge the proposal during the window. Obligations only — challenges dispute amounts, never move money. */
+export function fileChallenge(ctx: WorkshopCtx, c: { claim: string; evidence: string; by: string; handle: string }): RoomEvent {
+  assertCoordinator(ctx);
+  if (!latestProposal(ctx.store)) throw new WorkshopError("no_proposal", "Challenges open when the settlement is proposed at close.", 409);
+  if (finalizationOf(ctx.store)) throw new WorkshopError("finalized", "The settlement is final; the window is closed.", 409);
+  if (!c.claim.trim()) throw new WorkshopError("bad_challenge", "A claim is required.", 400);
+  if (!c.evidence.trim()) throw new WorkshopError("bad_challenge", "Evidence is required.", 400);
+  return ctx.store.append(
+    "challenge.filed",
+    `x:${c.by}`,
+    { id: nextId(ctx.store, "challenge.filed", "C"), claim: c.claim.trim().slice(0, 500), evidence: c.evidence.trim().slice(0, 1000), by: c.by, handle: c.handle, at: new Date(ctx.now()).toISOString() },
+    "public",
+    new Date(ctx.now()).toISOString(),
+  );
+}
+
+/**
+ * The producer answers a challenge publicly. An accepted challenge that
+ * changes amounts re-proposes the settlement, restarting the window.
+ */
+export function resolveChallenge(ctx: WorkshopCtx, r: { id: string; decision: string; note: string; by: string }): { event: RoomEvent; reproposed: RoomEvent | null } {
+  assertCoordinator(ctx);
+  const filed = ctx.store.all().some((e) => e.type === "challenge.filed" && (e.payload as any).id === r.id);
+  if (!filed) throw new WorkshopError("unknown_challenge", `No challenge ${r.id}.`, 404);
+  if (ctx.store.all().some((e) => e.type === "challenge.resolved" && (e.payload as any).id === r.id))
+    throw new WorkshopError("challenge_resolved", "That challenge is already resolved.", 409);
+  if (r.decision !== "accepted" && r.decision !== "rejected") throw new WorkshopError("bad_challenge", 'decision must be "accepted" or "rejected".', 400);
+  if (!r.note.trim()) throw new WorkshopError("bad_challenge", "A public note is required.", 400);
+  const event = ctx.store.append(
+    "challenge.resolved",
+    r.by,
+    { id: r.id, decision: r.decision, note: r.note.trim().slice(0, 500), at: new Date(ctx.now()).toISOString() },
+    "public",
+    new Date(ctx.now()).toISOString(),
+  );
+  let reproposed: RoomEvent | null = null;
+  if (r.decision === "accepted") {
+    const snap = settlementSnapshot(ctx.store.all(), ctx.config, ctx.now());
+    const latest = latestProposal(ctx.store)!;
+    if (snap.hash !== ((latest.payload as any).hash as string)) {
+      const at = new Date(ctx.now()).toISOString();
+      reproposed = ctx.store.append("settlement.proposed", "system", { at, formula: snap.formula, inputs: snap.inputs, operators: snap.operators, hash: snap.hash }, "public", at);
+    }
+  }
+  return { event, reproposed };
+}
+
+/** Finalize only when the window has ended and every challenge is resolved. */
+export function finalizeSettlement(ctx: WorkshopCtx, by: string): RoomEvent {
+  assertCoordinator(ctx);
+  const latest = latestProposal(ctx.store);
+  if (!latest) throw new WorkshopError("no_proposal", "Nothing to finalize: the settlement is proposed at close.", 409);
+  if (finalizationOf(ctx.store)) throw new WorkshopError("already_final", "The settlement is already final.", 409);
+  const windowEndsAt = new Date(Date.parse((latest.payload as any).at as string) + ctx.config.challengeWindowDays * 86_400_000).toISOString();
+  if (ctx.now() < Date.parse(windowEndsAt))
+    throw new WorkshopError("window_open", `The challenge window ends at ${windowEndsAt}.`, 409, { windowEndsAt });
+  const open = openChallenges(ctx.store);
+  if (open.length) throw new WorkshopError("challenges_open", `${open.length} challenge(s) still open: ${open.join(", ")}.`, 409, { open });
+  return ctx.store.append("settlement.finalized", by, { hash: (latest.payload as any).hash as string, at: new Date(ctx.now()).toISOString() }, "public", new Date(ctx.now()).toISOString());
 }

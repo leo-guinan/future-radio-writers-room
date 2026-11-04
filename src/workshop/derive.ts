@@ -2,6 +2,7 @@
 // stored. Every function here is pure over (events, config, now).
 
 import type { RoomEvent } from "../core/types.ts";
+import { sha256, canonical } from "../core/events.ts";
 import type { WorkshopConfig } from "./config.ts";
 
 export interface PlayerView {
@@ -98,13 +99,47 @@ export interface ScoreEntry {
   newAccount: boolean;
 }
 
+export interface AuditView {
+  nodeId: string;
+  result: "pass" | "fail";
+  k: number | null;
+  via: "coordinator" | "peer";
+  reporterNode: string | null;
+  at: string;
+}
+
+/** Audit history for one node (or all), oldest first. */
+export function deriveAudits(events: readonly RoomEvent[], nodeId?: string): AuditView[] {
+  const out: AuditView[] = [];
+  for (const e of events) {
+    if (e.type !== "node.audit") continue;
+    const a = e.payload as { nodeId: string; result: "pass" | "fail"; k: number | null; via: "coordinator" | "peer"; reporterNode?: string; at: string };
+    if (nodeId && a.nodeId !== nodeId) continue;
+    out.push({ nodeId: a.nodeId, result: a.result, k: a.k ?? null, via: a.via, reporterNode: a.reporterNode ?? null, at: a.at });
+  }
+  out.sort((x, y) => x.at.localeCompare(y.at));
+  return out;
+}
+
+/** Three straight failures with no pass since suspend the node's operator credit. */
+export function nodeSuspended(events: readonly RoomEvent[], nodeId: string): boolean {
+  const audits = deriveAudits(events, nodeId);
+  if (audits.length < 3) return false;
+  return audits.slice(-3).every((a) => a.result === "fail");
+}
+
 export function deriveNodeUptime(events: readonly RoomEvent[], nodeId: string): { upMinutes: number; upHours: number; lastHeartbeat: string | null } {
-  // A node is up for a minute when a heartbeat lands in that minute's bucket.
+  // A node is up for a minute when a heartbeat lands in that minute's bucket —
+  // but uptime only counts while audits pass. A heartbeat counts when the
+  // latest audit at its time is a pass, or no audit has run yet.
+  const audits = deriveAudits(events, nodeId);
   const buckets = new Set<number>();
   let last: string | null = null;
   for (const e of events) {
     if (e.type !== "workshop.heartbeat" || (e.payload as any).nodeId !== nodeId) continue;
     const at = (e.payload as any).at as string;
+    const latest = audits.filter((a) => a.at <= at).at(-1);
+    if (latest && latest.result === "fail") continue;
     buckets.add(Math.floor(Date.parse(at) / 60_000));
     if (!last || at > last) last = at;
   }
@@ -181,15 +216,55 @@ export interface NodeView {
   uptimePct: number; // upMinutes / elapsedMinutes (0 when nothing elapsed)
   qualifies: boolean; // uptime at least 50%: earns operator weight
   attributedPlayers: number; // bound players, operator's own account excluded
-  weight: number; // sqrt(attributedPlayers) when qualified, else 0 (producer node: fixed)
+  weight: number; // sqrt(attributedPlayers) when authorized, qualified, unsuspended and unquarantined, else 0 (producer node: fixed)
   capped: boolean; // the producer node admits a capped few and weighs a fixed 1
   leaseEnded: boolean;
   leaseReason: string | null;
+  authorized: boolean; // the operator posted the fingerprint and oEmbed confirmed it
+  authorizedBy: string | null; // the thread reply URL
+  suspended: boolean; // three straight audit failures, no pass since
+  revoked: boolean;
+  revokeReason: string | null;
+  quarantined: boolean; // an open or upheld flag holds this node's weight
+}
+
+/** nodeId -> authorization reply URL (first node.authorized wins). */
+export function deriveAuthorized(events: readonly RoomEvent[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const e of events) {
+    if (e.type !== "node.authorized") continue;
+    const a = e.payload as { nodeId: string; url: string };
+    if (!out.has(a.nodeId)) out.set(a.nodeId, a.url);
+  }
+  return out;
+}
+
+/** nodeId -> revocation (first node.revoked wins; revocation is permanent). */
+export function deriveRevoked(events: readonly RoomEvent[]): Map<string, { reason: string; at: string }> {
+  const out = new Map<string, { reason: string; at: string }>();
+  for (const e of events) {
+    if (e.type !== "node.revoked") continue;
+    const r = e.payload as { nodeId: string; reason: string; at: string };
+    if (!out.has(r.nodeId)) out.set(r.nodeId, { reason: r.reason, at: r.at });
+  }
+  return out;
+}
+
+/** Does this X account operate an authorized, unrevoked node? */
+export function operatesAuthorizedNode(events: readonly RoomEvent[], xId: string): boolean {
+  const auth = deriveAuthorized(events);
+  const revoked = deriveRevoked(events);
+  return events.some(
+    (e) => e.type === "workshop.node_registered" && (e.payload as any).operator === xId && auth.has((e.payload as any).nodeId) && !revoked.has((e.payload as any).nodeId),
+  );
 }
 
 export function deriveNodes(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): NodeView[] {
   const players = derivePlayers(events, config);
   const attribution = deriveAttribution(events);
+  const authorized = deriveAuthorized(events);
+  const revoked = deriveRevoked(events);
+  const quarantined = quarantinedSubjects(events).nodes;
   const horizon = Math.min(nowMs, Date.parse(config.closesAt));
   const out: NodeView[] = [];
   for (const e of events) {
@@ -206,6 +281,11 @@ export function deriveNodes(events: readonly RoomEvent[], config: WorkshopConfig
     }
     const capped = r.nodeId === config.producerNode.nodeId;
     const lease = events.find((x) => x.type === "node.lease.ended" && (x.payload as any).nodeId === r.nodeId)?.payload as any;
+    const isAuthorized = authorized.has(r.nodeId);
+    const isRevoked = revoked.has(r.nodeId);
+    const suspended = nodeSuspended(events, r.nodeId);
+    const held = quarantined.has(r.nodeId);
+    const earns = isAuthorized && !isRevoked && !suspended && !held;
     out.push({
       ...r,
       operatorHandle: players.get(r.operator)?.handle ?? r.operator,
@@ -218,11 +298,175 @@ export function deriveNodes(events: readonly RoomEvent[], config: WorkshopConfig
       uptimePct: Math.round(uptimePct * 10000) / 10000,
       qualifies,
       attributedPlayers,
-      weight: capped ? (qualifies ? config.producerNode.operatorWeight : 0) : qualifies ? Math.sqrt(attributedPlayers) : 0,
+      weight: !earns ? 0 : capped ? (qualifies ? config.producerNode.operatorWeight : 0) : qualifies ? Math.sqrt(attributedPlayers) : 0,
       capped,
       leaseEnded: Boolean(lease),
       leaseReason: lease?.reason ?? null,
+      authorized: isAuthorized,
+      authorizedBy: authorized.get(r.nodeId) ?? null,
+      suspended,
+      revoked: isRevoked,
+      revokeReason: revoked.get(r.nodeId)?.reason ?? null,
+      quarantined: held,
     });
+  }
+  return out;
+}
+
+export interface FlagView {
+  id: string;
+  subjectHash: string; // pseudonymous until appealed or resolved
+  subjectKind: "player" | "node";
+  signal: string;
+  evidence: unknown;
+  reporterHash: string | null;
+  status: "open" | "appealed" | "upheld" | "cleared";
+  subject?: string; // revealed once appealed or resolved
+  reporter?: string | null;
+  appealedAt: string | null;
+  resolvedAt: string | null;
+  note: string | null;
+}
+
+/** Flags with their lifecycle. Subjects stay pseudonymous until they have had the chance to appeal. */
+export function deriveFlags(events: readonly RoomEvent[]): FlagView[] {
+  const appealed = new Map<string, string>();
+  const resolved = new Map<string, { decision: string; note: string; at: string }>();
+  for (const e of events) {
+    if (e.type === "flag.appealed") {
+      const a = e.payload as { id: string; at: string };
+      if (!appealed.has(a.id)) appealed.set(a.id, a.at);
+    } else if (e.type === "flag.resolved") {
+      const r = e.payload as { id: string; decision: string; note: string; at: string };
+      if (!resolved.has(r.id)) resolved.set(r.id, { decision: r.decision, note: r.note, at: r.at });
+    }
+  }
+  const out: FlagView[] = [];
+  for (const e of events) {
+    if (e.type !== "flag.raised") continue;
+    const f = e.payload as { id: string; subject: string; subjectKind: "player" | "node"; signal: string; evidence: unknown; reporter: string | null };
+    if (out.some((x) => x.id === f.id)) continue;
+    const r = resolved.get(f.id);
+    const status = r ? ((r.decision as "upheld" | "cleared")) : appealed.has(f.id) ? "appealed" : "open";
+    const revealed = status !== "open";
+    out.push({
+      id: f.id,
+      subjectHash: sha256(f.subject).slice(0, 16),
+      subjectKind: f.subjectKind,
+      signal: f.signal,
+      evidence: f.evidence,
+      reporterHash: f.reporter ? sha256(f.reporter).slice(0, 16) : null,
+      status,
+      ...(revealed ? { subject: f.subject, reporter: f.reporter } : {}),
+      appealedAt: appealed.get(f.id) ?? null,
+      resolvedAt: r?.at ?? null,
+      note: r?.note ?? null,
+    });
+  }
+  return out;
+}
+
+/** Subjects whose weight is held: flagged and not cleared. */
+export function quarantinedSubjects(events: readonly RoomEvent[]): { players: Set<string>; nodes: Set<string> } {
+  const players = new Set<string>();
+  const nodes = new Set<string>();
+  const cleared = new Set<string>();
+  for (const e of events) {
+    if (e.type === "flag.resolved" && (e.payload as any).decision === "cleared") cleared.add((e.payload as any).id as string);
+  }
+  for (const e of events) {
+    if (e.type !== "flag.raised") continue;
+    const f = e.payload as { id: string; subject: string; subjectKind: string };
+    if (cleared.has(f.id)) continue;
+    if (f.subjectKind === "player") players.add(f.subject);
+    else if (f.subjectKind === "node") nodes.add(f.subject);
+  }
+  return { players, nodes };
+}
+
+export interface ChallengeView {
+  id: string;
+  claim: string;
+  evidence: string;
+  by: string;
+  handle: string;
+  at: string;
+  status: "open" | "accepted" | "rejected";
+  resolvedAt: string | null;
+  note: string | null;
+}
+
+export function deriveChallenges(events: readonly RoomEvent[]): ChallengeView[] {
+  const resolved = new Map<string, { decision: string; note: string; at: string }>();
+  for (const e of events) {
+    if (e.type !== "challenge.resolved") {
+      const r = e.payload as { id: string; decision: string; note: string; at: string };
+      if (!resolved.has(r.id)) resolved.set(r.id, { decision: r.decision, note: r.note, at: r.at });
+    }
+  }
+  const out: ChallengeView[] = [];
+  for (const e of events) {
+    if (e.type !== "challenge.filed") continue;
+    const c = e.payload as { id: string; claim: string; evidence: string; by: string; handle: string; at: string };
+    if (out.some((x) => x.id === c.id)) continue;
+    const r = resolved.get(c.id);
+    out.push({ ...c, status: r ? (r.decision as "accepted" | "rejected") : "open", resolvedAt: r?.at ?? null, note: r?.note ?? null });
+  }
+  return out;
+}
+
+export interface BountyClaim {
+  reporter: string; // x id
+  kind: "peer_audit" | "challenge" | "abuse" | "pretender";
+  dollars: number;
+  ref: string; // the audit / challenge / flag / pretender entry behind it
+}
+
+/**
+ * Validator bounty claims on the reserve, oldest first: confirmed peer audits
+ * (logged fail via a peer report), accepted challenges, upheld abuse reports
+ * with a reporter, and confirmed pretender reports. Amounts come from config.
+ */
+export function deriveBountyClaims(events: readonly RoomEvent[], config: WorkshopConfig): BountyClaim[] {
+  const out: BountyClaim[] = [];
+  const operatorOf = new Map<string, string>();
+  for (const e of events) {
+    if (e.type !== "workshop.node_registered") continue;
+    const r = e.payload as { nodeId: string; operator: string };
+    if (!operatorOf.has(r.nodeId)) operatorOf.set(r.nodeId, r.operator);
+  }
+  const raised = new Map<string, { reporter: string | null; signal: string }>();
+  for (const e of events) {
+    if (e.type === "flag.raised") {
+      const f = e.payload as { id: string; reporter: string | null; signal: string };
+      if (!raised.has(f.id)) raised.set(f.id, { reporter: f.reporter, signal: f.signal });
+    }
+  }
+  const challengerOf = new Map<string, string>();
+  for (const e of events) {
+    if (e.type === "challenge.filed") {
+      const c = e.payload as { id: string; by: string };
+      if (!challengerOf.has(c.id)) challengerOf.set(c.id, c.by);
+    }
+  }
+  for (const e of events) {
+    if (e.type === "node.audit") {
+      const a = e.payload as { result: string; via: string; reporterNode?: string };
+      if (a.result === "fail" && a.via === "peer" && a.reporterNode && operatorOf.has(a.reporterNode))
+        out.push({ reporter: operatorOf.get(a.reporterNode)!, kind: "peer_audit", dollars: config.auditBountyPoints, ref: `${a.reporterNode}→${(e.payload as any).nodeId}@${(e.payload as any).at}` });
+    } else if (e.type === "challenge.resolved") {
+      const r = e.payload as { id: string; decision: string };
+      if (r.decision === "accepted" && challengerOf.has(r.id))
+        out.push({ reporter: challengerOf.get(r.id)!, kind: "challenge", dollars: config.challengeBountyPoints, ref: r.id });
+    } else if (e.type === "flag.resolved") {
+      const r = e.payload as { id: string; decision: string };
+      const f = raised.get(r.id);
+      if (r.decision === "upheld" && f?.reporter && f.signal !== "pretender_claim")
+        out.push({ reporter: f.reporter, kind: "abuse", dollars: config.abuseBountyPoints, ref: r.id });
+    } else if (e.type === "pretender.confirmed") {
+      const p = e.payload as { reporter: string; url: string };
+      out.push({ reporter: p.reporter, kind: "pretender", dollars: config.pretenderBountyPoints, ref: p.url });
+    }
   }
   return out;
 }
@@ -274,11 +518,13 @@ export interface PlayerPayout {
   handle: string;
   workshares: number; // counted, unvoided
   builds: number; // authored ideas Future Radio made
-  weight: number; // workshares + blockBonus × builds (allow-listed: fixed)
+  weight: number; // workshares + blockBonus × builds (allow-listed: fixed); 0 while quarantined
   fixed: boolean; // allow-listed weight, independent of engagement
   n: number | null; // 1 for the producer row, so anyone can check the single share
+  quarantined: boolean; // an open or upheld flag holds this player's weight
   shareOfW: number; // pro rata by weight
   amount: number | null; // dollars; null until R and the operator share are set
+  bounty: number | null; // validator bounty dollars from the reserve (null until R is set)
 }
 
 export interface NodePayout {
@@ -288,9 +534,12 @@ export interface NodePayout {
   attributedPlayers: number; // operator's own account excluded
   uptimePct: number;
   qualifies: boolean;
-  weight: number; // sqrt(attributedPlayers) when qualified
+  weight: number; // sqrt(attributedPlayers) when authorized, qualified, unsuspended and unquarantined
   n: number; // attributed bodies (producer node: capped at maxPlayers)
   capped: boolean;
+  authorized: boolean;
+  suspended: boolean;
+  quarantined: boolean;
   shareOfO: number; // pro rata by weight
   amount: number | null; // dollars; null until R and the operator share are set
 }
@@ -352,13 +601,14 @@ export interface RewardsView {
   prizeOutcome: "pending" | "won" | "lost";
   formula: string;
   inputs: { R: number | null; nextContest: number; operatorShare: number | null; blockBonus: number; closesAt: string };
-  pools: { R: number; P: number; O: number; W: number; nextContest: number; operatorUnallocated: number } | null;
+  pools: { R: number; P: number; O: number; W: number; V: number; nextContest: number; operatorUnallocated: number; reserveUnused: number } | null;
   pledge: WorkshopConfig["pledge"];
   operatorShareOfParticipants: number | null;
   operatorShareNote: string; // "not set" when null, never 0
   players: PlayerPayout[];
   nodes: NodePayout[];
-  totals: { players: number; nodes: number; nextContest: number; unallocated: number; sum: number } | null;
+  quarantine: { playerWeight: number; nodeWeight: number }; // weight held by open or upheld flags
+  totals: { players: number; nodes: number; bounties: number; nextContest: number; unallocated: number; sum: number } | null;
 }
 
 export type ParsedSchedule = { kind: "now" } | { kind: "lump"; date: string } | { kind: "stream"; n: number; days: number };
@@ -394,10 +644,14 @@ function splitCents(totalCents: number, weights: number[]): number[] {
 }
 
 /**
- * v2 split (supersedes the v1 score-based projection). R comes from outside:
- * the prize if we win, the same amount as Story.markets debt if we don't.
- * P = R×(1−nextContest); O = P×operatorShare; W = P−O. Players earn W pro rata
- * by workshare weight; qualifying nodes earn O pro rata by sqrt weight. Money
+ * v2 split with the v5 validation reserve (supersedes the v1 score-based
+ * projection). R comes from outside: the prize if we win, the same amount as
+ * Story.markets debt if we don't. P = R×(1−nextContest); O = P×operatorShare;
+ * V = P×validationReserve; W = P−O−V. Players earn W pro rata by workshare
+ * weight; authorized, qualifying, unsuspended nodes earn O pro rata by sqrt
+ * weight. Validator bounties come from V (pro rata when over-subscribed);
+ * unused V returns to the players. Quarantined weight earns nothing: it is
+ * forfeited to the honest players pro rata, plus the reporter's bounty. Money
  * is split in integer cents so the pools sum exactly to R.
  */
 export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): RewardsView {
@@ -410,50 +664,88 @@ export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConf
   const builtByAuthor = new Map<string, number>();
   for (const i of ideas) if (builds.has(i.id)) builtByAuthor.set(i.author, (builtByAuthor.get(i.author) ?? 0) + 1);
   const players = derivePlayers(events, config);
+  const held = quarantinedSubjects(events);
   const weighed = [...players.values()].map((p) => {
     const ws = workshares.filter((w) => w.player === p.xId).reduce((s, w) => s + w.weight, 0);
     const b = builtByAuthor.get(p.xId) ?? 0;
     const fixed = config.producerNode.allow.includes(p.xId);
+    const full = fixed ? config.producerNode.fixedPlayerWeight : ws + config.blockBonus * b;
+    const quarantined = held.players.has(p.xId);
     return {
       xId: p.xId,
       handle: p.handle,
       workshares: ws,
       builds: b,
-      weight: fixed ? config.producerNode.fixedPlayerWeight : ws + config.blockBonus * b,
+      full,
+      weight: quarantined ? 0 : full,
       fixed,
       n: fixed ? 1 : null,
+      quarantined,
     };
   });
   const wTotal = weighed.reduce((s, p) => s + p.weight, 0);
   const nodes = deriveNodes(events, config, nowMs);
   const oTotal = nodes.reduce((s, n) => s + n.weight, 0);
+  const heldPlayerWeight = weighed.filter((p) => p.quarantined).reduce((s, p) => s + p.full, 0);
+  const heldNodeWeight = nodes.filter((n) => n.quarantined).reduce((s, n) => s + (n.authorized && !n.revoked && !n.suspended && n.qualifies ? (n.capped ? config.producerNode.operatorWeight : Math.sqrt(n.attributedPlayers)) : 0), 0);
 
   const money = R !== null && share !== null;
   const rCents = money ? Math.round(R! * 100) : 0;
   const pCents = money ? Math.round(rCents * (1 - nextContest)) : 0;
   const oCents = money ? Math.round(pCents * share!) : 0;
-  const playerCents = money ? splitCents(pCents - oCents, weighed.map((p) => p.weight)) : weighed.map(() => 0);
+  const vCents = money ? Math.round(pCents * config.validationReserve) : 0;
+  const claims = money ? deriveBountyClaims(events, config) : [];
+  const claimCents = claims.map((c) => Math.round(c.dollars * 100));
+  const paidClaimCents = money && vCents > 0 ? splitCents(vCents, claimCents) : claimCents.map(() => 0);
+  const paidVCents = paidClaimCents.reduce((s, c) => s + c, 0);
+  const unusedVCents = vCents - paidVCents; // unused reserve returns to the players
+  const wSplitCents = pCents - oCents - vCents + unusedVCents;
+  const playerCents = money ? splitCents(wSplitCents, weighed.map((p) => p.weight)) : weighed.map(() => 0);
   const nodeCents = money ? splitCents(oCents, nodes.map((n) => n.weight)) : nodes.map(() => 0);
   const wCents = playerCents.reduce((s, c) => s + c, 0);
   const paidOCents = nodeCents.reduce((s, c) => s + c, 0);
   const nextCents = rCents - pCents; // the next contest is a fixed share, never a residual
-  const unallocatedCents = pCents - wCents - paidOCents; // pool money with no earners yet
+  const unallocatedCents = wSplitCents - wCents + (oCents - paidOCents); // pool money with no earners yet
+  const bountyByReporter = new Map<string, number>();
+  claims.forEach((c, i) => bountyByReporter.set(c.reporter, (bountyByReporter.get(c.reporter) ?? 0) + paidClaimCents[i]));
+  // Bounty-only recipients (defensive: every reporter is a player, but the log is the log).
+  const extras = [...bountyByReporter.keys()]
+    .filter((xId) => !weighed.some((p) => p.xId === xId))
+    .map((xId) => ({ xId, handle: xId, workshares: 0, builds: 0, full: 0, weight: 0, fixed: false, n: null, quarantined: false }));
 
   return {
     status: config.pledge.prizeOutcome === "pending" ? "projected" : "final",
     prizeOutcome: config.pledge.prizeOutcome,
-    formula: "P = R×(1−nextContest); O = P×operatorShare; W = P−O. Players earn W pro rata by weight = counted workshares + blockBonus×builds. Qualifying nodes (uptime ≥50%) earn O pro rata by weight = sqrt(attributed players, operator excluded). Cents split by largest remainder: pools sum exactly to R.",
+    formula:
+      "P = R×(1−nextContest); O = P×operatorShare; V = P×validationReserve; W = P−O−V. Players earn W pro rata by weight = counted workshares + blockBonus×builds. Authorized, qualifying (uptime ≥50%), unsuspended nodes earn O pro rata by weight = sqrt(attributed players, operator excluded). Validator bounties (peer audits, accepted challenges, upheld abuse reports, confirmed pretenders) come from V, pro rata when over-subscribed; unused V returns to the players. Quarantined weight earns nothing and is forfeited to honest players pro rata at finalization. Cents split by largest remainder: pools sum exactly to R.",
     inputs: { R, nextContest, operatorShare: share, blockBonus: config.blockBonus, closesAt: config.closesAt },
     pools: money
-      ? { R: rCents / 100, P: pCents / 100, O: oCents / 100, W: (pCents - oCents) / 100, nextContest: nextCents / 100, operatorUnallocated: (oCents - paidOCents) / 100 }
+      ? {
+          R: rCents / 100,
+          P: pCents / 100,
+          O: oCents / 100,
+          W: (pCents - oCents - vCents) / 100,
+          V: vCents / 100,
+          nextContest: nextCents / 100,
+          operatorUnallocated: (oCents - paidOCents) / 100,
+          reserveUnused: unusedVCents / 100,
+        }
       : null,
     pledge: config.pledge,
     operatorShareOfParticipants: share,
     operatorShareNote: share === null ? "not set" : `${share * 100}% of the participants' share`,
-    players: weighed.map((p, i) => ({
-      ...p,
+    players: [...weighed, ...extras].map((p, i) => ({
+      xId: p.xId,
+      handle: p.handle,
+      workshares: p.workshares,
+      builds: p.builds,
+      weight: p.weight,
+      fixed: p.fixed,
+      n: p.n,
+      quarantined: p.quarantined,
       shareOfW: wTotal === 0 ? 0 : Math.round((p.weight / wTotal) * 10000) / 10000,
-      amount: money ? playerCents[i] / 100 : null,
+      amount: money ? (i < playerCents.length ? playerCents[i] / 100 : 0) : null,
+      bounty: money ? (bountyByReporter.get(p.xId) ?? 0) / 100 : null,
     })),
     nodes: nodes.map((n, i) => ({
       nodeId: n.nodeId,
@@ -465,16 +757,21 @@ export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConf
       weight: Math.round(n.weight * 10000) / 10000,
       n: n.capped ? Math.min(countAttributionsTo(events, n.nodeId), config.producerNode.maxPlayers) : n.attributedPlayers,
       capped: n.capped,
+      authorized: n.authorized,
+      suspended: n.suspended,
+      quarantined: n.quarantined,
       shareOfO: oTotal === 0 ? 0 : Math.round((n.weight / oTotal) * 10000) / 10000,
       amount: money ? nodeCents[i] / 100 : null,
     })),
+    quarantine: { playerWeight: heldPlayerWeight, nodeWeight: heldNodeWeight },
     totals: money
       ? {
           players: wCents / 100,
           nodes: paidOCents / 100,
+          bounties: paidVCents / 100,
           nextContest: nextCents / 100,
           unallocated: unallocatedCents / 100,
-          sum: (wCents + paidOCents + nextCents + unallocatedCents) / 100,
+          sum: (wCents + paidOCents + paidVCents + nextCents + unallocatedCents) / 100,
         }
       : null,
   };
@@ -579,5 +876,73 @@ export function deriveSettlement(events: readonly RoomEvent[], config: WorkshopC
     closesAt: config.closesAt,
     note: "Obligations only. Nothing here executes transfers.",
     operators: [...byOperator.values()].sort((a, b) => a.operatorHandle.localeCompare(b.operatorHandle)),
+  };
+}
+
+export interface SettlementSnapshot {
+  formula: string;
+  inputs: {
+    R: number | null;
+    nextContest: number;
+    operatorShare: number | null;
+    validationReserve: number;
+    blockBonus: number;
+    closesAt: string;
+    prizeOutcome: "pending" | "won" | "lost";
+    players: Array<{ xId: string; weight: number; quarantined: boolean; bounty: number | null }>;
+    nodes: Array<{ nodeId: string; weight: number; quarantined: boolean }>;
+    claims: BountyClaim[];
+  };
+  operators: OperatorSettlement[];
+  hash: string;
+}
+
+/** The proposed settlement: formula, every input, amounts owed, and their hash. Anyone re-derives it from the log and compares hashes. */
+export function settlementSnapshot(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): SettlementSnapshot {
+  const rewards = deriveRewards(events, config, nowMs);
+  const settlement = deriveSettlement(events, config, nowMs);
+  const formula = rewards.formula;
+  const inputs: SettlementSnapshot["inputs"] = {
+    R: config.rewardAmount,
+    nextContest: config.pledge.ifWin.nextContest,
+    operatorShare: config.pledge.nodeOperatorShareOfParticipants,
+    validationReserve: config.validationReserve,
+    blockBonus: config.blockBonus,
+    closesAt: config.closesAt,
+    prizeOutcome: config.pledge.prizeOutcome,
+    players: rewards.players.map((p) => ({ xId: p.xId, weight: p.weight, quarantined: p.quarantined, bounty: p.bounty })),
+    nodes: rewards.nodes.map((n) => ({ nodeId: n.nodeId, weight: n.weight, quarantined: n.quarantined })),
+    claims: deriveBountyClaims(events, config),
+  };
+  const hash = sha256(canonical({ formula, inputs, operators: settlement.operators }));
+  return { formula, inputs, operators: settlement.operators, hash };
+}
+
+export interface SettlementPhase {
+  phase: "open" | "proposed" | "challenged" | "final";
+  closed: boolean;
+  proposal: { hash: string; at: string; windowEndsAt: string } | null;
+  finalized: { hash: string; at: string } | null;
+  openChallenges: string[];
+  settlement: SettlementView;
+}
+
+/** Settlement with its lifecycle: proposed at close, challenged in the window, final when the window ends with all resolved. */
+export function deriveSettlementPhase(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): SettlementPhase {
+  const proposals = events.filter((e) => e.type === "settlement.proposed");
+  const latest = proposals.at(-1)?.payload as { hash: string; at: string } | undefined;
+  const fin = events.find((e) => e.type === "settlement.finalized")?.payload as { hash: string; at: string } | undefined;
+  const resolved = new Set(events.filter((e) => e.type === "challenge.resolved").map((e) => (e.payload as any).id as string));
+  const open = events
+    .filter((e) => e.type === "challenge.filed" && !resolved.has((e.payload as any).id as string))
+    .map((e) => (e.payload as any).id as string);
+  const closed = nowMs >= Date.parse(config.closesAt);
+  return {
+    phase: fin ? "final" : !latest ? "open" : open.length ? "challenged" : "proposed",
+    closed,
+    proposal: latest ? { hash: latest.hash, at: latest.at, windowEndsAt: new Date(Date.parse(latest.at) + config.challengeWindowDays * 86_400_000).toISOString() } : null,
+    finalized: fin ? { hash: fin.hash, at: fin.at } : null,
+    openChallenges: open,
+    settlement: deriveSettlement(events, config, nowMs),
   };
 }
