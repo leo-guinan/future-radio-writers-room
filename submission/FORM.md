@@ -14,7 +14,9 @@ Meta Global AI Developer Hackathon. Deadline: Nov 4, 2026, 9:00 PM ET.
 
 ### If you're competing for the Most Viral Track, please submit your X post link here
 
-*(Leave blank: we are not competing in that track.)*
+**Link to the X post of *Second Take*** (`submission/second-take/second-take.mp4`). We are
+entering this prize: the post is the revised take of our demo, and it asks the audience for the
+next note and for who to make an episode for.
 
 ### Project Description
 
@@ -54,6 +56,11 @@ monitor:
 - 17/17 acceptance tests pass;
 - three live comparison frames are served.
 
+After submitting, we gave our own demo notes. HumAIn OS turned Leonardo's spoken note into 3
+validated cut edits with Muse Spark, reused all 48 voice lines and re-rendered only the changed
+chunks: about 5 minutes from note to take 2, instead of a new episode. That is *Second Take*
+(`submission/second-take/`), our Most Viral post.
+
 Human impact so far: Future Radio made an episode about an artist (@strangestloop) and his public
 call for help. His response: "I just watched historical artists discuss my whole deal… it's great
 to see how the technology has advanced." Evidence is in `submission/IMPACT.md`.
@@ -88,7 +95,10 @@ Meta tooling is used at three layers.
      change contract with acceptance tests. Code enforces the contract; it is not trusted as prose.
    - In live mode, if Meta's APIs are unavailable the run fails visibly instead of swapping in
      mocks.
-3. **Built by itself.** Two of the commits came from HumAIn OS sessions running on Meta models,
+3. **The same loop on our own demo.** Muse Code built a cut-revision mode in about 14 minutes
+   (5 commits, 9 tests). Spark then used it live: from Leonardo's spoken note on our first cut to
+   3 schema-valid edits, 11/11 acceptance checks and take 2 (`submission/second-take/`).
+4. **Built by itself.** Two of the commits came from HumAIn OS sessions running on Meta models,
    which changed HumAIn OS's own code during development. The changes were visit classification
    and frame totals.
 

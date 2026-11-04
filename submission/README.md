@@ -12,6 +12,8 @@
 - **How it was built:** [`BUILT_WITH.md`](BUILT_WITH.md). Meta's Muse Code harness (on
   `muse-spark-1.3-contributor`) wrote every HumAIn OS commit. The session export is public at
   [meta-hackathon-proof-of-work](https://github.com/leo-guinan/meta-hackathon-proof-of-work).
+- **Second Take (Most Viral post):** [`second-take/`](second-take/). The demo, revised live by
+  Muse Spark from a spoken note, with its evidence.
 - **Human impact:** [`IMPACT.md`](IMPACT.md). An artist felt seen by a Future Radio episode about
   his work.
 - **Form answers:** [`FORM.md`](FORM.md). Indie track; Build for Your World.
