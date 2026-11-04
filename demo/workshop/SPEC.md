@@ -401,3 +401,70 @@ publicly with `flag.resolved {upheld|cleared, note}`.
 - an accepted challenge re-proposes the settlement;
 - finalize is refused before the window ends;
 - every amount still sums exactly to `R`.
+
+---
+
+# v6: the referee registry (real referees vs pretenders)
+
+A **referee** is an authorized validator node, or its operator. Anyone can claim to be one; the
+system decides who actually is.
+
+## Root of trust
+
+- The coordinator holds a **registry key** (Ed25519).
+- Its public key is **pinned in the first post of the thread** and in `demo/workshop/config.json`.
+  Nodes refuse to serve a registry whose signature doesn't verify against that pinned key.
+
+## The registry
+
+`GET /api/workshop/referees` returns `{entries, seq, signature}`. Each entry is:
+
+```json
+{ "nodeId": "...", "fingerprint": "...", "operatorXId": "...", "operatorHandle": "...",
+  "authorizedBy": "<thread reply URL>", "status": "authorized|suspended|revoked",
+  "audit": {"lastPass": "...", "passRate24h": 0.0} }
+```
+
+- An entry is created only by `node.authorized` (v5: the operator posted the fingerprint in the
+  thread, and oEmbed confirmed the author).
+- Status changes come only from logged audit results, or from a producer `node.revoked` with a
+  stated reason.
+- Every node mirrors the signed registry, so a referee can be checked against any node, not just
+  the coordinator.
+
+## Checking a referee
+
+`GET /api/workshop/referees/check?q=<handle | nodeId | fingerprint | node URL>` returns one of:
+
+- `AUTHORIZED`;
+- `SUSPENDED` (failing audits);
+- `REVOKED`;
+- `NOT_AUTHORIZED` (no registry entry).
+
+It always gives the reason and the evidence links (the authorization reply, the audit records). The
+MCP tool is `check_referee(q)`, and every node page shows a **referee badge**: the fingerprint, the
+status, and a link that re-checks it live.
+
+## Pretenders
+
+- Any account that claims in the thread to be a node, validator or referee, but has no registry
+  entry, can be reported with `POST /api/workshop/pretenders {url}`.
+- The coordinator checks the reply's author via oEmbed and the registry, then records
+  `pretender.confirmed {url, authorHash}`.
+- What happens to a confirmed pretender:
+  - recruit links that point at an unregistered node earn **no operator credit**, though those
+    players still play;
+  - the referee who reported it earns `pretenderBountyPoints` from the validation reserve;
+  - confirmed pretenders are listed by the reply URL and the fact "not an authorized referee".
+    No accusation is made beyond that fact.
+- **A pretender can become real.** Run a node, post the fingerprint, pass audits. An appeal
+  (`flag.appealed`) clears the listing once the account is authorized.
+
+## Tests
+
+- A registry with a bad signature is refused by nodes.
+- `check` returns each of the four statuses, with evidence.
+- A pretender report is confirmed only when the author is not in the registry.
+- The bounty is paid from the reserve.
+- An unregistered node earns no operator credit.
+- A pretender who becomes authorized is cleared.
