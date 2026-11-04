@@ -23,12 +23,21 @@
   #events { font-family: monospace; font-size: .8rem; max-height: 260px; overflow: auto; }
   .winbtn[aria-pressed="true"] { outline: 2px solid #d8b25c; }
   input[type="number"] { width: 7rem; }
+  #cutBanner { font-size: 1.4rem; }
+  .big { font-size: 28px; line-height: 1.45; }
+  .big .reuse { font-weight: bold; }
+  .big ul { list-style: none; padding-left: 0; }
+  .big li { border-bottom: 1px solid #333; padding: .45rem 0; }
+  .big .op { font-family: monospace; }
+  .big .pass { color: #7dd87d; }
+  .big .fail { color: #e5484d; }
 </style>
 </head>
 <body>
 <main>
   <p><a href="/">&larr; writers' room</a></p>
   <h1>HumAIn OS <span class="muted">prototype: spoken idea &rarr; costed, executable plan</span></h1>
+  <p id="cutBanner" hidden></p>
 
   <section class="card" id="setup">
     <h2>1. Human input window</h2>
@@ -97,6 +106,14 @@
     <table id="results"><thead><tr><th>Task</th><th>Status</th><th>Evidence</th><th>Cost</th></tr></thead><tbody></tbody></table>
     <p id="artifact"></p>
     <p id="ledgerLine"></p>
+  </section>
+
+  <section class="card" id="reviseCard" hidden>
+    <h2>Revision results</h2>
+    <p id="reuseLine" class="big"></p>
+    <div id="editRows" class="big"></div>
+    <h3>Acceptance</h3>
+    <div id="acceptRows" class="big"></div>
   </section>
 
   <section class="card" id="replayCard" hidden>

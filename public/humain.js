@@ -11,6 +11,22 @@ let mediaStream = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let lastState = null;
+let lastRevKey = null;
+const cutEpisode = new URLSearchParams(location.search).get("cut");
+
+// Revise mode: the session targets a cut file, not a frame.
+async function loadCutBanner() {
+  if (!cutEpisode) return;
+  try {
+    const c = await api(`/api/humain/cuts/${encodeURIComponent(cutEpisode)}`);
+    $("cutBanner").innerHTML = `Revising: ${escapeHtml(c.title)}, take ${c.take} <span class="muted">(${c.lines} voice lines)</span> <a href="${escapeHtml(c.roughCutUrl)}" target="_blank">rough cut</a>`;
+    $("cutBanner").hidden = false;
+  } catch (e) {
+    $("cutBanner").textContent = `Cannot revise ${cutEpisode}: ${e.message}`;
+    $("cutBanner").hidden = false;
+  }
+}
+loadCutBanner();
 
 for (const b of document.querySelectorAll(".winbtn")) {
   b.addEventListener("click", () => {
@@ -38,7 +54,7 @@ function mmss(ms) {
 
 $("open").addEventListener("click", async () => {
   try {
-    const s = await api("/api/humain/sessions", "POST", { inputWindowMin: windowMin, saveTranscript: $("saveTranscript").checked, reserveMin: Number($("reserveMin").value) });
+    const s = await api("/api/humain/sessions", "POST", { inputWindowMin: windowMin, saveTranscript: $("saveTranscript").checked, reserveMin: Number($("reserveMin").value), ...(cutEpisode ? { cut: cutEpisode } : {}) });
     sessionId = s.sessionId;
     $("sessionLabel").textContent = `Session ${sessionId} · ${windowMin} min window · transcript ${s.transcriptSaved ? "saved" : "memory-only"}`;
     $("capture").hidden = false;
@@ -101,6 +117,10 @@ function render(s) {
       `<p><strong>Acceptance (${c.acceptance.length}):</strong></p><ul>${c.acceptance.map((a) => `<li>${a.id}: ${escapeHtml(a.description)}</li>`).join("")}</ul>` +
       `<p><strong>Limits:</strong> ceiling ${c.limits.spendCeilingUsd === null ? "unset" : "$" + c.limits.spendCeilingUsd} · compute ${c.limits.computeDeadlineSecs === null ? "unset" : c.limits.computeDeadlineSecs + "s"}</p>`;
   }
+  if (s.cut && s.plan) {
+    const key = `${s.plan.tasks.length}/${s.results.length}/${s.terminal ? s.terminal.reason : ""}`;
+    if (key !== lastRevKey) { lastRevKey = key; loadRevision(); }
+  }
   if (s.frames && s.frames.length) loadFrames();
   if (s.approval) {
     $("approveCard").querySelector("button").disabled = true;
@@ -135,6 +155,17 @@ async function loadFrames() {
 }
 $("refreshFrames").addEventListener("click", loadFrames);
 loadFrames();
+
+async function loadRevision() {
+  if (!sessionId) return;
+  try {
+    const r = await api(`/api/humain/sessions/${sessionId}/revision`);
+    $("reviseCard").hidden = false;
+    $("reuseLine").innerHTML = `<span class="reuse">${escapeHtml(r.reuseLine)}</span> <span class="muted">take ${r.take} &rarr; ${r.nextTake}</span>`;
+    $("editRows").innerHTML = "<ul>" + r.edits.map((e) => `<li><span class="op">${escapeHtml(e.op)}</span> &middot; ${escapeHtml(e.target)} &middot; ${escapeHtml(e.why)} <span class="muted">(${escapeHtml(e.fixes)})</span></li>`).join("") + "</ul>";
+    $("acceptRows").innerHTML = "<ul>" + r.acceptance.map((a) => `<li><span class="${a.pass ? "pass" : "fail"}">${a.pass ? "✓" : "✗"}</span> ${escapeHtml(a.description)} <span class="muted">${escapeHtml(a.detail || "")}</span></li>`).join("") + "</ul>";
+  } catch (e) { /* revision not ready yet; next render retries on change */ }
+}
 
 async function loadReplay() {
   const events = await api(`/api/humain/sessions/${sessionId}/events`);
