@@ -225,3 +225,81 @@ How each pool is paid:
 - The void removes the workshare's weight.
 - The sqrt node weight and the uptime threshold are applied.
 - The pool arithmetic sums exactly to `R`.
+
+---
+
+# v3: the producer's node is n = 1
+
+Leo runs a basic node and does not recruit. His node admits exactly one player, himself, and his
+weight is fixed. Every other share of the player pool is earned by engagement.
+
+## Config (`demo/workshop/config.json`)
+
+```json
+{ "producerNode": { "nodeId": "producer", "allow": ["<Leo's X user id>"], "maxPlayers": 1,
+                    "fixedPlayerWeight": 1, "operatorWeight": 1 },
+  "noViaPolicy": "reject" }
+```
+
+## Rules
+
+- **Only Leo can sign in through the producer node.** A sign-in through it (or through the
+  coordinator, if Leo hosts that) by any account not in `allow` is refused with `403
+  sign_in_through_a_community_node`. The response lists the registered community nodes with their
+  sign-in links, so the refusal points people to nodes run by others.
+- **Signing in with no node.** `noViaPolicy: "reject"` (the default) refuses a sign-in that names no
+  node, in the same way. `"unassigned"` lets the player in and attributes them to no node: they earn
+  as players, but no operator earns for them. Switch to it only if there are no community nodes yet.
+- **Leo's player weight is always `fixedPlayerWeight` (1).** It does not depend on how many
+  workshares he submits, how many builds he gets, or how many votes he receives. He can still play;
+  it just never raises his weight.
+- **The producer node's operator weight is always `operatorWeight` (1)**, which equals
+  `sqrt(1)`. Its uptime still has to meet the 50% threshold.
+- **Every other player's weight is earned:** counted workshares + `blockBonus` × builds, exactly as
+  in v2.
+
+## What the API and MCP show
+
+- `GET /api/workshop/rewards` and the MCP tool `rewards()` show the producer row explicitly, with
+  `weight: 1 (fixed)` and `n: 1`, so anyone can check Leo isn't taking more than one share.
+- `node_standings()` lists the producer node with `n = 1 (capped)`.
+
+## Tests (added)
+
+- A second account signing in through the producer node is refused, and the response lists the
+  community nodes.
+- With `noViaPolicy` set to `reject`, a sign-in with no node is refused. With `unassigned`, the
+  player is admitted with no operator credit.
+- Leo's weight stays 1 after he submits many workshares and has a build.
+- The producer node's operator weight stays 1.
+- Pool arithmetic still sums exactly to `R`, with the producer included.
+
+---
+
+# v4: energy-bound nodes (see `EXPERIMENT.md`)
+
+- **`POST /api/workshop/nodes/register`** gains new fields:
+  - `energy: {watts, source, evidenceUrl, budgetWh}`;
+  - `payout: {qi, quai, fiat, schedule}`, where the three fractions sum to 1 and `schedule` is one
+    of `now`, `lump_at:<ISO date>` or `stream:<n>x<P1D|P7D|P30D>`.
+
+  The body is signed with the node key.
+- **`POST /api/workshop/nodes/payout`** sets `payout.profile.set` (auth, signed). It is final at close.
+- **Hourly derived `energy.receipt` per node:** Wh = watts × hours up (from verified heartbeats),
+  plus the work counts. The receipt is derived and then **appended** to the log, so it is fixed at
+  creation.
+- **Energy TTL.** A node's lease ends when its receipted Wh reaches `budgetWh` (`node.lease.ended`,
+  reason `energy_budget`) or when the event closes.
+- **Generation requests are priced in workshares.** `POST /api/workshop/generate {ideaId}` spends
+  `generateCostWorkshares` (in config) from the requester's counted workshares. It never charges
+  money.
+- **`GET /api/workshop/settlement`** returns, per operator: the computed share, the payout profile,
+  and the schedule rendered as dated amounts. Until the prize outcome is known it is labelled
+  `obligation`, never `paid`. Nothing executes transfers.
+- **MCP:** add `energy_receipts(node)` and `settlement()`.
+- **Tests:**
+  - payout fractions must sum to 1;
+  - the energy-budget TTL ends the lease;
+  - receipt Wh comes from heartbeats only, never from claims;
+  - spending workshares on generation reduces player weight correctly;
+  - settlement is reproducible from the log on a node.
