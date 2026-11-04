@@ -49,6 +49,13 @@ async function loadStatus() {
       ? `Projected split · prize ${rw.prizeOutcome} · operator share: ${rw.operatorShareNote}`
       : `Final split · prize ${rw.prizeOutcome} · operator share: ${rw.operatorShareNote}`;
   }
+  const stl = await api("/api/workshop/settlement").catch(() => null);
+  if (stl && stl.phase !== "open") {
+    const extra = stl.phase === "final"
+      ? ` · settlement FINAL (${stl.finalized.hash.slice(0, 12)})`
+      : ` · settlement ${stl.phase} · window ends ${stl.proposal.windowEndsAt} · ${stl.openChallenges.length} open challenges`;
+    $("rewardsLine").textContent += extra;
+  }
 }
 
 async function loadMe() {
@@ -100,18 +107,26 @@ async function loadScoreboard() {
   ).join("") || `<tr><td colspan="7" class="muted">Nobody scored yet.</td></tr>`;
 }
 
+function badge(n) {
+  // Referee badge: fingerprint, status, and a link that re-checks it live.
+  if (!n.authorized) return `<span class="badge unauthorized">unauthorized</span>`;
+  if (n.revoked) return `<span class="badge revoked">REVOKED</span>`;
+  if (n.suspended) return `<a class="badge suspended" href="/api/workshop/referees/check?q=${encodeURIComponent(n.nodeId)}">SUSPENDED · re-check</a>`;
+  return `<a class="badge" href="/api/workshop/referees/check?q=${encodeURIComponent(n.nodeId)}" title="${esc(n.authorizedBy || "")}">referee · re-check</a>`;
+}
+
 async function loadNodes() {
   const nodes = await api("/api/workshop/nodes");
   $("nodes").querySelector("tbody").innerHTML = nodes.map((n) =>
-    `<tr><td>${esc(n.nodeId)}</td><td>${esc(n.operatorHandle)}</td><td>${n.up ? "yes" : "no"}</td><td>${n.upHours} (${n.upMinutes}m)</td><td>${esc(n.lastHeartbeat || "—")}</td></tr>`
-  ).join("") || `<tr><td colspan="5" class="muted">No nodes yet.</td></tr>`;
+    `<tr><td>${esc(n.nodeId)}</td><td>${esc(n.operatorHandle)}</td><td>${n.up ? "yes" : "no"}</td><td>${n.upHours} (${n.upMinutes}m)</td><td>${esc(n.lastHeartbeat || "—")}</td><td>${badge(n)}</td></tr>`
+  ).join("") || `<tr><td colspan="6" class="muted">No nodes yet.</td></tr>`;
 }
 
 $("submitIdea").addEventListener("click", async () => {
   const msg = $("ideaMsg");
   msg.className = "";
   try {
-    const r = await api("/api/workshop/ideas", "POST", { kind: $("kind").value, title: $("title").value, pitch: $("pitch").value, incentive: $("incentive").value });
+    const r = await api("/api/workshop/ideas", "POST", { kind: $("kind").value, title: $("title").value, pitch: $("pitch").value, incentive: $("incentive").value, website: $("website").value });
     msg.className = "ok";
     msg.textContent = `Submitted ${r.id}.`;
     $("title").value = $("pitch").value = $("incentive").value = "";

@@ -40,13 +40,58 @@ DATA_DIR=./node-data npm run workshop:node -- --upstream http://localhost:8787 -
 One command. The node verifies the upstream chain first and refuses to serve
 if it does not verify. It re-pulls every 15 s and heartbeats every 60 s.
 
+## 3. Earn the right to recruit
+
+Registration alone earns nothing. Post a reply in the workshop thread
+containing your node's key fingerprint, then authorize:
+
+```bash
+# Your fingerprint (sha256 of your node key's JWK; print it from node-data/workshop/node-key.json).
+# Post it in a thread reply, then:
+curl -X POST http://localhost:8787/api/workshop/nodes/N-0001/authorize \
+  -H 'content-type: application/json' \
+  -H 'cookie: workshop_session=PASTE_YOURS' \
+  -d '{"url":"https://x.com/YOU/status/REPLY_ID"}'
+```
+
+The coordinator checks the reply through oEmbed: the author must be you and
+the text must contain the fingerprint. Players through unauthorized nodes
+still play and earn, but the node gets no operator credit for them.
+
+## 4. Stay honest: audits, flags, settlement
+
+- **Spot checks.** About hourly, the coordinator challenges your node: the
+  signed hash of a random event plus your chain head, within 10 s. Your node
+  answers automatically. Uptime only counts while audits pass; three straight
+  failures suspend your operator credit until you pass again.
+- **Peer audits.** Any node can challenge any other the same way. A correct
+  report of a failing node earns a bounty from the validation reserve (5% of
+  the participants' pool; unused returns to the players).
+- **Gaming.** Bursts, fake-account clusters, and audit-fail-while-growing
+  raise public (pseudonymous) flags. Flagged weight is quarantined, and at
+  finalization it is forfeited to the honest players — plus a bounty to whoever
+  reported it. If you are flagged, sign in and appeal; the producer resolves
+  every appeal in public.
+- **Settlement is proposed, then challenged, then final.** At close the
+  coordinator proposes the settlement with its hash. For 14 days anyone can
+  re-derive it from the log and file challenges; accepted challenges that
+  change amounts re-propose. Finalization needs the window ended and every
+  challenge resolved. Obligations only — nothing executes transfers.
+- **Referee registry.** Authorized nodes appear in the signed registry at
+  `GET /api/workshop/referees`; check anyone with
+  `/api/workshop/referees/check?q=<handle|node|fingerprint|url>`. Claiming to
+  be a referee without an entry can be reported (`POST /pretenders`) and earns
+  the reporter a bounty. Pretenders go legit the same way you did: run a node,
+  post the fingerprint, pass audits.
+
 ## What operators earn
 
 - Players who sign in through your node's page are attributed to your node
   (first binding is permanent; your own account never counts toward it).
-- Your node's weight is `sqrt(attributed players)`, counted only while its
-  uptime is at least 50% of the window since it registered. The square root
-  gives diminishing returns: many mid-sized neighborhoods out-earn one giant.
+- Your node's weight is `sqrt(attributed players)`, counted only while it is
+  authorized, unsuspended, unflagged, and its uptime is at least 50% of the
+  window since it registered. The square root gives diminishing returns: many
+  mid-sized neighborhoods out-earn one giant.
 - Rewards come from the pledge: if Future Radio wins the Most Viral prize, the
   participants' share (50%) splits into a player pool and an operator pool
   (`nodeOperatorShareOfParticipants`, set by the producer before nodes are

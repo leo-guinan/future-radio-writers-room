@@ -26,6 +26,10 @@
   .flag { display: inline-block; padding: .1rem .5rem; border: 1px solid #d8b25c; border-radius: 999px; font-size: 1rem; color: #d8b25c; }
   .err { color: #e5484d; }
   .ok { color: #7dd87d; }
+  .hp { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+  .badge { display: inline-block; padding: .1rem .5rem; border: 1px solid #7dd87d; border-radius: 999px; font-size: .85rem; color: #7dd87d; }
+  .badge.suspended, .badge.revoked { border-color: #e5484d; color: #e5484d; }
+  .badge.unauthorized { border-color: #888; color: #888; }
 </style>
 </head>
 <body>
@@ -47,6 +51,7 @@
     <p><label>Title (80)<br><input type="text" id="title" maxlength="80"></label></p>
     <p><label>Pitch (500)<br><textarea id="pitch" maxlength="500"></textarea></label></p>
     <p><label>Incentive (200)<br><input type="text" id="incentive" maxlength="200"></label></p>
+    <p class="hp" aria-hidden="true"><label>Website<br><input type="text" id="website" tabindex="-1" autocomplete="off"></label></p>
     <div class="row"><button id="submitIdea">Submit idea</button><span id="ideaMsg"></span></div>
     <p class="muted">Sign-in required. At most 3 ideas per player.</p>
   </section>
@@ -64,7 +69,7 @@
 
   <section class="card">
     <h2>Nodes</h2>
-    <table id="nodes"><thead><tr><th>Node</th><th>Operator</th><th>Up</th><th>Hours</th><th>Last beat</th></tr></thead><tbody></tbody></table>
+    <table id="nodes"><thead><tr><th>Node</th><th>Operator</th><th>Up</th><th>Hours</th><th>Last beat</th><th>Referee</th></tr></thead><tbody></tbody></table>
     <p class="muted">Run one: see docs/RUN_A_NODE.md in the repo.</p>
   </section>
 
