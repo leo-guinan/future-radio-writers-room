@@ -152,3 +152,76 @@ Every tool result carries `asOf` (event seq and time) and `closesAt`.
 - `docs/RUN_A_NODE.md`: one command, then what operators earn, and that rewards depend on the
   prize outcome or the Story.markets debt.
 - A `Dockerfile`.
+
+---
+
+# v2 (Fifth Take): node attribution, workshares, SOAP-style split, sharding
+
+These changes **supersede** the Agnolo score table and the reward projection above.
+
+## Attribution: players belong to the node they came through
+
+- Every node page links to the coordinator's sign-in as
+  `/api/workshop/auth/x/start?via=<nodeId>`. The `via` value travels inside the signed OAuth
+  `state`, so only the coordinator needs X credentials.
+- On a player's **first** successful sign-in, the coordinator appends `player.attributed
+  {player, nodeId}`. The binding is permanent.
+- If there is no `via`, or it names an unknown node, the player is attributed to `coordinator`.
+- An operator's own X account never counts toward their own node.
+
+## Workshares: every verified comment in the thread
+
+- A signed-in player submits the URL of a comment they posted:
+  `POST /api/workshop/workshares {url}`.
+- The coordinator verifies it with X's public oEmbed endpoint
+  (`https://publish.twitter.com/oembed?url=`), which needs no API keys:
+  - the `author_url` handle must equal the signed-in handle;
+  - the tweet's snowflake timestamp must fall between `opensAt` and `closesAt`;
+  - the same URL is never counted twice.
+- Thread membership is **asserted by the player and auditable**: the URL is in the public ledger.
+  The producer can void a workshare (`workshare.voided {url, reason}`).
+- Cap: `workshareCapPerDay` (default 5) counted workshares per player per ET day. Extra ones are
+  logged but not counted.
+
+## The split (inspired by Quai: workshares paid in proportion; SOAP routes outside value back in)
+
+Inputs:
+- `R`: the reward that comes in from outside the game. It is the prize if we win, or the same amount
+  booked as Story.markets debt if we don't.
+- `nextContest`: the share that seeds the next contest (0.5).
+- `operatorShare`: `nodeOperatorShareOfParticipants`, set by the producer. `null` means "not set".
+
+Pools:
+- Participants: `P = R × (1 − nextContest)`.
+- Operators: `O = P × operatorShare`.
+- Players: `W = P − O`.
+
+How each pool is paid:
+- **Players (`W`).** Pro rata by **weight** = counted workshares + `blockBonus` × builds. A build is
+  the "block": a player's idea that Future Radio actually made. `blockBonus` defaults to 10. So it
+  is not winner-take-all, and every counted workshare earns.
+- **Operators (`O`)**, which also rewards sharding. A node's weight is `sqrt(attributed players)`,
+  counted only if its uptime is at least 50% of the window since it registered. The square root
+  gives diminishing returns, so many mid-sized neighborhoods out-earn one giant one.
+- `GET /api/workshop/rewards` returns per-player and per-node projections, with the formula and every
+  input. It stays `projected` until `prizeOutcome` is set.
+
+## New and changed API / MCP
+
+- `POST /api/workshop/workshares` (auth).
+- `GET /api/workshop/workshares?player=`.
+- `GET /api/workshop/nodes/:id/players`, a count only, never a list of handles.
+- MCP tools:
+  - add `workshares(player)`;
+  - add `node_standings()`;
+  - `rewards()` now explains the formula.
+
+## Tests (added)
+
+- Attribution is first-binding-only, and the operator's own account is excluded.
+- oEmbed author mismatch is rejected (use a mocked fetch).
+- Out-of-window and duplicate URLs are rejected.
+- The daily cap is applied.
+- The void removes the workshare's weight.
+- The sqrt node weight and the uptime threshold are applied.
+- The pool arithmetic sums exactly to `R`.
