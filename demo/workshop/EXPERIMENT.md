@@ -59,6 +59,22 @@ lets it be paid later: the record is fixed and validated at creation.
 - **Players never need a wallet.** The game itself has no tokens, as Fifth Take says. Only node
   operators who choose a Qi/Quai payout give an address, and only at settlement.
 
+## Validation, gaming, and review before payout (spec v5)
+
+- **Validators are validated.**
+  - A node may recruit from the thread only after its operator posts the node's key fingerprint in
+    the thread from the linked X account.
+  - Every node is spot-checked hourly with a signed chain challenge, and nodes can audit each other.
+- **Gaming is expected.**
+  - It is detected by signals and canaries, and the flagged weight is quarantined, not deleted.
+  - Weight still quarantined at finalization is forfeited and goes to honest players, plus a bounty
+    to whoever caught it.
+- **Payouts are proposed, then reviewed.**
+  - At close a settlement is *proposed* with a hash.
+  - It stays open for community challenges until 14 days after the Most Viral result is announced,
+    so reality decides the outcome.
+  - Only then is it finalized and paid, from the prize or as the Story.markets debt.
+
 ## Success criteria (measured at close)
 
 1. The number of independent operators and nodes, and their cumulative receipted Wh.
