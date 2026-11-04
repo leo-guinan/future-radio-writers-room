@@ -75,7 +75,10 @@ export type EventType =
   | "workshop.build"
   | "workshop.node_registered"
   | "workshop.heartbeat"
-  | "workshop.closed";
+  | "workshop.closed"
+  | "player.attributed"
+  | "workshare.recorded"
+  | "workshare.voided";
 
 // ---------- Ideas: the central unit of the room ----------
 

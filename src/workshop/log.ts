@@ -27,8 +27,10 @@ export interface WorkshopCtx {
   now: () => number; // ms epoch; injected so tests freeze time
   mode: WorkshopMode;
   upstream?: string; // node mode: coordinator base URL
+  nodeId?: string; // node mode: this replica's registered id (for ?via= links)
   producerToken: string;
   verified?: () => boolean; // node mode: serve gate (false = refuse everything)
+  fetchImpl?: typeof fetch; // outbound HTTP (oEmbed, X); injected in tests
 }
 
 export const WORKSHOP_LOG_PATH = () => join(process.env.DATA_DIR ?? join(process.cwd(), "data"), "workshop", "events.jsonl");
@@ -195,6 +197,137 @@ export function verifyHeartbeatSig(publicKey: Record<string, unknown>, nodeId: s
   } catch {
     return false;
   }
+}
+
+/** A player's permanent node binding (first sign-in wins), or null if unbound. */
+export function attributionOf(store: EventStore, xId: string): string | null {
+  const e = store.all().find((e) => e.type === "player.attributed" && (e.payload as any).player === xId);
+  return e ? ((e.payload as any).nodeId as string) : null;
+}
+
+export function isKnownNode(store: EventStore, nodeId: string): boolean {
+  return store.all().some((e) => e.type === "workshop.node_registered" && (e.payload as any).nodeId === nodeId);
+}
+
+/**
+ * Bind a player to the node they came through. First binding only: later
+ * sign-ins keep the original. Missing/unknown via binds to "coordinator".
+ */
+export function attributePlayer(ctx: WorkshopCtx, xId: string, via: string | null): RoomEvent | null {
+  assertCoordinator(ctx);
+  assertOpen(ctx);
+  if (attributionOf(ctx.store, xId) !== null) return null;
+  const nodeId = via && isKnownNode(ctx.store, via) ? via : "coordinator";
+  return ctx.store.append("player.attributed", `x:${xId}`, { player: xId, nodeId }, "public", new Date(ctx.now()).toISOString());
+}
+
+// ---------------------------------------------------------------- workshares
+
+export const OEMBED_URL = "https://publish.twitter.com/oembed?url=";
+const SNOWFLAKE_EPOCH_MS = 1288834974657n; // X snowflake epoch
+
+export function tweetIdFromUrl(url: string): string | null {
+  const m = url.match(/\/status\/(\d+)/);
+  return m ? m[1] : null;
+}
+
+/** Snowflake id -> authored time (ms). BigInt: ids exceed double precision. */
+export function snowflakeTimeMs(tweetId: string): number | null {
+  try {
+    return Number((BigInt(tweetId) >> 22n) + SNOWFLAKE_EPOCH_MS);
+  } catch {
+    return null;
+  }
+}
+
+/** First path segment of an oEmbed author_url (its X handle), or null. */
+export function handleFromAuthorUrl(authorUrl: string): string | null {
+  try {
+    const seg = new URL(authorUrl).pathname.split("/").filter(Boolean)[0];
+    return seg ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const etDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
+export const etDay = (ms: number): string => etDayFmt.format(new Date(ms));
+
+export function voidedUrls(store: EventStore): Set<string> {
+  const out = new Set<string>();
+  for (const e of store.all()) if (e.type === "workshare.voided") out.add((e.payload as any).url);
+  return out;
+}
+
+/** Currently-counted workshares for a player on an ET day (voids excluded). */
+export function countedOnDay(store: EventStore, player: string, day: string): number {
+  const voided = voidedUrls(store);
+  return store
+    .all()
+    .filter((e) => e.type === "workshare.recorded" && (e.payload as any).player === player && (e.payload as any).day === day && (e.payload as any).counted && !voided.has((e.payload as any).url)).length;
+}
+
+export interface WorkshareInput {
+  player: string; // x id
+  handle: string; // signed-in handle (must author the comment)
+  url: string;
+}
+
+/**
+ * Record a comment workshare after oEmbed verification: author match, snowflake
+ * time in-window, never twice. Over the daily cap it is still logged, but not
+ * counted. Thread membership is asserted by the player; the URL is the audit.
+ */
+export async function addWorkshare(
+  ctx: WorkshopCtx,
+  input: WorkshareInput,
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<{ event: RoomEvent; counted: boolean; reason: string | null; tweetId: string; tweetedAt: string; day: string }> {
+  assertCoordinator(ctx);
+  assertOpen(ctx);
+  if (!hasPlayer(ctx.store, input.player)) throw new WorkshopError("not_a_player", "Sign in with X and verify before submitting workshares.", 403);
+  const url = input.url.trim();
+  const tweetId = tweetIdFromUrl(url);
+  if (!tweetId) throw new WorkshopError("bad_url", "Submit the URL of an X comment (…/status/<id>).", 400);
+  if (ctx.store.all().some((e) => e.type === "workshare.recorded" && (e.payload as any).url === url))
+    throw new WorkshopError("duplicate_workshare", "This URL was already submitted. Each comment counts once.", 409);
+  let meta: any;
+  try {
+    const res = await fetchImpl(`${OEMBED_URL}${encodeURIComponent(url)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    meta = await res.json();
+  } catch (e: any) {
+    throw new WorkshopError("oembed_failed", `X oEmbed verification failed: ${e?.message ?? e}`, 502);
+  }
+  const author = handleFromAuthorUrl(String(meta?.author_url ?? ""));
+  if (!author || author.toLowerCase() !== input.handle.toLowerCase())
+    throw new WorkshopError("author_mismatch", "That comment is not yours: its author does not match your X handle.", 403);
+  const tweetedMs = snowflakeTimeMs(tweetId);
+  const tweetedAt = tweetedMs === null ? null : new Date(tweetedMs).toISOString();
+  if (tweetedMs === null || tweetedMs < Date.parse(ctx.config.opensAt) || tweetedMs > Date.parse(ctx.config.closesAt))
+    throw new WorkshopError("out_of_window", "That comment was posted outside the workshop window.", 400);
+  const day = etDay(tweetedMs);
+  const counted = countedOnDay(ctx.store, input.player, day) < ctx.config.workshareCapPerDay;
+  const event = ctx.store.append(
+    "workshare.recorded",
+    `x:${input.player}`,
+    { url, player: input.player, handle: input.handle, tweetId, tweetedAt, day, counted },
+    "public",
+    new Date(ctx.now()).toISOString(),
+  );
+  return { event, counted, reason: counted ? null : "daily_cap", tweetId, tweetedAt: tweetedAt!, day };
+}
+
+/** The producer voids a workshare; its weight is gone (the history stays). */
+export function voidWorkshare(ctx: WorkshopCtx, v: { url: string; reason: string; by: string }): RoomEvent {
+  assertCoordinator(ctx);
+  assertOpen(ctx);
+  const url = v.url.trim();
+  if (!ctx.store.all().some((e) => e.type === "workshare.recorded" && (e.payload as any).url === url))
+    throw new WorkshopError("unknown_workshare", "No submitted workshare has that URL.", 404);
+  if (voidedUrls(ctx.store).has(url)) throw new WorkshopError("already_voided", "That workshare is already voided.", 409);
+  if (!v.reason.trim()) throw new WorkshopError("bad_void", "A reason is required.", 400);
+  return ctx.store.append("workshare.voided", v.by, { url, reason: v.reason.trim().slice(0, 500) }, "public", new Date(ctx.now()).toISOString());
 }
 
 export function addHeartbeat(ctx: WorkshopCtx, h: { nodeId: string; at: string; sig: string }): RoomEvent {

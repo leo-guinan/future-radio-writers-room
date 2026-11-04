@@ -111,6 +111,48 @@ export function deriveNodeUptime(events: readonly RoomEvent[], nodeId: string): 
   return { upMinutes: buckets.size, upHours: Math.floor(buckets.size / 60), lastHeartbeat: last };
 }
 
+/** First-binding-only attribution: player x id -> node id (or "coordinator"). */
+export function deriveAttribution(events: readonly RoomEvent[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const e of events) {
+    if (e.type !== "player.attributed") continue;
+    const a = e.payload as { player: string; nodeId: string };
+    if (!out.has(a.player)) out.set(a.player, a.nodeId);
+  }
+  return out;
+}
+
+export interface WorkshareView {
+  url: string;
+  player: string;
+  handle: string;
+  tweetId: string;
+  tweetedAt: string;
+  day: string; // ET day of the tweet
+  counted: boolean; // as recorded (cap applied at record time)
+  voided: boolean;
+  voidReason: string | null;
+  weight: number; // 1 when counted and not voided, else 0
+}
+
+export function deriveWorkshares(events: readonly RoomEvent[]): WorkshareView[] {
+  const voids = new Map<string, string>();
+  for (const e of events) {
+    if (e.type !== "workshare.voided") continue;
+    const v = e.payload as { url: string; reason: string };
+    if (!voids.has(v.url)) voids.set(v.url, v.reason);
+  }
+  const out: WorkshareView[] = [];
+  for (const e of events) {
+    if (e.type !== "workshare.recorded") continue;
+    const w = e.payload as { url: string; player: string; handle: string; tweetId: string; tweetedAt: string; day: string; counted: boolean };
+    if (out.some((x) => x.url === w.url)) continue; // first record wins; dupes never append
+    const voided = voids.has(w.url);
+    out.push({ ...w, voided, voidReason: voids.get(w.url) ?? null, weight: w.counted && !voided ? 1 : 0 });
+  }
+  return out;
+}
+
 export interface NodeView {
   nodeId: string;
   operator: string;
@@ -121,16 +163,31 @@ export interface NodeView {
   upHours: number;
   lastHeartbeat: string | null;
   up: boolean; // a heartbeat arrived within the window
+  registeredAt: string;
+  elapsedMinutes: number; // window minutes since registration (capped at close)
+  uptimePct: number; // upMinutes / elapsedMinutes (0 when nothing elapsed)
+  qualifies: boolean; // uptime at least 50%: earns operator weight
+  attributedPlayers: number; // bound players, operator's own account excluded
+  weight: number; // sqrt(attributedPlayers) when qualified, else 0
 }
 
 export function deriveNodes(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): NodeView[] {
   const players = derivePlayers(events, config);
+  const attribution = deriveAttribution(events);
+  const horizon = Math.min(nowMs, Date.parse(config.closesAt));
   const out: NodeView[] = [];
   for (const e of events) {
     if (e.type !== "workshop.node_registered") continue;
     const r = e.payload as { nodeId: string; operator: string; url: string; publicKey: Record<string, unknown> };
     if (out.some((n) => n.nodeId === r.nodeId)) continue;
     const { upMinutes, upHours, lastHeartbeat } = deriveNodeUptime(events, r.nodeId);
+    const elapsedMinutes = Math.max(0, Math.floor((horizon - Date.parse(e.ts)) / 60_000));
+    const uptimePct = elapsedMinutes === 0 ? 0 : upMinutes / elapsedMinutes;
+    const qualifies = uptimePct >= 0.5;
+    let attributedPlayers = 0;
+    for (const [player, nodeId] of attribution) {
+      if (nodeId === r.nodeId && player !== r.operator) attributedPlayers++; // never the operator's own account
+    }
     out.push({
       ...r,
       operatorHandle: players.get(r.operator)?.handle ?? r.operator,
@@ -138,6 +195,12 @@ export function deriveNodes(events: readonly RoomEvent[], config: WorkshopConfig
       upHours,
       lastHeartbeat,
       up: lastHeartbeat !== null && nowMs - Date.parse(lastHeartbeat) <= config.heartbeatWindowSecs * 1000,
+      registeredAt: e.ts,
+      elapsedMinutes,
+      uptimePct: Math.round(uptimePct * 10000) / 10000,
+      qualifies,
+      attributedPlayers,
+      weight: qualifies ? Math.sqrt(attributedPlayers) : 0,
     });
   }
   return out;
@@ -185,12 +248,26 @@ export function deriveScoreboard(events: readonly RoomEvent[], config: WorkshopC
   return entries;
 }
 
-export interface RewardSplit {
+export interface PlayerPayout {
   xId: string;
   handle: string;
-  points: number;
-  shareOfParticipants: number; // pro rata by points (0 when nobody scored)
-  operatorShare: number | null; // pro rata by uptime points, from the operator pool; null when share not set
+  workshares: number; // counted, unvoided
+  builds: number; // authored ideas Future Radio made
+  weight: number; // workshares + blockBonus × builds
+  shareOfW: number; // pro rata by weight
+  amount: number | null; // dollars; null until R and the operator share are set
+}
+
+export interface NodePayout {
+  nodeId: string;
+  operator: string;
+  operatorHandle: string;
+  attributedPlayers: number; // operator's own account excluded
+  uptimePct: number;
+  qualifies: boolean;
+  weight: number; // sqrt(attributedPlayers) when qualified
+  shareOfO: number; // pro rata by weight
+  amount: number | null; // dollars; null until R and the operator share are set
 }
 
 export interface StatusCtx {
@@ -199,6 +276,7 @@ export interface StatusCtx {
   now: () => number;
   mode: "coordinator" | "node";
   upstream?: string;
+  nodeId?: string;
   verified?: () => boolean;
 }
 
@@ -213,6 +291,7 @@ export interface StatusView {
   seq: number;
   mode: "coordinator" | "node";
   upstream?: string;
+  nodeId?: string | null; // null when the node is not registered yet
   verified?: boolean;
 }
 
@@ -239,43 +318,112 @@ export function deriveStatus(ctx: StatusCtx): StatusView {
     head: ctx.store.head,
     seq: events.length,
     mode: ctx.mode,
-    ...(ctx.mode === "node" ? { upstream: ctx.upstream, verified: ctx.verified ? ctx.verified() : false } : {}),
+    ...(ctx.mode === "node" ? { upstream: ctx.upstream, nodeId: ctx.nodeId ?? null, verified: ctx.verified ? ctx.verified() : false } : {}),
   };
 }
 
 export interface RewardsView {
   status: "projected" | "final";
   prizeOutcome: "pending" | "won" | "lost";
+  formula: string;
+  inputs: { R: number | null; nextContest: number; operatorShare: number | null; blockBonus: number; closesAt: string };
+  pools: { R: number; P: number; O: number; W: number; nextContest: number; operatorUnallocated: number } | null;
   pledge: WorkshopConfig["pledge"];
   operatorShareOfParticipants: number | null;
   operatorShareNote: string; // "not set" when null, never 0
-  operatorPool: number | null; // fraction of the prize reserved for operators
-  splits: RewardSplit[];
+  players: PlayerPayout[];
+  nodes: NodePayout[];
+  totals: { players: number; nodes: number; nextContest: number; unallocated: number; sum: number } | null;
+}
+
+/** Split integer cents pro rata by weight (largest remainder: the sum is exact). */
+function splitCents(totalCents: number, weights: number[]): number[] {
+  const total = weights.reduce((s, w) => s + w, 0);
+  if (totalCents <= 0 || total <= 0) return weights.map(() => 0);
+  const raw = weights.map((w) => (totalCents * w) / total);
+  const floors = raw.map(Math.floor);
+  let left = totalCents - floors.reduce((s, c) => s + c, 0);
+  const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (const [, i] of order) {
+    if (left <= 0) break;
+    floors[i]++;
+    left--;
+  }
+  return floors;
 }
 
 /**
- * Projected split from the scores: participants pro rata by points, operators
- * paid from their share pro rata by uptime. Projected until won/lost.
+ * v2 split (supersedes the v1 score-based projection). R comes from outside:
+ * the prize if we win, the same amount as Story.markets debt if we don't.
+ * P = R×(1−nextContest); O = P×operatorShare; W = P−O. Players earn W pro rata
+ * by workshare weight; qualifying nodes earn O pro rata by sqrt weight. Money
+ * is split in integer cents so the pools sum exactly to R.
  */
-export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConfig): RewardsView {
-  const board = deriveScoreboard(events, config);
-  const total = board.reduce((s, r) => s + r.points, 0);
-  const totalUptime = board.reduce((s, r) => s + r.breakdown.uptime, 0);
+export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): RewardsView {
+  const R = config.rewardAmount;
+  const nextContest = config.pledge.ifWin.nextContest;
   const share = config.pledge.nodeOperatorShareOfParticipants;
-  const participantsPool = config.pledge.ifWin.participants;
+  const workshares = deriveWorkshares(events);
+  const builds = deriveBuilds(events);
+  const ideas = events.filter((e) => e.type === "workshop.idea").map((e) => e.payload as { id: string; author: string });
+  const builtByAuthor = new Map<string, number>();
+  for (const i of ideas) if (builds.has(i.id)) builtByAuthor.set(i.author, (builtByAuthor.get(i.author) ?? 0) + 1);
+  const players = derivePlayers(events, config);
+  const weighed = [...players.values()].map((p) => {
+    const ws = workshares.filter((w) => w.player === p.xId).reduce((s, w) => s + w.weight, 0);
+    const b = builtByAuthor.get(p.xId) ?? 0;
+    return { xId: p.xId, handle: p.handle, workshares: ws, builds: b, weight: ws + config.blockBonus * b };
+  });
+  const wTotal = weighed.reduce((s, p) => s + p.weight, 0);
+  const nodes = deriveNodes(events, config, nowMs);
+  const oTotal = nodes.reduce((s, n) => s + n.weight, 0);
+
+  const money = R !== null && share !== null;
+  const rCents = money ? Math.round(R! * 100) : 0;
+  const pCents = money ? Math.round(rCents * (1 - nextContest)) : 0;
+  const oCents = money ? Math.round(pCents * share!) : 0;
+  const playerCents = money ? splitCents(pCents - oCents, weighed.map((p) => p.weight)) : weighed.map(() => 0);
+  const nodeCents = money ? splitCents(oCents, nodes.map((n) => n.weight)) : nodes.map(() => 0);
+  const wCents = playerCents.reduce((s, c) => s + c, 0);
+  const paidOCents = nodeCents.reduce((s, c) => s + c, 0);
+  const nextCents = rCents - pCents; // the next contest is a fixed share, never a residual
+  const unallocatedCents = pCents - wCents - paidOCents; // pool money with no earners yet
+
   return {
     status: config.pledge.prizeOutcome === "pending" ? "projected" : "final",
     prizeOutcome: config.pledge.prizeOutcome,
+    formula: "P = R×(1−nextContest); O = P×operatorShare; W = P−O. Players earn W pro rata by weight = counted workshares + blockBonus×builds. Qualifying nodes (uptime ≥50%) earn O pro rata by weight = sqrt(attributed players, operator excluded). Cents split by largest remainder: pools sum exactly to R.",
+    inputs: { R, nextContest, operatorShare: share, blockBonus: config.blockBonus, closesAt: config.closesAt },
+    pools: money
+      ? { R: rCents / 100, P: pCents / 100, O: oCents / 100, W: (pCents - oCents) / 100, nextContest: nextCents / 100, operatorUnallocated: (oCents - paidOCents) / 100 }
+      : null,
     pledge: config.pledge,
     operatorShareOfParticipants: share,
     operatorShareNote: share === null ? "not set" : `${share * 100}% of the participants' share`,
-    operatorPool: share === null ? null : Math.round(participantsPool * share * 10000) / 10000,
-    splits: board.map((r) => ({
-      xId: r.xId,
-      handle: r.handle,
-      points: r.points,
-      shareOfParticipants: total === 0 ? 0 : Math.round((r.points / total) * 10000) / 10000,
-      operatorShare: share === null ? null : totalUptime === 0 ? 0 : Math.round((r.breakdown.uptime / totalUptime) * participantsPool * share * 10000) / 10000,
+    players: weighed.map((p, i) => ({
+      ...p,
+      shareOfW: wTotal === 0 ? 0 : Math.round((p.weight / wTotal) * 10000) / 10000,
+      amount: money ? playerCents[i] / 100 : null,
     })),
+    nodes: nodes.map((n, i) => ({
+      nodeId: n.nodeId,
+      operator: n.operator,
+      operatorHandle: n.operatorHandle,
+      attributedPlayers: n.attributedPlayers,
+      uptimePct: n.uptimePct,
+      qualifies: n.qualifies,
+      weight: Math.round(n.weight * 10000) / 10000,
+      shareOfO: oTotal === 0 ? 0 : Math.round((n.weight / oTotal) * 10000) / 10000,
+      amount: money ? nodeCents[i] / 100 : null,
+    })),
+    totals: money
+      ? {
+          players: wCents / 100,
+          nodes: paidOCents / 100,
+          nextContest: nextCents / 100,
+          unallocated: unallocatedCents / 100,
+          sum: (wCents + paidOCents + nextCents + unallocatedCents) / 100,
+        }
+      : null,
   };
 }
