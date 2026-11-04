@@ -3,9 +3,8 @@
 Scored by us against the published judging process, on the evidence in this folder.
 This is our own estimate, not a judge's score.
 
-**Note on the rubric:** the Stage Two rubric table was not available to us when we wrote this, so
-the scores below use the three Indie-track criteria from the event page: creativity, technical
-ambition, and whether it works. Re-score this against the official table before relying on it.
+Rubric: the official Stage Two table (Impact 30%, Use of Meta AI Tooling 25%, Technical Depth &
+Execution 20%, Demo 25%), each scored 0–10.
 
 ## Stage One — baseline viability (pass/fail)
 
@@ -23,14 +22,20 @@ ambition, and whether it works. Re-score this against the official table before 
   HumAIn OS's own Frame Maker. Muse Code and Meta image generation are described in our copy but
   were not exercised in this video.
 
-## Stage Two — scores (0–10)
+## Stage Two — scores (0–10, weighted)
 
-| Criterion | Score | Why |
+| Category (weight) | Score | Why |
 |---|---|---|
-| Creativity | **8** | The demo is an episode. Robot radio hosts speak the request, and that same audio clip is the microphone input the live system transcribes. The argument ("a better paintbrush, not a market competitor") is clear and specific to artists. The animated framing is unusual for a hackathon demo, which cuts both ways. |
-| Technical ambition | **7** | Hard enforcement in code: monotonic-clock deadlines, spend ceilings, a watchdog, and stop/revoke from any state. A contract-first loop: desired vs observed state, reuse vs build, acceptance tests. A hash-chained evidence ledger. Honest cost accounting: Meta returns usage without a price, so spend is booked **unknown**, never $0. Held back because the autonomous step is a deterministic frame builder rather than model-driven code generation. |
-| Whether it works | **7** | One live end-to-end run on camera: Meta Voice transcription, then a Spark plan (5 tasks), then $5 / 300 s approval, then unsupervised execution, then **17/17 acceptance tests pass**, three frames served over HTTP with visitor counts. 43/43 HumAIn tests pass. Held back because: one run; no reported cost for Spark; and the video shows the session on an in-scene monitor in an edited, partly sped-up order (labelled on screen), so judges see less of the raw UI than in a screen-recorded demo. |
-| **Average** | **7.3** | |
+| **Impact (30%)** | **6** | Real need: artists choosing between versions of their work, with audience help, while keeping their own tools and audiences. HumAIn OS already builds the comparison frames and counts unique visitors (excluding refreshes and automated checks). Held back: no artists or audiences have used it yet. "Find the hundred who would pay" is a goal, not a result. We also have not checked the entry against the event's listed problem statements, which this rubric asks about. |
+| **Use of Meta AI Tooling (25%)** | **6** | Two Meta models ran live in the recorded session. Voice Transcribe turned the spoken request into text. Muse Spark turned it into a structured, costed change contract: desired vs observed state, reuse vs build, 17 acceptance tests. Spark's output is enforced by code, not trusted as prose. Held back: transcription and planning are fairly standard uses. Muse Code and Meta image generation are in our copy but were not used in this run. Nothing here is likely to "surprise" Meta. |
+| **Technical Depth & Execution (20%)** | **8** | Sound, refined engineering. Deadlines run on a monotonic clock, and spend ceilings, a watchdog and stop/revoke are enforced in code. Results land in a hash-chained event log that can be replayed. Unpriced Meta usage is booked as **unknown**, never $0. Restart recovery and atomic frame-ID allocation exist; 43/43 HumAIn tests pass. The live mode fails visibly instead of silently swapping in mocks. Held back: the unsupervised step is a fixed frame builder, not model-driven work. |
+| **Demo (25%)** | **7** | Cool to watch and under 3 minutes (2:57). The hosts' recorded voice is the system's actual input, and the run on screen is live: transcript → plan → approval → execution → 17/17 acceptance tests pass → served frames. Held back: the real UI is small inside the animation. The footage is cut out of order and partly sped up (labelled on screen). It is one run. |
+| **Weighted total** | **6.7 / 10** | 0.30×6 + 0.25×6 + 0.20×8 + 0.25×7 = 6.65 |
+
+**Biggest lever:** *Use of Meta AI Tooling* (25%) is where we are thinnest relative to its weight.
+Getting a Meta model into the execution step, not only the planning step, would lift both that
+score and Impact. That means Muse Code writing the change, or Meta image generation producing the
+competing versions artists compare. Even one more live stage shown on the monitor would help.
 
 ## Stage Three — demo-video risk
 
@@ -42,9 +47,11 @@ ambition, and whether it works. Re-score this against the official table before 
 
 ## What would raise the score before the deadline
 
-1. **Whether it works / ambition.** In the description, add a direct link to `live-capture/`. Quote
-   the session's own line: "Verified state reconciliation: 17/17 acceptance tests pass."
-2. **Readability.** Attach a 60–90 s raw screen recording of the same session as a second video,
-   if the form allows one. The capture already exists.
-3. **Precision.** In the form, state plainly: Voice and Spark ran live via the Meta Model API;
-   execution is local and deterministic; Muse Code and image generation are next.
+1. **Use of Meta AI Tooling.** Wire Meta image generation into Frame Maker, so the competing
+   versions are generated, then re-run live. The adapter seam (`MetaImageGen`) already exists. This
+   is the highest-weighted gap we can still move today.
+2. **Demo.** In the description, link `live-capture/` and quote "17/17 acceptance tests pass". If
+   the form allows a second video, attach the 60–90 s raw screen recording of the same session, so
+   judges can read the contract and results.
+3. **Impact.** In the copy, name the event's problem statement this addresses, and describe one
+   concrete artist workflow: post two cuts, share the frame, read the unique-visitor counts.
