@@ -1,0 +1,32 @@
+{
+ "model": "muse-spark-1.3",
+ "usage": {
+  "completion_tokens": 2104,
+  "prompt_tokens": 899,
+  "total_tokens": 3003,
+  "completion_tokens_details": {
+   "reasoning_tokens": 1860
+  },
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  }
+ },
+ "seconds": 26.6,
+ "prompt": "Rate TAKE SIX for virality on X.\nCONTEXT: Meta hackathon Most Viral Project prize: the post with the most likes, reposts and comments on X by Nov 8 11:59 PM ET wins. This 30-second video will be the top post of a thread whose replies are the longer takes (5 down to 1).\nTHE SHOW'S OWN VIRALITY DISCUSSION (from the first take, Going Viral) \u2014 use it as the yardstick:\n \"v2_010\":[\"BORGES\",\"I've been researching virality. It appears to be a system for distributing information through people.\"],\n \"v2_011\":[\"AGNOLO\",\"Does it distribute money?\"],\n \"v2_012\":[\"BORGES\",\"Not necessarily.\"],\n \"v2_013\":[\"AGNOLO\",\"Then why are we competing?\"],\n \"v2_014\":[\"LEONARDO\",\"Because artists need audiences.\"],\n \"v2_015\":[\"AGNOLO\",\"Artists need customers.\"],\n \"v2_016\":[\"LEONARDO\",\"They need to find the people who care about what they make.\"],\n \"v2_017\":[\"BORGES\",\"Which raises a question. Is going viral valuable because many people see something, or because the right people see it?\"],\n \"v2_018\":[\"AGNOLO\",\"One million people watching me starve is not a business model.\"],\n \"v2_019\":[\"LEONARDO\",\"Exactly! What if the million people watching could help you find the hundred who would pay to keep you creating?\"],\n \"v2_020\":[\"BORGES\",\"Then attention becomes a search mechanism.\"],\n \"v2_021\":[\"AGNOLO\",\"Provided it eventually finds a wallet.\"],\n\nTAKE SIX SCRIPT (30 s):\n \"x_001\":[\"EVAL\", \"Take six. Thirty seconds.\"],\n \"x_002\":[\"LEONARDO\", \"Five takes. From three minutes down to ninety-seven seconds.\"],\n \"x_003\":[\"BORGES\", \"Each one watched the last.\"],\n \"x_004\":[\"AGNOLO\", \"And kept only what worked.\"],\n \"x_005\":[\"HAYEK\", \"A market, forming in the comments.\"],\n \"x_006\":[\"LEONARDO\", \"The next take is yours.\"],\n \"x_007\":[\"AGNOLO\", \"Arm the artists!\"],\n\nSHOT LIST:\n0:00-0:02 title card FUTURE RADIO / TAKE SIX. Camera on the studio monitor from 0:01.\nMonitor 0:00-0:09: Take 1 (Going Viral, 2:57) playing, labelled. 0:09-0:12 Take 2 (Second Take, 2:27): Spark's cut edits and green acceptance checks. 0:12-0:15 Take 3 (1:52): one-edit fix. 0:15-0:18 Take 4 (2:04): card 'Everyone shares the parent'. 0:18-0:21 Take 5 (1:37): card 'Value from outside, spread out' (SOAP + sharding).\n0:21-0:26: camera pulls back to the three hosts; monitor card 'TAKE 7 \u00b7 Yours. Comment an idea. Run a node. Do your share of the work. Books close Nov 8, 11:59 PM ET.' 0:25-0:30 end card FUTURE RADIO / ARM THE ARTISTS / THE NEXT TAKE IS YOURS.\nReturn JSON: {\"scores\":{\"hook_first_3s\":0-10,\"clarity_without_context\":0-10,\"reason_to_comment\":0-10,\"reason_to_repost\":0-10,\"right_people_not_just_many\":0-10,\"call_to_action\":0-10},\"overall\":0-10,\"verdict\":\"one sentence\",\"strongest\":\"one sentence\",\"weakest\":\"one sentence\",\"one_change\":\"the single smallest change that would most raise engagement\",\"right_people_answer\":\"one or two sentences answering Borges' question for this cut\"}",
+ "reply": {
+  "scores": {
+   "hook_first_3s": 3,
+   "clarity_without_context": 4,
+   "reason_to_comment": 6,
+   "reason_to_repost": 4,
+   "right_people_not_just_many": 6,
+   "call_to_action": 6
+  },
+  "overall": 5,
+  "verdict": "A clear insider recap that proves iteration but lacks a cold-open hook to win a mass-engagement race.",
+  "strongest": "The 0:00-0:21 monitor montage visually proves five takes shrinking from 2:57 to 1:37 by keeping only what worked.",
+  "weakest": "The first 3 seconds offer only a title card and 'Take six. Thirty seconds.' with no conflict, question, or payoff to stop the scroll.",
+  "one_change": "Replace x_001 audio with a spoken stakes-question in the first 2s: 'We let comments rewrite our show 5 times \u2014 comment to write Take 7.'",
+  "right_people_answer": "For this cut many views are only valuable to win by Nov 8; its real test per Borges is whether attention works as a search mechanism to find the few who will comment, run a node, and eventually supply Agnolo's wallet."
+ }
+}
