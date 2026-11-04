@@ -122,6 +122,13 @@ export function deriveAttribution(events: readonly RoomEvent[]): Map<string, str
   return out;
 }
 
+/** Bodies bound to a node, including the operator (for admission caps). */
+export function countAttributionsTo(events: readonly RoomEvent[], nodeId: string): number {
+  let n = 0;
+  for (const [, bound] of deriveAttribution(events)) if (bound === nodeId) n++;
+  return n;
+}
+
 export interface WorkshareView {
   url: string;
   player: string;
@@ -132,15 +139,20 @@ export interface WorkshareView {
   counted: boolean; // as recorded (cap applied at record time)
   voided: boolean;
   voidReason: string | null;
-  weight: number; // 1 when counted and not voided, else 0
+  spent: boolean; // consumed by a generation request
+  weight: number; // 1 when counted, unvoided and unspent, else 0
 }
 
 export function deriveWorkshares(events: readonly RoomEvent[]): WorkshareView[] {
   const voids = new Map<string, string>();
+  const spent = new Set<string>();
   for (const e of events) {
-    if (e.type !== "workshare.voided") continue;
-    const v = e.payload as { url: string; reason: string };
-    if (!voids.has(v.url)) voids.set(v.url, v.reason);
+    if (e.type === "workshare.voided") {
+      const v = e.payload as { url: string; reason: string };
+      if (!voids.has(v.url)) voids.set(v.url, v.reason);
+    } else if (e.type === "generation.requested") {
+      for (const u of ((e.payload as any).spentUrls as string[])) spent.add(u);
+    }
   }
   const out: WorkshareView[] = [];
   for (const e of events) {
@@ -148,7 +160,8 @@ export function deriveWorkshares(events: readonly RoomEvent[]): WorkshareView[] 
     const w = e.payload as { url: string; player: string; handle: string; tweetId: string; tweetedAt: string; day: string; counted: boolean };
     if (out.some((x) => x.url === w.url)) continue; // first record wins; dupes never append
     const voided = voids.has(w.url);
-    out.push({ ...w, voided, voidReason: voids.get(w.url) ?? null, weight: w.counted && !voided ? 1 : 0 });
+    const isSpent = spent.has(w.url);
+    out.push({ ...w, voided, voidReason: voids.get(w.url) ?? null, spent: isSpent, weight: w.counted && !voided && !isSpent ? 1 : 0 });
   }
   return out;
 }
@@ -168,7 +181,10 @@ export interface NodeView {
   uptimePct: number; // upMinutes / elapsedMinutes (0 when nothing elapsed)
   qualifies: boolean; // uptime at least 50%: earns operator weight
   attributedPlayers: number; // bound players, operator's own account excluded
-  weight: number; // sqrt(attributedPlayers) when qualified, else 0
+  weight: number; // sqrt(attributedPlayers) when qualified, else 0 (producer node: fixed)
+  capped: boolean; // the producer node admits a capped few and weighs a fixed 1
+  leaseEnded: boolean;
+  leaseReason: string | null;
 }
 
 export function deriveNodes(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): NodeView[] {
@@ -188,6 +204,8 @@ export function deriveNodes(events: readonly RoomEvent[], config: WorkshopConfig
     for (const [player, nodeId] of attribution) {
       if (nodeId === r.nodeId && player !== r.operator) attributedPlayers++; // never the operator's own account
     }
+    const capped = r.nodeId === config.producerNode.nodeId;
+    const lease = events.find((x) => x.type === "node.lease.ended" && (x.payload as any).nodeId === r.nodeId)?.payload as any;
     out.push({
       ...r,
       operatorHandle: players.get(r.operator)?.handle ?? r.operator,
@@ -200,7 +218,10 @@ export function deriveNodes(events: readonly RoomEvent[], config: WorkshopConfig
       uptimePct: Math.round(uptimePct * 10000) / 10000,
       qualifies,
       attributedPlayers,
-      weight: qualifies ? Math.sqrt(attributedPlayers) : 0,
+      weight: capped ? (qualifies ? config.producerNode.operatorWeight : 0) : qualifies ? Math.sqrt(attributedPlayers) : 0,
+      capped,
+      leaseEnded: Boolean(lease),
+      leaseReason: lease?.reason ?? null,
     });
   }
   return out;
@@ -253,7 +274,9 @@ export interface PlayerPayout {
   handle: string;
   workshares: number; // counted, unvoided
   builds: number; // authored ideas Future Radio made
-  weight: number; // workshares + blockBonus × builds
+  weight: number; // workshares + blockBonus × builds (allow-listed: fixed)
+  fixed: boolean; // allow-listed weight, independent of engagement
+  n: number | null; // 1 for the producer row, so anyone can check the single share
   shareOfW: number; // pro rata by weight
   amount: number | null; // dollars; null until R and the operator share are set
 }
@@ -266,6 +289,8 @@ export interface NodePayout {
   uptimePct: number;
   qualifies: boolean;
   weight: number; // sqrt(attributedPlayers) when qualified
+  n: number; // attributed bodies (producer node: capped at maxPlayers)
+  capped: boolean;
   shareOfO: number; // pro rata by weight
   amount: number | null; // dollars; null until R and the operator share are set
 }
@@ -336,6 +361,22 @@ export interface RewardsView {
   totals: { players: number; nodes: number; nextContest: number; unallocated: number; sum: number } | null;
 }
 
+export type ParsedSchedule = { kind: "now" } | { kind: "lump"; date: string } | { kind: "stream"; n: number; days: number };
+
+export function parseSchedule(s: unknown): ParsedSchedule | null {
+  if (s === "now") return { kind: "now" };
+  if (typeof s !== "string") return null;
+  const lump = s.match(/^lump_at:(.+)$/);
+  if (lump) return Number.isFinite(Date.parse(lump[1])) ? { kind: "lump", date: new Date(lump[1]).toISOString() } : null;
+  const stream = s.match(/^stream:(\d+)x(P1D|P7D|P30D)$/);
+  if (stream) {
+    const n = Number(stream[1]);
+    if (!Number.isInteger(n) || n <= 0) return null;
+    return { kind: "stream", n, days: stream[2] === "P1D" ? 1 : stream[2] === "P7D" ? 7 : 30 };
+  }
+  return null;
+}
+
 /** Split integer cents pro rata by weight (largest remainder: the sum is exact). */
 function splitCents(totalCents: number, weights: number[]): number[] {
   const total = weights.reduce((s, w) => s + w, 0);
@@ -372,7 +413,16 @@ export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConf
   const weighed = [...players.values()].map((p) => {
     const ws = workshares.filter((w) => w.player === p.xId).reduce((s, w) => s + w.weight, 0);
     const b = builtByAuthor.get(p.xId) ?? 0;
-    return { xId: p.xId, handle: p.handle, workshares: ws, builds: b, weight: ws + config.blockBonus * b };
+    const fixed = config.producerNode.allow.includes(p.xId);
+    return {
+      xId: p.xId,
+      handle: p.handle,
+      workshares: ws,
+      builds: b,
+      weight: fixed ? config.producerNode.fixedPlayerWeight : ws + config.blockBonus * b,
+      fixed,
+      n: fixed ? 1 : null,
+    };
   });
   const wTotal = weighed.reduce((s, p) => s + p.weight, 0);
   const nodes = deriveNodes(events, config, nowMs);
@@ -413,6 +463,8 @@ export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConf
       uptimePct: n.uptimePct,
       qualifies: n.qualifies,
       weight: Math.round(n.weight * 10000) / 10000,
+      n: n.capped ? Math.min(countAttributionsTo(events, n.nodeId), config.producerNode.maxPlayers) : n.attributedPlayers,
+      capped: n.capped,
       shareOfO: oTotal === 0 ? 0 : Math.round((n.weight / oTotal) * 10000) / 10000,
       amount: money ? nodeCents[i] / 100 : null,
     })),
@@ -425,5 +477,107 @@ export function deriveRewards(events: readonly RoomEvent[], config: WorkshopConf
           sum: (wCents + paidOCents + nextCents + unallocatedCents) / 100,
         }
       : null,
+  };
+}
+
+// ---------------------------------------------------------------- settlement (obligations only; never executes transfers)
+
+export interface NodeProfile {
+  qi: number;
+  quai: number;
+  fiat: number;
+  schedule: string;
+}
+
+/** Latest payout profile per node (last payout.profile.set wins; registration is first). */
+export function derivePayoutProfiles(events: readonly RoomEvent[]): Map<string, NodeProfile> {
+  const out = new Map<string, NodeProfile>();
+  for (const e of events) {
+    if (e.type === "workshop.node_registered" && (e.payload as any).payout) out.set((e.payload as any).nodeId, (e.payload as any).payout);
+    else if (e.type === "payout.profile.set") out.set((e.payload as any).nodeId, (e.payload as any).payout);
+  }
+  return out;
+}
+
+export interface ScheduledPayout {
+  asset: "qi" | "quai" | "fiat";
+  fraction: number;
+  schedule: string;
+  amounts: Array<{ date: string | null; amount: number | null }>; // date null = due now
+}
+
+export interface OperatorSettlement {
+  operator: string;
+  operatorHandle: string;
+  total: number | null;
+  nodes: Array<{
+    nodeId: string;
+    share: number | null;
+    profile: NodeProfile | null;
+    payouts: ScheduledPayout[];
+  }>;
+}
+
+export interface SettlementView {
+  status: "obligation" | "final"; // obligation until the prize outcome is known; never "paid"
+  prizeOutcome: "pending" | "won" | "lost";
+  R: number | null;
+  closesAt: string;
+  note: string;
+  operators: OperatorSettlement[];
+}
+
+/** Render one asset total across a schedule, in exact cents. Streams start one interval after close. */
+function renderSchedule(totalCents: number, schedule: ParsedSchedule, closesMs: number): Array<{ date: string | null; amount: number }> {
+  if (schedule.kind === "now") return [{ date: null, amount: totalCents / 100 }];
+  if (schedule.kind === "lump") return [{ date: schedule.date, amount: totalCents / 100 }];
+  const parts = splitCents(totalCents, new Array(schedule.n).fill(1));
+  return parts.map((c, k) => ({ date: new Date(closesMs + (k + 1) * schedule.days * 86_400_000).toISOString(), amount: c / 100 }));
+}
+
+/**
+ * Settlement: per operator, the computed share, the payout profile, and the
+ * schedule as dated amounts. Pure over the log, so any node reproduces it
+ * exactly. Obligations only — nothing here moves money.
+ */
+export function deriveSettlement(events: readonly RoomEvent[], config: WorkshopConfig, nowMs: number): SettlementView {
+  const rewards = deriveRewards(events, config, nowMs);
+  const profiles = derivePayoutProfiles(events);
+  const closesMs = Date.parse(config.closesAt);
+  const byOperator = new Map<string, OperatorSettlement>();
+  for (const n of rewards.nodes) {
+    let op = byOperator.get(n.operator);
+    if (!op) {
+      op = { operator: n.operator, operatorHandle: n.operatorHandle, total: 0, nodes: [] };
+      byOperator.set(n.operator, op);
+    }
+    const profile = profiles.get(n.nodeId) ?? null;
+    const payouts: ScheduledPayout[] = [];
+    if (profile && n.amount !== null) {
+      const shareCents = Math.round(n.amount * 100);
+      const assetCents = splitCents(shareCents, [profile.qi, profile.quai, profile.fiat]);
+      const sched = parseSchedule(profile.schedule) ?? { kind: "now" as const };
+      (["qi", "quai", "fiat"] as const).forEach((asset, i) => {
+        payouts.push({ asset, fraction: profile[asset], schedule: profile.schedule, amounts: renderSchedule(assetCents[i], sched, closesMs) });
+      });
+      op.total = (op.total ?? 0) + n.amount;
+    } else if (n.amount !== null) {
+      op.total = (op.total ?? 0) + n.amount;
+    } else {
+      op.total = null;
+    }
+    op.nodes.push({ nodeId: n.nodeId, share: n.amount, profile, payouts });
+  }
+  for (const op of byOperator.values()) {
+    if (op.total !== null) op.total = Math.round(op.total * 100) / 100;
+    op.nodes.sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+  }
+  return {
+    status: config.pledge.prizeOutcome === "pending" ? "obligation" : "final",
+    prizeOutcome: config.pledge.prizeOutcome,
+    R: config.rewardAmount,
+    closesAt: config.closesAt,
+    note: "Obligations only. Nothing here executes transfers.",
+    operators: [...byOperator.values()].sort((a, b) => a.operatorHandle.localeCompare(b.operatorHandle)),
   };
 }

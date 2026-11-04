@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadWorkshopConfig } from "../src/workshop/config.ts";
-import { WorkshopError, addIdea, addPlayer, attributePlayer, attributionOf, registerNode } from "../src/workshop/log.ts";
+import { WorkshopError, addIdea, addPlayer, attributePlayer, attributionOf } from "../src/workshop/log.ts";
 import { deriveNodes, deriveRewards, deriveWorkshares } from "../src/workshop/derive.ts";
 import { handleMcpMessage } from "../src/workshop/mcp.ts";
 import { workshopRoutes } from "../src/workshop/routes.ts";
-import { NOW, asPlayer, call, testConfig, testCtx } from "./workshop-helpers.ts";
+import { NOW, asPlayer, call, registerTestNode, testConfig, testCtx } from "./workshop-helpers.ts";
 
 const EPOCH = 1288834974657n;
 /** Snowflake id authored at iso (seq disambiguates same-ms tweets). */
@@ -13,7 +13,6 @@ const snowId = (iso: string, seq = 0): string => (((BigInt(Date.parse(iso)) - EP
 const commentUrl = (handle: string, id: string) => `https://x.com/${handle}/status/${id}`;
 const oembedMock = (handle: string) =>
   (async () => ({ ok: true, json: async () => ({ author_url: `https://x.com/${handle}` }) })) as unknown as typeof fetch;
-const JWK = { kty: "OKP", crv: "Ed25519", x: "test-key-material" } as unknown as Record<string, unknown>;
 const IN_WINDOW = "2026-11-05T12:00:00Z";
 
 test("attribution is first-binding-only, and the operator's own account is excluded", async () => {
@@ -21,15 +20,15 @@ test("attribution is first-binding-only, and the operator's own account is exclu
   const routes = workshopRoutes(ctx);
   asPlayer(ctx, "1", "ada");
   asPlayer(ctx, "2", "bob");
-  const { nodeId: n1 } = registerNode(ctx, { operator: "1", url: "http://n1.example", publicKey: JWK });
-  const { nodeId: n2 } = registerNode(ctx, { operator: "1", url: "http://n2.example", publicKey: JWK });
+  const { nodeId: n1 } = registerTestNode(ctx, "1", "http://n1.example");
+  const { nodeId: n2 } = registerTestNode(ctx, "1", "http://n2.example");
   const first = attributePlayer(ctx, "2", n1);
   assert.equal((first!.payload as any).nodeId, n1);
   assert.equal(attributePlayer(ctx, "2", n2), null); // re-sign-in keeps the first binding
   assert.equal(attributionOf(ctx.store, "2"), n1);
   attributePlayer(ctx, "1", n1); // the operator binds like anyone…
-  const ghost = attributePlayer(ctx, "3", "N-9999"); // …unknown via falls back…
-  assert.equal((ghost!.payload as any).nodeId, "coordinator");
+  // v3 retired the "coordinator" fallback: unknown via with policy reject is refused.
+  assert.throws(() => attributePlayer(ctx, "3", "N-9999"), (e: unknown) => e instanceof WorkshopError && e.code === "sign_in_through_a_community_node");
   const nodes = deriveNodes(ctx.store.all(), ctx.config, NOW);
   assert.equal(nodes.find((n) => n.nodeId === n1)!.attributedPlayers, 1); // …but never counts toward their own node
   const count = await call(routes, "GET", `/api/workshop/nodes/${n1}/players`);
@@ -122,8 +121,8 @@ test("the sqrt node weight and the uptime threshold are applied", () => {
   const ctx = testCtx({ now: () => nowMs });
   asPlayer(ctx, "1", "ada");
   for (let i = 2; i <= 14; i++) asPlayer(ctx, String(i), `p${i}`);
-  const { nodeId: n1 } = registerNode(ctx, { operator: "1", url: "http://n1.example", publicKey: JWK });
-  const { nodeId: n2 } = registerNode(ctx, { operator: "1", url: "http://n2.example", publicKey: JWK });
+  const { nodeId: n1 } = registerTestNode(ctx, "1", "http://n1.example");
+  const { nodeId: n2 } = registerTestNode(ctx, "1", "http://n2.example");
   for (let i = 2; i <= 5; i++) attributePlayer(ctx, String(i), n1); // 4 players
   for (let i = 6; i <= 14; i++) attributePlayer(ctx, String(i), n2); // 9 players
   const t0 = nowMs;
@@ -159,7 +158,7 @@ test("the pool arithmetic sums exactly to R", () => {
       ctx.store.append("workshare.recorded", `x:${player}`, { url, player, handle, tweetId: `9000${player}${i}`, tweetedAt: `${day}T12:00:00Z`, day, counted: true }, "public");
     }
   }
-  const { nodeId } = registerNode(ctx, { operator: "3", url: "http://n.example", publicKey: JWK });
+  const { nodeId } = registerTestNode(ctx, "3", "http://n.example");
   attributePlayer(ctx, "1", nodeId);
   attributePlayer(ctx, "2", nodeId);
   attributePlayer(ctx, "3", nodeId); // operator excluded: 2 counted
@@ -185,7 +184,7 @@ test("MCP workshares and node_standings carry asOf and closesAt", async () => {
   const ctx = testCtx();
   asPlayer(ctx, "1", "ada");
   ctx.store.append("workshare.recorded", "x:1", { url: "https://x.com/ada/status/1", player: "1", handle: "ada", tweetId: "1", tweetedAt: "2026-11-05T12:00:00Z", day: "2026-11-05", counted: true }, "public");
-  registerNode(ctx, { operator: "1", url: "http://n.example", publicKey: JWK });
+  registerTestNode(ctx, "1", "http://n.example");
   for (const [name, args] of [["workshares", { player: "ada" }], ["node_standings", {}], ["rewards", {}]] as const) {
     const r: any = await handleMcpMessage(ctx, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } });
     const env = JSON.parse(r.result.content[0].text);

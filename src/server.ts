@@ -525,7 +525,7 @@ export const server = createServer(async (req, res) => {
     if (req.method === "GET" && !url.pathname.startsWith("/api/")) return serveStatic(url.pathname, res);
     send(res, 404, { error: "Not found" });
   } catch (e) {
-    if (e instanceof WorkshopError) return send(res, e.status, { error: e.message, code: e.code });
+    if (e instanceof WorkshopError) return send(res, e.status, { error: e.message, code: e.code, ...e.details });
     if (e instanceof RuleError) {
       const status = e.rule === "auth" ? 401 : e.rule === "limits" ? 429 : 400;
       return send(res, status, { error: e.message, rule: e.rule });

@@ -19,6 +19,15 @@ export interface WorkshopConfig {
   blockBonus: number; // player weight per built idea (a build is the "block")
   workshareCapPerDay: number; // counted workshares per player per ET day
   rewardAmount: number | null; // R: outside reward in dollars; null until the prize/debt amount is known
+  generateCostWorkshares: number; // generation price, in counted workshares. Never money.
+  producerNode: {
+    nodeId: string;
+    allow: string[]; // X user ids admitted through the producer node/coordinator (Leo)
+    maxPlayers: number; // players the producer node admits
+    fixedPlayerWeight: number; // allow-listed player weight, always
+    operatorWeight: number; // producer node operator weight when qualified
+  };
+  noViaPolicy: "reject" | "unassigned";
   pledge: {
     text: string; // verbatim from the Third Take episode
     ifWin: { participants: number; nextContest: number };
@@ -46,6 +55,15 @@ export function loadWorkshopConfig(path = DEFAULT_CONFIG_PATH()): WorkshopConfig
   if (!Number.isInteger(c.workshareCapPerDay) || c.workshareCapPerDay <= 0) throw new Error("Workshop config: workshareCapPerDay must be a positive integer.");
   if (c.rewardAmount !== null && (typeof c.rewardAmount !== "number" || c.rewardAmount < 0))
     throw new Error("Workshop config: rewardAmount must be null or a non-negative dollar amount.");
+  if (!Number.isInteger(c.generateCostWorkshares) || c.generateCostWorkshares <= 0)
+    throw new Error("Workshop config: generateCostWorkshares must be a positive integer.");
+  const pn = c.producerNode;
+  if (!pn || typeof pn.nodeId !== "string" || !pn.nodeId || !Array.isArray(pn.allow) || !pn.allow.every((a) => typeof a === "string"))
+    throw new Error("Workshop config: producerNode needs a nodeId and an allow list of X user ids.");
+  if (!Number.isInteger(pn.maxPlayers) || pn.maxPlayers <= 0) throw new Error("Workshop config: producerNode.maxPlayers must be a positive integer.");
+  if (typeof pn.fixedPlayerWeight !== "number" || pn.fixedPlayerWeight < 0 || typeof pn.operatorWeight !== "number" || pn.operatorWeight < 0)
+    throw new Error("Workshop config: producerNode weights must be non-negative numbers.");
+  if (c.noViaPolicy !== "reject" && c.noViaPolicy !== "unassigned") throw new Error('Workshop config: noViaPolicy must be "reject" or "unassigned".');
   if (typeof c.pledge?.text !== "string" || !c.pledge.text) throw new Error("Workshop config: pledge.text is required.");
   if (!["pending", "won", "lost"].includes(c.pledge.prizeOutcome)) throw new Error("Workshop config: pledge.prizeOutcome must be pending, won or lost.");
   const share = c.pledge.nodeOperatorShareOfParticipants;

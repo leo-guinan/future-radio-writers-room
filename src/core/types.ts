@@ -78,7 +78,11 @@ export type EventType =
   | "workshop.closed"
   | "player.attributed"
   | "workshare.recorded"
-  | "workshare.voided";
+  | "workshare.voided"
+  | "energy.receipt"
+  | "payout.profile.set"
+  | "node.lease.ended"
+  | "generation.requested";
 
 // ---------- Ideas: the central unit of the room ----------
 

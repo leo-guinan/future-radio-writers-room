@@ -1,8 +1,9 @@
 // Shared workshop test helpers (no tests here; imported by workshop test files).
 import assert from "node:assert/strict";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { EventStore } from "../src/core/events.ts";
 import type { WorkshopConfig } from "../src/workshop/config.ts";
-import { WorkshopError, addPlayer, type WorkshopCtx } from "../src/workshop/log.ts";
+import { WorkshopError, addPlayer, registrationMessage, registerNode, type WorkshopCtx } from "../src/workshop/log.ts";
 import { signSession } from "../src/workshop/auth.ts";
 import { workshopRoutes } from "../src/workshop/routes.ts";
 
@@ -26,6 +27,9 @@ export function testConfig(over: Partial<WorkshopConfig> = {}): WorkshopConfig {
     blockBonus: 10,
     workshareCapPerDay: 5,
     rewardAmount: null,
+    generateCostWorkshares: 3,
+    producerNode: { nodeId: "producer", allow: [], maxPlayers: 1, fixedPlayerWeight: 1, operatorWeight: 1 },
+    noViaPolicy: "reject",
     pledge: {
       text: "pledge",
       ifWin: { participants: 0.5, nextContest: 0.5 },
@@ -80,7 +84,7 @@ export async function call(
   } catch (e) {
     if (e instanceof WorkshopError) {
       status = e.status;
-      text = JSON.stringify({ error: e.message, code: e.code });
+      text = JSON.stringify({ error: e.message, code: e.code, ...e.details });
     } else throw e;
   }
   return { status, headers, json: text ? JSON.parse(text) : null, text };
@@ -92,3 +96,51 @@ export const asPlayer = (ctx: WorkshopCtx, xId: string, handle: string, createdA
   addPlayer(ctx, { xId, handle, createdAt });
   return cookieFor(xId, handle);
 };
+
+export interface TestNodeKey {
+  jwk: Record<string, unknown>;
+  sign: (msg: Buffer) => Buffer;
+}
+
+export function testNodeKey(): TestNodeKey {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  return { jwk: publicKey.export({ format: "jwk" }) as unknown as Record<string, unknown>, sign: (msg) => sign(null, msg, privateKey) };
+}
+
+export const testEnergy = () => ({ watts: 65, source: "rooftop solar (self-attested)", evidenceUrl: "https://example.com/plug-log", budgetWh: 5000 });
+export const testPayout = () => ({ qi: 0.5, quai: 0.3, fiat: 0.2, schedule: "now" });
+
+export function signedRegistration(key: TestNodeKey, url: string, energy = testEnergy(), payout = testPayout(), nodeId?: string) {
+  const body = { url, publicKey: key.jwk, energy, payout };
+  return { ...body, ...(nodeId ? { nodeId } : {}), sig: key.sign(registrationMessage(body)).toString("base64") };
+}
+
+/** Register a node with valid energy, payout and signature. Returns the key for heartbeats. */
+export function registerTestNode(ctx: WorkshopCtx, operator: string, url = "http://node.example", nodeId?: string): { key: TestNodeKey; nodeId: string } {
+  const key = testNodeKey();
+  const { nodeId: assigned } = registerNode(ctx, { operator, ...signedRegistration(key, url, testEnergy(), testPayout(), nodeId) });
+  return { key, nodeId: assigned };
+}
+
+/** Mock X token + user endpoints for the OAuth callback path. */
+export const xMock = (profile: { id: string; username: string; created_at: string }) =>
+  (async (url: string) =>
+    String(url).includes("oauth2/token")
+      ? { ok: true, json: async () => ({ access_token: "mock-token-never-kept" }) } // # git-secret-ignore (test fixture, not a credential)
+      : { ok: true, json: async () => ({ data: profile }) }) as unknown as typeof fetch;
+
+/** Set X env for auth tests; returns a restore function. */
+export function setXEnv(): () => void {
+  const saved = { id: process.env.X_CLIENT_ID, secret: process.env.X_CLIENT_SECRET, cb: process.env.X_CALLBACK_URL };
+  process.env.X_CLIENT_ID = "test-client";
+  process.env.X_CLIENT_SECRET = "test-secret";
+  process.env.X_CALLBACK_URL = "http://localhost:8787/api/workshop/auth/x/callback";
+  return () => {
+    if (saved.id === undefined) delete process.env.X_CLIENT_ID;
+    else process.env.X_CLIENT_ID = saved.id;
+    if (saved.secret === undefined) delete process.env.X_CLIENT_SECRET;
+    else process.env.X_CLIENT_SECRET = saved.secret;
+    if (saved.cb === undefined) delete process.env.X_CALLBACK_URL;
+    else process.env.X_CALLBACK_URL = saved.cb;
+  };
+}

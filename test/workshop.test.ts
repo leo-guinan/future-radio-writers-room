@@ -1,11 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { generateKeyPairSync, sign } from "node:crypto";
-import { WorkshopError, addBuild, addIdea, addPlayer, heartbeatMessage, isClosed, registerNode, setVotes } from "../src/workshop/log.ts";
+import { WorkshopError, addBuild, addIdea, addPlayer, heartbeatMessage, isClosed, setVotes } from "../src/workshop/log.ts";
 import { deriveIdeas, deriveNodes, deriveRewards, deriveScoreboard } from "../src/workshop/derive.ts";
 import { authConfigured, signSession, verifySession } from "../src/workshop/auth.ts";
 import { workshopRoutes } from "../src/workshop/routes.ts";
-import { NOW, asPlayer, call, cookieFor, testConfig, testCtx } from "./workshop-helpers.ts";
+import { NOW, asPlayer, call, cookieFor, registerTestNode, signedRegistration, testConfig, testCtx, testNodeKey } from "./workshop-helpers.ts";
 
 test("close is enforced in code at closesAt", async () => {
   const ctx = testCtx({}, { closesAt: "2026-11-04T09:00:01-05:00" }); // already past at NOW
@@ -94,9 +93,7 @@ test("scores derive from a fixture log", () => {
   setVotes(ctx, "1", { [aid]: 5, [gid]: 3 });
   setVotes(ctx, "2", { [aid]: 2 });
   addBuild(ctx, { ideaId: aid, url: "https://example.com/a", note: "made", by: "producer" });
-  const { publicKey } = generateKeyPairSync("ed25519");
-  const jwk = publicKey.export({ format: "jwk" });
-  const { nodeId } = registerNode(ctx, { operator: "1", url: "http://node.example", publicKey: jwk as any });
+  const { nodeId } = registerTestNode(ctx, "1");
   // Heartbeats bypass signature here: append raw heartbeat events across 61 distinct minutes.
   for (let m = 0; m < 61; m++) {
     const at = new Date(Date.parse("2026-11-05T00:00:00-05:00") + m * 60_000).toISOString();
@@ -134,28 +131,37 @@ test("heartbeat signature check", async () => {
   const ctx = testCtx();
   const routes = workshopRoutes(ctx);
   const ada = asPlayer(ctx, "1", "ada");
-  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const key = testNodeKey();
   const reg = await call(routes, "POST", "/api/workshop/nodes/register", {
-    body: { url: "http://node.example:8788", publicKey: publicKey.export({ format: "jwk" }) },
+    body: signedRegistration(key, "http://node.example:8788"),
     headers: ada,
   });
   assert.equal(reg.status, 201);
   const nodeId = reg.json.nodeId;
+  const counts = { eventsVerified: ctx.store.all().length, requestsServed: 4, head: ctx.store.head };
   const at = new Date(NOW).toISOString();
-  const sig = sign(null, heartbeatMessage(nodeId, at), privateKey).toString("base64");
-  const good = await call(routes, "POST", "/api/workshop/nodes/heartbeat", { body: { nodeId, at, sig } });
+  const sig = key.sign(heartbeatMessage(nodeId, at, counts)).toString("base64");
+  const good = await call(routes, "POST", "/api/workshop/nodes/heartbeat", { body: { nodeId, at, sig, ...counts } });
   assert.equal(good.status, 201);
-  const forged = await call(routes, "POST", "/api/workshop/nodes/heartbeat", { body: { nodeId, at, sig: Buffer.from("forged").toString("base64") } });
+  const forged = await call(routes, "POST", "/api/workshop/nodes/heartbeat", { body: { nodeId, at, sig: Buffer.from("forged").toString("base64"), ...counts } });
   assert.equal(forged.status, 401);
   assert.equal(forged.json.code, "bad_heartbeat");
   // Same signature replayed at a different minute does not verify.
   const replayAt = new Date(NOW + 60_000).toISOString();
-  const replay = await call(routes, "POST", "/api/workshop/nodes/heartbeat", { body: { nodeId, at: replayAt, sig } });
+  const replay = await call(routes, "POST", "/api/workshop/nodes/heartbeat", { body: { nodeId, at: replayAt, sig, ...counts } });
   assert.equal(replay.json.code, "bad_heartbeat");
+  const staleAt = new Date(NOW - 3600_000).toISOString();
   const stale = await call(routes, "POST", "/api/workshop/nodes/heartbeat", {
-    body: { nodeId, at: new Date(NOW - 3600_000).toISOString(), sig: sign(null, heartbeatMessage(nodeId, new Date(NOW - 3600_000).toISOString()), privateKey).toString("base64") },
+    body: { nodeId, at: staleAt, sig: key.sign(heartbeatMessage(nodeId, staleAt, counts)).toString("base64"), ...counts },
   });
   assert.equal(stale.json.code, "stale_heartbeat");
+  // A head the coordinator never saw is refused.
+  const badHead = { ...counts, head: "bogus" };
+  const bogus = await call(routes, "POST", "/api/workshop/nodes/heartbeat", {
+    body: { nodeId, at, sig: key.sign(heartbeatMessage(nodeId, at, badHead)).toString("base64"), ...badHead },
+  });
+  assert.equal(bogus.status, 400);
+  assert.equal(bogus.json.code, "bad_head");
 });
 
 test("reward projection reports a null operator share as not set", () => {

@@ -4,8 +4,8 @@
 
 import { createInterface } from "node:readline";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { assertServing, WorkshopError, type WorkshopCtx } from "./log.ts";
-import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
+import { assertServing, energyReceiptsOf, WorkshopError, type WorkshopCtx } from "./log.ts";
+import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveSettlement, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
 
 export function asOf(ctx: WorkshopCtx): { seq: number; time: string } {
   const last = ctx.store.all().at(-1);
@@ -95,6 +95,7 @@ export function workshopTools(): Record<string, ToolDef> {
           uptimePct: n.uptimePct,
           qualifies: n.qualifies,
           weight: n.weight,
+          n: n.capped ? `${n.n} (capped)` : n.n,
           shareOfO: n.shareOfO,
           amount: n.amount,
         }));
@@ -118,6 +119,21 @@ export function workshopTools(): Record<string, ToolDef> {
       description: "Volunteer nodes and their uptime.",
       inputSchema: { type: "object", properties: {} },
       call: (ctx) => deriveNodes(ctx.store.all(), ctx.config, ctx.now()),
+    },
+    energy_receipts: {
+      description: "Hourly energy receipts for a node: Wh from verified heartbeats, plus work counts.",
+      inputSchema: { type: "object", properties: { node: { type: "string" } }, required: ["node"] },
+      call: (ctx, args) => {
+        const nodeId = String(args?.node ?? "");
+        if (!ctx.store.all().some((e) => e.type === "workshop.node_registered" && (e.payload as any).nodeId === nodeId))
+          throw new WorkshopError("unknown_node", `No node ${nodeId}.`, 404);
+        return energyReceiptsOf(ctx.store, nodeId);
+      },
+    },
+    settlement: {
+      description: "Per-operator settlement: computed share, payout profile, schedule as dated amounts. Obligations only.",
+      inputSchema: { type: "object", properties: {} },
+      call: (ctx) => deriveSettlement(ctx.store.all(), ctx.config, ctx.now()),
     },
     how_to_play: {
       description: "Sign-in URL and the rules. Writes need X sign-in in a browser.",

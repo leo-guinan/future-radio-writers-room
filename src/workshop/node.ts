@@ -11,7 +11,7 @@ import { generateKeyPairSync, createPrivateKey, sign } from "node:crypto";
 import { EventStore, sha256, canonical } from "../core/events.ts";
 import type { RoomEvent } from "../core/types.ts";
 import { loadWorkshopConfig } from "./config.ts";
-import { WorkshopError, heartbeatMessage, type WorkshopCtx } from "./log.ts";
+import { WorkshopError, heartbeatMessage, registrationMessage, type EnergyDeclaration, type PayoutProfile, type WorkshopCtx } from "./log.ts";
 import { workshopRoutes } from "./routes.ts";
 
 export interface NodeOptions {
@@ -86,15 +86,36 @@ export function loadOrCreateNodeKey(dataDir: string): { publicJwk: Record<string
   return { publicJwk: jwk.public, sign: (msg: Buffer) => sign(null, msg, priv) };
 }
 
-export async function sendHeartbeat(upstream: string, nodeId: string, signFn: (msg: Buffer) => Buffer, nowMs: number, fetchImpl: typeof fetch = globalThis.fetch): Promise<void> {
-  const at = new Date(nowMs).toISOString();
-  const sig = signFn(heartbeatMessage(nodeId, at)).toString("base64");
+export interface HeartbeatReport {
+  at: string;
+  eventsVerified: number;
+  requestsServed: number;
+  head: string;
+}
+
+export async function sendHeartbeat(
+  upstream: string,
+  nodeId: string,
+  signFn: (msg: Buffer) => Buffer,
+  beat: HeartbeatReport,
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<void> {
+  const sig = signFn(heartbeatMessage(nodeId, beat.at, { eventsVerified: beat.eventsVerified, requestsServed: beat.requestsServed, head: beat.head })).toString("base64");
   const res = await fetchImpl(`${upstream}/api/workshop/nodes/heartbeat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ nodeId, at, sig }),
+    body: JSON.stringify({ nodeId, at: beat.at, sig, eventsVerified: beat.eventsVerified, requestsServed: beat.requestsServed, head: beat.head }),
   });
   if (!res.ok) throw new Error(`Heartbeat refused: HTTP ${res.status} ${String(await res.text().catch(() => "")).slice(0, 160)}`);
+}
+
+/** Build the signed registration body to POST at the coordinator (print-register). */
+export function buildRegistration(
+  signFn: (msg: Buffer) => Buffer,
+  input: { url: string; publicKey: Record<string, unknown>; nodeId?: string; energy: EnergyDeclaration; payout: PayoutProfile },
+): Record<string, unknown> {
+  const sig = signFn(registrationMessage({ url: input.url, publicKey: input.publicKey, energy: input.energy, payout: input.payout })).toString("base64");
+  return { url: input.url, publicKey: input.publicKey, ...(input.nodeId ? { nodeId: input.nodeId } : {}), energy: input.energy, payout: input.payout, sig };
 }
 
 export async function startNode(opts: NodeOptions, fetchImpl: typeof fetch = globalThis.fetch) {
@@ -132,13 +153,19 @@ export async function startNode(opts: NodeOptions, fetchImpl: typeof fetch = glo
 
   const key = loadOrCreateNodeKey(opts.dataDir);
   if (!opts.nodeId) {
-    console.log("node: no --node-id. Register this node at the coordinator (POST /api/workshop/nodes/register) with public key:");
-    console.log(`node: ${JSON.stringify(key.publicJwk)}`);
+    console.log("node: no --node-id. Print a signed registration with: npm run workshop:node -- print-register --url <this node> --watts <n> --source <s> --evidence <url> --budget-wh <n> --qi <f> --quai <f> --fiat <f> --schedule <sched>");
   }
+  let requestsServed = 0;
   const beat = async () => {
     if (!opts.nodeId) return;
     try {
-      await sendHeartbeat(opts.upstream, opts.nodeId, key.sign, Date.now(), fetchImpl);
+      await sendHeartbeat(
+        opts.upstream,
+        opts.nodeId,
+        key.sign,
+        { at: new Date(Date.now()).toISOString(), eventsVerified: store.all().length, requestsServed, head: store.all().length ? store.head : "genesis" },
+        fetchImpl,
+      );
     } catch (e: any) {
       console.error(`node: heartbeat failed: ${e?.message ?? e}`);
     }
@@ -152,7 +179,10 @@ export async function startNode(opts: NodeOptions, fetchImpl: typeof fetch = glo
     try {
       for (const [method, re, h] of routes) {
         const m = url.pathname.match(re);
-        if (m && req.method === method) return await h(req, res, m);
+        if (m && req.method === method) {
+          requestsServed++;
+          return await h(req, res, m);
+        }
       }
       if (req.method === "GET" && (url.pathname === "/workshop" || url.pathname === "/workshop.js")) {
         const file = join(opts.publicPath, url.pathname === "/workshop" ? "workshop.html" : "workshop.js");
@@ -168,7 +198,7 @@ export async function startNode(opts: NodeOptions, fetchImpl: typeof fetch = glo
     } catch (e) {
       if (e instanceof WorkshopError) {
         res.writeHead(e.status, { "content-type": "application/json" });
-        return res.end(JSON.stringify({ error: e.message, code: e.code }));
+        return res.end(JSON.stringify({ error: e.message, code: e.code, ...e.details }));
       }
       console.error(e);
       res.writeHead(500, { "content-type": "application/json" });
@@ -180,10 +210,39 @@ export async function startNode(opts: NodeOptions, fetchImpl: typeof fetch = glo
   return { server, ctx, stop: () => (clearInterval(pullTimer), clearInterval(beatTimer), server.close()) };
 }
 
+function printRegister(argv: string[], dataDir: string): void {
+  const flag = (name: string): string => {
+    const i = argv.indexOf(name);
+    if (i < 0 || argv[i + 1] === undefined) throw new Error(`print-register needs ${name} <value>.`);
+    return argv[i + 1];
+  };
+  const energy: EnergyDeclaration = {
+    watts: Number(flag("--watts")),
+    source: flag("--source"),
+    evidenceUrl: flag("--evidence"),
+    budgetWh: Number(flag("--budget-wh")),
+  };
+  const payout: PayoutProfile = { qi: Number(flag("--qi")), quai: Number(flag("--quai")), fiat: Number(flag("--fiat")), schedule: flag("--schedule") };
+  const key = loadOrCreateNodeKey(dataDir);
+  const nodeId = argv.includes("--node-id") ? flag("--node-id") : undefined;
+  console.log(JSON.stringify(buildRegistration(key.sign, { url: flag("--url"), publicKey: key.publicJwk, nodeId, energy, payout })));
+}
+
 if (process.argv[1]?.endsWith("workshop/node.ts")) {
-  const args = parseNodeArgs(process.argv.slice(2));
-  startNode({ ...args, dataDir: process.env.DATA_DIR ?? join(process.cwd(), "data"), publicPath: join(process.cwd(), "public") }).catch((e) => {
-    console.error(`node: ${e?.message ?? e}`);
-    process.exit(1);
-  });
+  const argv = process.argv.slice(2);
+  const dataDir = process.env.DATA_DIR ?? join(process.cwd(), "data");
+  if (argv[0] === "print-register") {
+    try {
+      printRegister(argv.slice(1), dataDir);
+    } catch (e: any) {
+      console.error(`node: ${e?.message ?? e}`);
+      process.exit(1);
+    }
+  } else {
+    const args = parseNodeArgs(argv);
+    startNode({ ...args, dataDir, publicPath: join(process.cwd(), "public") }).catch((e) => {
+      console.error(`node: ${e?.message ?? e}`);
+      process.exit(1);
+    });
+  }
 }

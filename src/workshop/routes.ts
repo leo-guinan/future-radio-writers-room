@@ -15,14 +15,19 @@ import {
   assertOpen,
   assertServing,
   attributePlayer,
+  energyReceiptsOf,
   hasPlayer,
   maybeClose,
+  maybeReceipt,
   registerNode,
+  requestGeneration,
+  resolveAttributionTarget,
+  setPayout,
   setVotes,
   voidWorkshare,
   type WorkshopCtx,
 } from "./log.ts";
-import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
+import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveSettlement, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
 import { authConfigured, authEnv, beginAuth, requestSession, sessionCookieHeader, signSession, takeVerifier, verifyCode } from "./auth.ts";
 import { mcpHttpHandler } from "./mcp.ts";
 
@@ -67,6 +72,7 @@ const requireSession = (ctx: WorkshopCtx, req: IncomingMessage): { xId: string; 
 export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler]> {
   const tick = () => {
     ctx.store.sync();
+    maybeReceipt(ctx); // receipts fix hourly work before anything else reads the log
     maybeClose(ctx);
   };
   return [
@@ -188,16 +194,57 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
       tick();
       assertCoordinator(ctx);
       const s = requireSession(ctx, req);
-      const b = await body(req);
-      const { event, nodeId } = registerNode(ctx, { operator: s.xId, url: clip(b.url, 200), publicKey: b.publicKey });
+      const b = await body(req, 64_000);
+      const { event, nodeId } = registerNode(ctx, {
+        operator: s.xId,
+        url: clip(b.url, 200),
+        publicKey: b.publicKey,
+        nodeId: typeof b.nodeId === "string" ? b.nodeId : undefined,
+        energy: b.energy,
+        payout: b.payout,
+        sig: String(b.sig ?? ""),
+      });
       send(res, 201, { nodeId, eventId: event.id });
+    }],
+    ["POST", /^\/api\/workshop\/nodes\/payout$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const ev = setPayout(ctx, { nodeId: String(b.nodeId ?? ""), payout: b.payout, byOperator: s.xId, sig: String(b.sig ?? "") });
+      send(res, 201, { nodeId: (ev.payload as any).nodeId, eventId: ev.id });
     }],
     ["POST", /^\/api\/workshop\/nodes\/heartbeat$/, async (req, res) => {
       tick();
       assertCoordinator(ctx);
       const b = await body(req);
-      const ev = addHeartbeat(ctx, { nodeId: String(b.nodeId ?? ""), at: String(b.at ?? ""), sig: String(b.sig ?? "") });
+      const ev = addHeartbeat(ctx, {
+        nodeId: String(b.nodeId ?? ""),
+        at: String(b.at ?? ""),
+        sig: String(b.sig ?? ""),
+        eventsVerified: Number(b.eventsVerified),
+        requestsServed: Number(b.requestsServed),
+        head: String(b.head ?? ""),
+      });
       send(res, 201, { ok: true, eventId: ev.id });
+    }],
+    ["GET", /^\/api\/workshop\/nodes\/([^/]+)\/receipts$/, (_q, res, m) => {
+      tick();
+      assertServing(ctx);
+      send(res, 200, energyReceiptsOf(ctx.store, decodeURIComponent(m[1])));
+    }],
+    ["POST", /^\/api\/workshop\/generate$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const r = requestGeneration(ctx, { player: s.xId, ideaId: String(b.ideaId ?? "") });
+      send(res, 201, { id: r.id, ideaId: String(b.ideaId ?? ""), spent: r.spent, remaining: r.remaining, eventId: r.event.id });
+    }],
+    ["GET", /^\/api\/workshop\/settlement$/, (_q, res) => {
+      tick();
+      assertServing(ctx);
+      send(res, 200, deriveSettlement(ctx.store.all(), ctx.config, ctx.now()));
     }],
     ["POST", /^\/api\/workshop\/builds$/, async (req, res) => {
       tick();
@@ -238,13 +285,16 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
         throw new WorkshopError("x_verify_failed", `X verification failed: ${e?.message ?? e}`, 502);
       }
       // Access token already discarded inside verifyCode. One player per X id.
-      // First sign-in binds the player to the node they came through, forever.
+      // Admission first: a refused sign-in leaves no player record. First
+      // sign-in binds the player to the node they came through, forever.
+      const isNew = !hasPlayer(ctx.store, profile.xId);
+      if (isNew) resolveAttributionTarget(ctx, profile.xId, claimed.via);
       try {
         addPlayer(ctx, profile);
-        attributePlayer(ctx, profile.xId, claimed.via);
       } catch (e) {
         if (!(e instanceof WorkshopError && e.code === "duplicate_player")) throw e;
       }
+      if (isNew) attributePlayer(ctx, profile.xId, claimed.via);
       if (!hasPlayer(ctx.store, profile.xId)) throw new WorkshopError("not_a_player", "Player record missing after verification.", 500);
       const secure = authEnv().callbackUrl.startsWith("https://");
       res.writeHead(302, { location: "/workshop", "set-cookie": sessionCookieHeader(signSession(authEnv().secret, profile, ctx.now()), secure) });

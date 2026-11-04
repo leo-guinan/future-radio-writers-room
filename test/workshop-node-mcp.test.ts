@@ -75,9 +75,10 @@ test("node keys persist and heartbeats verify", async () => {
     posted = JSON.parse(String(init.body));
     return { ok: true, text: async () => "" };
   }) as unknown as typeof fetch;
-  await sendHeartbeat("http://up:8787", "N-0001", k1.sign, Date.parse("2026-11-05T12:00:00Z"), fetchImpl);
+  await sendHeartbeat("http://up:8787", "N-0001", k1.sign, { at: new Date("2026-11-05T12:00:00Z").toISOString(), eventsVerified: 3, requestsServed: 9, head: "genesis" }, fetchImpl);
   assert.equal(posted.nodeId, "N-0001");
-  assert.equal(verifyHeartbeatSig(k1.publicJwk, posted.nodeId, posted.at, posted.sig), true);
+  assert.deepEqual([posted.eventsVerified, posted.requestsServed, posted.head], [3, 9, "genesis"]);
+  assert.equal(verifyHeartbeatSig(k1.publicJwk, posted.nodeId, posted.at, { eventsVerified: posted.eventsVerified, requestsServed: posted.requestsServed, head: posted.head }, posted.sig), true);
 });
 
 test("node args parse and reject", () => {

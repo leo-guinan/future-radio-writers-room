@@ -13,6 +13,9 @@
   "blockBonus": 10,
   "workshareCapPerDay": 5,
   "rewardAmount": null,
+  "generateCostWorkshares": 3,
+  "producerNode": { "nodeId": "producer", "allow": [], "maxPlayers": 1, "fixedPlayerWeight": 1, "operatorWeight": 1 },
+  "noViaPolicy": "reject",
   "pledge": {
     "text": "The workshop: our pledge (stated in the episode)\n\nHow it works. Until Nov 8, 11:59 PM ET, the thread is a workshop. People comment ideas (an artist, a tool, a story), and we make videos from them in the open.\nIf we win the Most Viral prize: 50% goes to the people whose ideas we make, and 50% seeds a next contest.\nIf we don't: the same amount is recorded as a public debt on Story.markets, to be repaid from future earnings. The obligation is ours.\n\nThis is our own pledge. It is not a Meta prize and not a sweepstakes. The amounts depend on the outcome stated above.",
     "ifWin": { "participants": 0.5, "nextContest": 0.5 },
