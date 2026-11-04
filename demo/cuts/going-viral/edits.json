@@ -1,0 +1,85 @@
+{
+  "episode": "going-viral",
+  "fromTake": 1,
+  "take": 2,
+  "feedback": [
+    {
+      "id": "F1",
+      "point": "The real UI is too small to read the contract and the results table."
+    },
+    {
+      "id": "F2",
+      "point": "The monitor footage is out of chronological order with the finished frame appearing before the results table."
+    }
+  ],
+  "edits": [
+    {
+      "op": "set_monitor",
+      "span": "s2",
+      "from": {
+        "mark": "contract",
+        "off": 0
+      },
+      "to": {
+        "mark": "execute",
+        "off": 0.6
+      },
+      "crop": [
+        240,
+        135,
+        800,
+        450
+      ],
+      "why": "Add a tighter crop to the contract span so the text is large enough to read.",
+      "fixes": "F1"
+    },
+    {
+      "op": "set_monitor",
+      "span": "s3",
+      "from": {
+        "mark": "done",
+        "off": 0.6
+      },
+      "to": {
+        "mark": "done",
+        "off": 6.4
+      },
+      "crop": [
+        240,
+        135,
+        800,
+        450
+      ],
+      "why": "Repoint this span to the results table with a tighter crop so the results are large enough to read in chronological position.",
+      "fixes": "F1"
+    },
+    {
+      "op": "set_monitor",
+      "span": "s4",
+      "from": {
+        "mark": "frame",
+        "off": 0
+      },
+      "to": {
+        "mark": "frame",
+        "off": 5
+      },
+      "crop": [
+        240,
+        135,
+        800,
+        450
+      ],
+      "why": "Repoint this span to the finished frame so the frame plays after the results in chronological order.",
+      "fixes": "F2"
+    }
+  ],
+  "declined": [],
+  "reuse": {
+    "preserved": 48,
+    "total": 48
+  },
+  "rewriteCount": 0,
+  "voiceEstimateHours": 0,
+  "reuseLine": "3 edits · 48/48 lines reused · 0 new recordings"
+}
