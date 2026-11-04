@@ -24,7 +24,7 @@ import {
 } from "../src/humain/cuts.ts";
 import type { CutDoc, CutEdit, CutRevision } from "../src/humain/cuts.ts";
 
-const { cut: TAKE1 } = loadCut("going-viral");
+const { cut: TAKE1 } = loadTake("going-viral", 1);
 const FIDS = ["F1", "F2"];
 const ed = (op: CutEdit["op"], args: Partial<CutEdit> = {}): CutEdit => ({ op, why: "Fix the framing.", fixes: "F1", ...args });
 
