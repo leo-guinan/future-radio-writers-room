@@ -6,7 +6,7 @@ This is our own estimate, not a judge's score.
 Rubric: the official Stage Two table (Impact 30%, Use of Meta AI Tooling 25%, Technical Depth &
 Execution 20%, Demo 25%), each scored 0–10.
 
-## What we are submitting: two takes
+## What we are submitting: three takes
 
 | | Video | Role |
 |---|---|---|
