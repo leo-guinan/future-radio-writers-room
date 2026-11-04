@@ -152,6 +152,9 @@ HumAIn OS (voice-first, human-time-bounded sessions; web UI at /humain)
                                          Run the demo end to end (simulated speech, or real
                                          muse-voice-transcribe-1.0 with MODEL_API_KEY;
                                          --live fails visibly without Meta APIs)
+  humain revise EPISODE [--feedback "..."] [--ceiling N] [--secs N] [--voice-file f.wav] [--live]
+                                         Revise a cut (take N -> N+1) from spoken
+                                         feedback; strict muse-spark-1.3, no offline planner
   humain replay H-0001                   Terminal replay of a session's events from the log
   humain evidence H-0001                 Observed/estimated/unknown costs, time, reuse evidence
   humain frames                          Persistent shareable frames and their visit counts
@@ -725,6 +728,73 @@ async function main() {
         out(`Done: ${st.terminal?.detail} Spend $${st.spendUsd}. Replay: npm run room -- humain replay ${s.sessionId}`);
         return;
       }
+      if (sub === "revise") {
+        if (flags.live) process.env.HUMAIN_LIVE = "1";
+        const { SparkPlanner, isLive } = await import("./humain/adapters.ts");
+        const { HUMAN_BUDGET_MIN } = await import("./humain/session.ts");
+        const { VOICE_HOURS_PER_RECORDING, buildReviseContract, buildReviseTasks, loadCritiques, loadCut, preservedLines, applyEdits, reuseLine, rewriteCount, validateEdits } = await import("./humain/cuts.ts");
+        const { runAcceptance } = await import("./humain/observe.ts");
+        const episode = need(pos[1], "episode (e.g. going-viral)");
+        let cut;
+        let take;
+        try {
+          ({ cut, take } = loadCut(episode));
+        } catch (e: any) {
+          throw new RuleError("usage", e?.message ?? String(e));
+        }
+        const feedback = flags.feedback ?? flags.idea ?? "Make the monitor easier to read and keep the story as is.";
+        const s = SessionController.open(room, by, 2, flags["save-transcript"] === "true", Number(flags.reserve ?? 10), episode);
+        out(`Session ${s.sessionId}: revising ${cut.title} take ${take} (2-minute input window, simulated speech). Human budget ${HUMAN_BUDGET_MIN} min/day, reserved ${s.reserveMin} min.${isLive() ? " LIVE MODE: Meta APIs or visible failure." : ""}`);
+        s.startRecording("revise: simulated microphone");
+        if (flags["voice-file"]) {
+          if (!MetaVoiceTranscriber.available()) throw new RuleError("usage", "--voice-file needs MODEL_API_KEY for muse-voice-transcribe-1.0.");
+          const { readFileSync: readAudio } = await import("node:fs");
+          const t = new MetaVoiceTranscriber();
+          const { chunks, costUsd } = await t.transcribe(readAudio(flags["voice-file"]), "audio/wav");
+          for (const c of chunks) s.ingestTranscript(c.text, c.final, t.id);
+          out(`Voice: ${chunks.length} chunk(s) via ${t.id} (cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
+          if (typeof costUsd === "number" && costUsd > 0)
+            room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: costUsd, unit: "usd", status: "observed", label: `muse-voice-transcribe-1.0 ${s.sessionId}`, evidence: s.sessionId }, "producer");
+        } else {
+          s.ingestTranscript(feedback, true, "cli-revise/typed");
+        }
+        s.closeInput("revise: finished speaking");
+        if (!SparkPlanner.available()) throw new RuleError("usage", "humain revise needs MODEL_API_KEY for muse-spark-1.3 (strict live mode; no offline revise planner).");
+        const planner = new SparkPlanner();
+        const { draft, costUsd, usage } = await planner.planRevise(s.ideaText(), cut, loadCritiques(episode, take));
+        const errs = validateEdits(cut, draft.edits, draft.feedback.map((f) => f.id), draft.declined);
+        if (errs.length) throw new RuleError("humain", `Spark's revision failed validation (nothing was applied): ${errs.join("; ")}`);
+        const plan = s.recordPlan({ idea: s.ideaText(), hook: `Revise ${cut.title} take ${take} → take ${take + 1}: ${draft.edits.length} edits`, planner: planner.id, tasks: buildReviseTasks(s.sessionId, episode, take, draft).map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
+        out(`Revision (${planner.id}): ${draft.edits.length} edits, ${draft.feedback.length} feedback points, ${draft.declined.length} declined (tokens in/out ${usage.input}/${usage.output}, cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
+        if (typeof costUsd === "number" && costUsd > 0)
+          room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: costUsd, unit: "usd", status: "observed", label: `${planner.id} revise ${s.sessionId}`, evidence: s.sessionId }, "producer");
+        else if (usage.input + usage.output > 0)
+          room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: usage.input + usage.output, unit: "tokens", status: "unknown", label: `${planner.id} revise ${s.sessionId} (unpriced)`, evidence: s.sessionId }, "producer");
+        const inv = inventory();
+        s.recordCapabilities({ reuse: [...inv.reuse, { capability: "cut.edit", source: "src/humain/cuts.ts, demo/cuts/CUT_SCHEMA.md", evidence: `validateEdits + applyEdits; ${draft.edits.length} validated edits` }], build: inv.build });
+        const est = estimatePlan(plan);
+        const recorded = s.recordEstimate({ ...est, forecastId: bookEstimate(room, by, s.sessionId, est) });
+        out(`ESTIMATE: $${est.apiUsd} API · ${est.localHours}h local · ${est.executionSeconds}s (forecast, not a receipt)`);
+        const rw = rewriteCount(draft);
+        room.addLedgerEntry(by, { ledger: "effort", kind: "hours", amount: Math.round(rw * VOICE_HOURS_PER_RECORDING * 100) / 100, unit: "hours", status: "projected", label: `ESTIMATE ${s.sessionId} voice re-recordings (${rw} new)`, who: by }, "producer");
+        out(`Voice cost: ${rw} new recording(s) → ${Math.round(rw * VOICE_HOURS_PER_RECORDING * 100) / 100}h estimated (booked as projected)`);
+        const contract = buildReviseContract(s.sessionId, plan, cut, draft, episode, take, (t) => runAcceptance(t, s.sessionId, []));
+        s.recordContract(contract, []);
+        out(`Contract: desired vs observed (${contract.observed.length} facts), satisfied ${contract.satisfied.length}, modifications ${contract.modifications.length}, acceptance ${contract.acceptance.length} tests`);
+        const { preserved, total } = preservedLines(cut, applyEdits(cut, draft.edits));
+        out(`Reuse: ${reuseLine(draft.edits.length, preserved, total, rw)}`);
+        s.approve(Number(flags.ceiling ?? 5), Number(flags.secs ?? 300));
+        await executePlan(room, s, by);
+        const st = s.state();
+        for (const r of st.results) out(`  ${r.taskId} ${r.status} — ${r.detail}`);
+        if (st.lastCheckpoint) out(`  checkpoint: ${st.lastCheckpoint.reason} — remaining: ${st.lastCheckpoint.remaining.join("; ") || "none"}`);
+        if (st.accounting) {
+          const a = st.accounting;
+          out(`  time: human used ${a.humanUsedSecs}s of ${a.reserveMin * 60}s reserved (${a.humanReleasedSecs}s released) · autonomous ${a.autonomousSecs}s · daily budget ${a.humanBudgetMin} min`);
+        }
+        out(`Done: ${st.terminal?.detail} Spend $${st.spendUsd}. Replay: npm run room -- humain replay ${s.sessionId}`);
+        return;
+      }
       if (sub === "frames") {
         const { listFrames } = await import("./humain/frames.ts");
         const frames = listFrames();
@@ -791,7 +861,7 @@ async function main() {
         out(`Today: human ${used}s of ${HUMAN_BUDGET_MIN * 60}s budget (${Math.round(used / 60 * 10) / 10}/${HUMAN_BUDGET_MIN} min).`);
         return;
       }
-      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N] | humain replay H-0001 | humain evidence H-0001 | humain frames | humain budget");
+      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N] | humain revise EPISODE [--feedback ...] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] | humain replay H-0001 | humain evidence H-0001 | humain frames | humain budget");
     }
     default:
       throw new RuleError("usage", `Unknown command '${cmd}'. Run \`npm run room -- help\`.`);

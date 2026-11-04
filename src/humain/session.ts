@@ -3,6 +3,7 @@
 // event log the writers' room replays.
 
 import { Deadline, monotonicMs } from "./clock.ts";
+import { loadCut } from "./cuts.ts";
 import { RuleError } from "../core/room.ts";
 import type { Room } from "../core/room.ts";
 import type {
@@ -58,12 +59,24 @@ export interface SessionState {
   lastCheckpoint: HumainCheckpoint | null;
   accounting: HumainAccounting | null;
   computeRemainingMs: number | null;
+  cut: { episode: string; take: number; title: string; roughCutUrl: string; lines: number } | null;
   spendUsd: number;
   decisions: Record<string, string>; // taskId -> resolution
   blocked: string[];
   results: HumainTaskResult[];
   artifacts: HumainArtifact[];
   terminal: HumainStopped | null;
+}
+
+/** Resolve the revise target for views. Disk reads can fail (fixture moved); the target still reports. */
+function cutView(cutTarget: { episode: string; take: number } | null) {
+  if (!cutTarget) return null;
+  try {
+    const { cut } = loadCut(cutTarget.episode);
+    return { episode: cutTarget.episode, take: cutTarget.take, title: cut.title, roughCutUrl: cut.rough_cut_url, lines: cut.lines.length };
+  } catch {
+    return { episode: cutTarget.episode, take: cutTarget.take, title: cutTarget.episode, roughCutUrl: "", lines: 0 };
+  }
 }
 
 export class SessionController {
@@ -100,15 +113,25 @@ export class SessionController {
     readonly saveTranscript: boolean,
     readonly reserveMin: number,
     inputDeadline: Deadline,
+    readonly cutTarget: { episode: string; take: number } | null = null,
   ) {
     this.inputDeadline = inputDeadline;
   }
 
-  static open(room: Room, actor: string, inputWindowMin: number, saveTranscript: boolean, reserveMin = 10): SessionController {
+  static open(room: Room, actor: string, inputWindowMin: number, saveTranscript: boolean, reserveMin = 10, cutEpisode?: string): SessionController {
     if (!(INPUT_WINDOWS as readonly number[]).includes(inputWindowMin))
       throw new RuleError("humain", `Pick a human input window: ${INPUT_WINDOWS.join(", ")} minutes.`);
     if (!(reserveMin > 0) || reserveMin > HUMAN_BUDGET_MIN)
       throw new RuleError("humain", `Reserve 1–${HUMAN_BUDGET_MIN} human minutes for the session.`);
+    let cutTarget: { episode: string; take: number } | null = null;
+    if (cutEpisode !== undefined && cutEpisode !== null && cutEpisode !== "") {
+      try {
+        const { take } = loadCut(cutEpisode);
+        cutTarget = { episode: cutEpisode, take };
+      } catch (e: any) {
+        throw new RuleError("humain", `Cannot revise ${JSON.stringify(cutEpisode)}: ${e?.message ?? e}`);
+      }
+    }
     const n = room.store.all().filter((e) => e.type === "humain.session_opened").length + 1;
     const sessionId = `H-${String(n).padStart(4, "0")}`;
     const deadline = Deadline.in(inputWindowMin * 60_000);
@@ -118,9 +141,10 @@ export class SessionController {
       inputDeadlineWall: deadline.atWallIso,
       saveTranscript,
       reserveMin,
+      ...(cutTarget ? { cut: cutTarget } : {}),
     };
     room.store.append("humain.session_opened", actor, opened, "public");
-    return new SessionController(room, sessionId, actor, inputWindowMin, saveTranscript, reserveMin, deadline);
+    return new SessionController(room, sessionId, actor, inputWindowMin, saveTranscript, reserveMin, deadline, cutTarget);
   }
 
   /** Rebuild a controller from the log (e.g. after a restart). Memory-only transcripts are gone; the log says so. */
@@ -129,7 +153,7 @@ export class SessionController {
     const opened = events.find((e) => e.type === "humain.session_opened");
     if (!opened) throw new RuleError("humain", `No session ${sessionId}.`);
     const p = opened.payload as HumainSessionOpened;
-    const c = new SessionController(room, sessionId, opened.actor, p.inputWindowMin, p.saveTranscript, p.reserveMin ?? 10, Deadline.fromWallIso(p.inputDeadlineWall));
+    const c = new SessionController(room, sessionId, opened.actor, p.inputWindowMin, p.saveTranscript, p.reserveMin ?? 10, Deadline.fromWallIso(p.inputDeadlineWall), p.cut ?? null);
     for (const e of events) {
       const q = e.payload as any;
       switch (e.type) {
@@ -521,6 +545,7 @@ export class SessionController {
       lastCheckpoint: this.lastCheckpoint,
       accounting: this.accounting,
       computeRemainingMs: this.computeDeadline?.remainingMs() ?? null,
+      cut: cutView(this.cutTarget),
       spendUsd: Math.round(this.spendUsd * 10000) / 10000,
       decisions: { ...this.decisions },
       blocked: [...this.blocked],

@@ -7,11 +7,13 @@ import type { Room } from "../core/room.ts";
 import { RuleError } from "../core/room.ts";
 import { SessionController } from "./session.ts";
 import { getSession, listSessions, register } from "./store.ts";
-import { MetaVoiceTranscriber, makePlanner, makeTranscriber } from "./adapters.ts";
+import { MetaVoiceTranscriber, SparkPlanner, makePlanner, makeTranscriber } from "./adapters.ts";
 import { inventory } from "./capabilities.ts";
 import { bookEstimate, estimatePlan } from "./estimate.ts";
 import { buildContract } from "./contract.ts";
 import { executePlan } from "./reconcile.ts";
+import { VOICE_HOURS_PER_RECORDING, applyEdits, buildReviseContract, buildReviseTasks, editTarget, loadCritiques, loadCut, loadTake, preservedLines, reuseLine, rewriteCount, validateEdits } from "./cuts.ts";
+import { runAcceptance } from "./observe.ts";
 import { loadWorks } from "./frame-maker.ts";
 import { allocateFrameIds, listFrames, readFrame, serveFrame } from "./frames.ts";
 import { RestrictedWorkspace } from "./executor.ts";
@@ -43,7 +45,7 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
   return [
     ["POST", /^\/api\/humain\/sessions$/, async (req, res) => {
       const b = await body(req);
-      const s = register(SessionController.open(room, actor, Number(b.inputWindowMin), b.saveTranscript === true, b.reserveMin === undefined ? 10 : Number(b.reserveMin)));
+      const s = register(SessionController.open(room, actor, Number(b.inputWindowMin), b.saveTranscript === true, b.reserveMin === undefined ? 10 : Number(b.reserveMin), typeof b.cut === "string" ? b.cut : undefined));
       send(res, 201, s.state());
     }],
     ["GET", /^\/api\/humain\/sessions$/, (_q, res) => {
@@ -74,10 +76,90 @@ export function humainRoutes(room: Room, actor: string): Array<[string, RegExp, 
       s.closeInput((await body(req)).reason || "user finished speaking");
       send(res, 200, s.state());
     }],
+    ["GET", /^\/api\/humain\/cuts\/([a-z0-9-]+)$/, (_q, res, m) => {
+      try {
+        const { cut, take } = loadCut(m[1]);
+        send(res, 200, { episode: m[1], title: cut.title, take, roughCutUrl: cut.rough_cut_url, lines: cut.lines.length });
+      } catch (e: any) {
+        throw new RuleError("humain", e?.message ?? String(e));
+      }
+    }],
+    ["GET", /^\/api\/humain\/sessions\/(H-\d{4})\/revision$/, (_q, res, m) => {
+      const s = getSession(room, m[1]);
+      const st = s.state();
+      if (!st.cut || !st.plan) throw new RuleError("humain", "No cut revision on this session yet.");
+      const revision = st.plan.tasks.find((t) => t.cut)?.cut?.revision;
+      if (!revision) throw new RuleError("humain", "This session is not revising a cut.");
+      const { cut } = loadTake(st.cut.episode, st.cut.take);
+      const next = applyEdits(cut, revision.edits);
+      const { preserved, total } = preservedLines(cut, next);
+      const rw = rewriteCount(revision);
+      let files: string[] = [];
+      try {
+        files = RestrictedWorkspace.open(m[1]).list();
+      } catch {
+        files = [];
+      }
+      send(res, 200, {
+        episode: st.cut.episode, title: cut.title, take: st.cut.take, nextTake: next.take, roughCutUrl: cut.rough_cut_url,
+        edits: revision.edits.map((e, i) => ({ i: i + 1, op: e.op, target: editTarget(e), why: e.why, fixes: e.fixes })),
+        declined: revision.declined,
+        reuseLine: reuseLine(revision.edits.length, preserved, total, rw),
+        rewriteCount: rw,
+        voiceHours: Math.round(rw * VOICE_HOURS_PER_RECORDING * 100) / 100,
+        acceptance: (st.contract?.acceptance ?? []).map((a) => ({ description: a.description, ...runAcceptance(a, m[1], st.results) })),
+        files,
+      });
+    }],
     ["POST", /^\/api\/humain\/sessions\/(H-\d{4})\/plan$/, async (_req, res, m) => {
       const s = getSession(room, m[1]);
       const idea = s.ideaText();
       if (!idea) throw new RuleError("humain", "Nothing was said. Speak first, then plan.");
+      const cutTarget = s.state().cut;
+      if (cutTarget) {
+        // Revise mode: same voice flow, but the target is a cut file, not a frame.
+        if (!SparkPlanner.available())
+          throw new RuleError("humain", "Cut revision needs muse-spark-1.3 (MODEL_API_KEY). No offline revise planner exists.");
+        const { cut } = loadTake(cutTarget.episode, cutTarget.take);
+        const take = cutTarget.take;
+        const critiques = loadCritiques(cutTarget.episode, take);
+        const planner = new SparkPlanner();
+        const { draft, costUsd, usage } = await planner.planRevise(idea, cut, critiques);
+        const errs = validateEdits(cut, draft.edits, draft.feedback.map((f) => f.id), draft.declined);
+        if (errs.length) throw new RuleError("humain", `Spark's revision failed validation (nothing was applied): ${errs.join("; ")}`);
+        const plan = s.recordPlan({
+          idea,
+          hook: `Revise ${cut.title} take ${take} → take ${take + 1}: ${draft.edits.length} edits`,
+          planner: planner.id,
+          tasks: buildReviseTasks(m[1], cutTarget.episode, take, draft).map((t, i) => ({ ...t, taskId: `${m[1]}-T${i + 1}` })),
+        });
+        const inv = inventory();
+        s.recordCapabilities({
+          reuse: [...inv.reuse, { capability: "cut.edit", source: "src/humain/cuts.ts, demo/cuts/CUT_SCHEMA.md", evidence: `validateEdits + applyEdits; ${draft.edits.length} validated edits` }],
+          build: inv.build,
+        });
+        const est = estimatePlan(plan);
+        const forecastId = bookEstimate(room, actor, m[1], est);
+        s.recordEstimate({ ...est, forecastId });
+        const rw = rewriteCount(draft);
+        room.addLedgerEntry(actor, {
+          ledger: "effort", kind: "hours", amount: Math.round(rw * VOICE_HOURS_PER_RECORDING * 100) / 100, unit: "hours",
+          status: "projected", label: `ESTIMATE ${m[1]} voice re-recordings (${rw} new)`, who: actor,
+        }, "producer");
+        s.recordContract(buildReviseContract(m[1], plan, cut, draft, cutTarget.episode, take, (t) => runAcceptance(t, m[1], [])), []);
+        if (typeof costUsd === "number" && costUsd > 0)
+          room.addLedgerEntry(actor, {
+            ledger: "operations", kind: "expense", amount: costUsd, unit: "usd",
+            status: "observed", label: `${planner.id} revise ${m[1]}`, evidence: m[1],
+          }, "producer");
+        else if (usage.input + usage.output > 0)
+          room.addLedgerEntry(actor, {
+            ledger: "operations", kind: "expense", amount: usage.input + usage.output, unit: "tokens",
+            status: "unknown", label: `${planner.id} revise ${m[1]} (unpriced)`, evidence: m[1],
+          }, "producer");
+        send(res, 201, s.state());
+        return;
+      }
       const works = loadWorks();
       const planner = makePlanner();
       const { draft, costUsd, usage } = await planner.plan(idea, { works });

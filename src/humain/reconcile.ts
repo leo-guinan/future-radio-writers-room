@@ -12,6 +12,7 @@ import type { Room } from "../core/room.ts";
 import type { HumainPlanTask } from "../core/types.ts";
 import type { SessionController } from "./session.ts";
 import { RestrictedWorkspace, WorkspaceDenied } from "./executor.ts";
+import { VOICE_HOURS_PER_RECORDING, applyEdits, editTarget, finalizeRevision, loadTake, preservedLines, renderDiff, reuseLine, rewriteCount, validateEdits } from "./cuts.ts";
 import { acceptanceSummary, observeState, runAcceptance } from "./observe.ts";
 import { Watchdog } from "./watchdog.ts";
 import { resolveEstimate } from "./estimate.ts";
@@ -48,9 +49,16 @@ export async function executePlan(room: Room, session: SessionController, actor:
   for (;;) {
     const { passed, failed } = snapshot();
     if (contract.acceptance.length > 0 && failed.length === 0) {
+      let pub: { files: string[] } | null = null;
+      try {
+        pub = finalizeRevision(session.sessionId, plan);
+      } catch (e: any) {
+        halt("safety", `Acceptance passed but publishing failed: ${e?.message ?? e}. Checkpoint preserved.`);
+        return;
+      }
       bookActuals(room, session, actor, started);
       const secs = Math.round((Date.now() - started) / 1000);
-      session.finish(`Verified state reconciliation: ${passed.length}/${contract.acceptance.length} acceptance tests pass. ${plan.tasks.length} tasks, ${session.state().repairs.length} repairs, ${secs}s.`);
+      session.finish(`Verified state reconciliation: ${passed.length}/${contract.acceptance.length} acceptance tests pass. ${plan.tasks.length} tasks, ${session.state().repairs.length} repairs, ${secs}s.${pub ? ` Published ${pub.files.join(", ")}.` : ""}`);
       return;
     }
     const failedSet = new Set(failed);
@@ -153,7 +161,7 @@ async function runTask(
   _actor: string,
   ws: RestrictedWorkspace,
   works: ReturnType<typeof loadWorks>,
-  plan: { hook: string; tasks: Array<{ detail: string }> },
+  plan: { hook: string; tasks: HumainPlanTask[] },
   task: HumainPlanTask,
 ): Promise<void> {
   const t0 = Date.now();
@@ -206,6 +214,39 @@ async function runTask(
       taskId: task.taskId, status: "success",
       evidence: `frames: ${frames.map((f) => f.frameId).join(", ")}`,
       detail: `Verified ${frames.length} published frame(s).`,
+      costUsd: 0, seconds: secs(),
+    });
+    return;
+  }
+  if (task.capability === "cut.edit") {
+    const ctx = task.cut;
+    if (!ctx) throw new Error(`${task.taskId}: cut.edit task carries no revision.`);
+    const { cut: source } = loadTake(ctx.episode, ctx.take);
+    const revision = ctx.revision;
+    const errs = validateEdits(source, revision.edits, revision.feedback.map((f) => f.id), revision.declined);
+    if (errs.length) throw new Error(`${task.taskId}: edits invalid: ${errs.join("; ")}`);
+    // Idempotent and deterministic: every edit task rewrites the same three
+    // files (same bytes), then records its own edit as applied with evidence.
+    const next = applyEdits(source, revision.edits);
+    const { preserved, total } = preservedLines(source, next);
+    const rw = rewriteCount(revision);
+    const line = reuseLine(revision.edits.length, preserved, total, rw);
+    const takeName = `take${next.take}.cut.json`;
+    const written = ws.writeFile(takeName, `${JSON.stringify(next, null, 1)}\n`);
+    ws.writeFile("edits.json", `${JSON.stringify({
+      episode: ctx.episode, fromTake: ctx.take, take: next.take,
+      feedback: revision.feedback, edits: revision.edits, declined: revision.declined,
+      reuse: { preserved, total }, rewriteCount: rw,
+      voiceEstimateHours: Math.round(rw * VOICE_HOURS_PER_RECORDING * 100) / 100,
+      reuseLine: line,
+    }, null, 2)}\n`);
+    ws.writeFile("diff.md", renderDiff(source, next, revision));
+    const edit = revision.edits[ctx.editIndex];
+    session.recordArtifact({ taskId: task.taskId, path: takeName, sha256: written.sha256, bytes: written.bytes, label: `Take ${next.take}: ${source.title} (${line})` });
+    session.recordTaskResult({
+      taskId: task.taskId, status: "success",
+      evidence: `edit ${ctx.editIndex + 1}/${revision.edits.length} ${edit.op} ${editTarget(edit)} applied; ${takeName} sha256 ${written.sha256}; ${line}`,
+      detail: `Applied ${edit.op} ${editTarget(edit)}; wrote ${takeName}, edits.json, diff.md. ${line}.`,
       costUsd: 0, seconds: secs(),
     });
     return;

@@ -3,8 +3,23 @@
 // meaningful action and chooses the next action from what it finds.
 
 import { listFrames, peekFrame, readFrame } from "./frames.ts";
+import { feedbackCoverage, loadTake, preservedLines, validateEdits } from "./cuts.ts";
 import { RestrictedWorkspace } from "./executor.ts";
 import type { HumainAcceptanceTest, HumainContract, HumainTaskResult } from "../core/types.ts";
+
+/** Parse a cut check target like "going-viral:take1". Fails closed on garbage. */
+function parseCutExpected(expected: string): { episode: string; take: number } {
+  const m = expected.match(/^([a-z0-9][a-z0-9-]*):take(\d+)$/);
+  if (!m) throw new Error(`bad cut reference ${JSON.stringify(expected)} (want episode:takeN)`);
+  return { episode: m[1], take: Number(m[2]) };
+}
+
+function readRevision(sessionId: string): { feedback: Array<{ id: string; point: string }>; edits: any[]; declined: Array<{ fixes: string; reason: string }>; reuse?: { preserved: number; total: number }; rewriteCount?: number } {
+  const rev = JSON.parse(RestrictedWorkspace.open(sessionId).readFile("edits.json"));
+  if (!Array.isArray(rev?.feedback) || !Array.isArray(rev?.edits) || !Array.isArray(rev?.declined))
+    throw new Error("edits.json lacks feedback/edits/declined arrays");
+  return rev;
+}
 
 export interface ObservedState {
   facts: string[]; // observed facts, each carrying its evidence
@@ -82,6 +97,52 @@ export function runAcceptance(t: HumainAcceptanceTest, sessionId: string, result
         return ws.exists(t.expected)
           ? { id: t.id, pass: true, detail: `${t.expected} present in workspace` }
           : fail(`${t.expected} missing from workspace`);
+      }
+      case "cut.edits_valid": {
+        const { episode, take } = parseCutExpected(t.expected);
+        const { cut } = loadTake(episode, take);
+        const rev = readRevision(sessionId);
+        const errs = validateEdits(cut, rev.edits, rev.feedback.map((f) => f.id), rev.declined);
+        return errs.length === 0
+          ? { id: t.id, pass: true, detail: `${rev.edits.length} edits validate against take ${take}` }
+          : fail(errs.join("; "));
+      }
+      case "cut.feedback_addressed": {
+        const rev = readRevision(sessionId);
+        const { uncovered, double } = feedbackCoverage(rev.feedback, rev.edits, rev.declined);
+        return uncovered.length === 0 && double.length === 0
+          ? { id: t.id, pass: true, detail: `${rev.feedback.length} feedback point(s) fixed or declined` }
+          : fail([...uncovered.map((id) => `${id} unaddressed`), ...double.map((id) => `${id} both fixed and declined`)].join("; "));
+      }
+      case "cut.edit_count": {
+        const rev = readRevision(sessionId);
+        const max = Number(t.expected);
+        return rev.edits.length <= max
+          ? { id: t.id, pass: true, detail: `${rev.edits.length} edits within ${max}` }
+          : fail(`${rev.edits.length} edits exceed ${max}`);
+      }
+      case "cut.reuse_reported": {
+        const { episode, take } = parseCutExpected(t.expected);
+        const { cut } = loadTake(episode, take);
+        const ws = RestrictedWorkspace.open(sessionId);
+        const rev = readRevision(sessionId);
+        const next = JSON.parse(ws.readFile(`take${take + 1}.cut.json`));
+        const { preserved, total } = preservedLines(cut, next);
+        if (rev.reuse?.preserved !== preserved || rev.reuse?.total !== total)
+          return fail(`edits.json reuse ${rev.reuse?.preserved}/${rev.reuse?.total} disagrees with recomputed ${preserved}/${total}`);
+        const diff = ws.readFile("diff.md");
+        const line = `${preserved}/${total} lines reused`;
+        if (!diff.includes(line)) return fail(`diff.md lacks the reuse line (${line})`);
+        const missing = rev.edits.filter((e) => typeof e?.op !== "string" || !diff.includes(e.op));
+        if (missing.length) return fail(`diff.md lacks before/after for ${missing.length} edit(s)`);
+        return { id: t.id, pass: true, detail: `${line}; diff covers ${rev.edits.length} edits` };
+      }
+      case "cut.voice_booked": {
+        const rev = readRevision(sessionId);
+        const booked = Number(t.expected);
+        return rev.rewriteCount === booked
+          ? { id: t.id, pass: true, detail: `${booked} new recording(s) booked` }
+          : fail(`edits.json books ${rev.rewriteCount}, contract booked ${booked}`);
       }
       default:
         return fail(`unknown check ${t.check}`);
