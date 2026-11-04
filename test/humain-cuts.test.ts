@@ -207,3 +207,78 @@ test("planRevise parses a canned Spark reply and fails strict without key or sha
   const garbage = (async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "not json" } }] }) })) as unknown as typeof fetch;
   await assert.rejects(() => new SparkPlanner("k", "https://x.test/chat", garbage).planRevise("x", TAKE1, ""), /unusable revision/);
 });
+
+test("fixture run: canned Spark revision executes to take2 on disk", async () => {
+  const { mkdtempSync, mkdirSync, copyFileSync, readFileSync, existsSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { EventStore } = await import("../src/core/events.ts");
+  const { Room, RuleError } = await import("../src/core/room.ts");
+  const { SessionController } = await import("../src/humain/session.ts");
+  const { executePlan } = await import("./../src/humain/reconcile.ts");
+  const { runAcceptance } = await import("../src/humain/observe.ts");
+
+  // Isolated cuts root + data dir: the run publishes take2 into temp, never the repo.
+  const cutsDir = mkdtempSync(join(tmpdir(), "humain-cuts-"));
+  mkdirSync(join(cutsDir, "going-viral"), { recursive: true });
+  copyFileSync("demo/cuts/going-viral/take1.cut.json", join(cutsDir, "going-viral", "take1.cut.json"));
+  copyFileSync("demo/cuts/going-viral/take1.feedback.md", join(cutsDir, "going-viral", "take1.feedback.md"));
+  const prevCuts = process.env.CUTS_DIR;
+  const prevData = process.env.DATA_DIR;
+  process.env.CUTS_DIR = cutsDir;
+  process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "humain-data-"));
+  try {
+    const room = new Room(new EventStore(null));
+    assert.throws(() => SessionController.open(room, "leo", 2, false, 10, "no-such-episode"), (e: unknown) => e instanceof RuleError);
+    const s = SessionController.open(room, "leo", 2, false, 10, "going-viral");
+    assert.deepEqual(s.state().cut, { episode: "going-viral", take: 1, title: "Going Viral", roughCutUrl: TAKE1.rough_cut_url, lines: 48 });
+    s.startRecording("test");
+    s.ingestTranscript("Hold the results table longer and punch up the sales line.", true, "test");
+    s.closeInput("test");
+
+    const canned = {
+      feedback: [
+        { id: "F1", point: "Results table passes too fast." },
+        { id: "F2", point: "Sales line falls flat." },
+      ],
+      edits: [
+        { op: "set_cue", before: "v4_038", shot: "MON_R", hold_after: 2.5, why: "Hold the results table on screen.", fixes: "F1" },
+        { op: "rewrite_line", id: "v5_046", text: "And sell it now!", why: "Punch up the sales line.", fixes: "F2" },
+      ],
+      declined: [],
+    };
+    const fetchImpl = (async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(canned) } }], usage: {} }) })) as unknown as typeof fetch;
+    const { cut } = loadCut("going-viral");
+    const { draft } = await new SparkPlanner("test-key", "https://x.test/chat", fetchImpl).planRevise(s.ideaText(), cut, "critiques");
+    assert.deepEqual(validateEdits(cut, draft.edits, draft.feedback.map((f) => f.id), draft.declined), []);
+    const plan = s.recordPlan({ idea: s.ideaText(), hook: "revise", planner: "muse-spark-1.3", tasks: buildReviseTasks(s.sessionId, "going-viral", 1, draft).map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
+    s.recordCapabilities({ reuse: [], build: [] });
+    s.recordEstimate({ apiUsd: 0, localHours: 0.1, executionSeconds: 10, forecastId: "F-001" });
+    s.recordContract(buildReviseContract(s.sessionId, plan, cut, draft, "going-viral", 1, (t) => runAcceptance(t, s.sessionId, [])), []);
+    s.approve(5, 300);
+    await executePlan(room, s, "leo");
+
+    const st = s.state();
+    assert.equal(st.terminal?.reason, "done");
+    assert.ok(st.results.every((r) => r.status === "success"));
+    const dir = join(cutsDir, "going-viral");
+    assert.ok(existsSync(join(dir, "take2.cut.json")));
+    assert.ok(existsSync(join(dir, "edits.json")));
+    const diff = readFileSync(join(dir, "diff.md"), "utf8");
+    assert.match(diff, /2 edits · 47\/48 lines reused · 1 new recording/);
+    assert.match(diff, /set_cue v4_038 \(fixes F1\)/);
+    assert.match(diff, /rewrite_line v5_046 \(fixes F2\)/);
+    const take2 = JSON.parse(readFileSync(join(dir, "take2.cut.json"), "utf8"));
+    assert.equal(take2.take, 2);
+    assert.equal(take2.lines.find((l: any) => l.id === "v5_046").text, "And sell it now!");
+    // The revision survives a controller rebuild (restart-safe target + ownership).
+    const rebuilt = SessionController.rebuild(room, s.sessionId);
+    assert.equal(rebuilt.state().cut?.episode, "going-viral");
+    assert.deepEqual(rebuilt.state().plan?.tasks[0].acceptance?.length! > 0, true);
+  } finally {
+    if (prevCuts === undefined) delete process.env.CUTS_DIR;
+    else process.env.CUTS_DIR = prevCuts;
+    if (prevData === undefined) delete process.env.DATA_DIR;
+    else process.env.DATA_DIR = prevData;
+  }
+});
