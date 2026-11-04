@@ -428,6 +428,7 @@ export interface HumainSessionOpened {
   inputDeadlineWall: string; // ISO wall-clock display copy; enforcement uses the monotonic clock
   saveTranscript: boolean; // transcripts hit the log only with explicit permission
   reserveMin: number; // human minutes reserved for this session (released when unused)
+  cut?: { episode: string; take: number }; // cut revision target (latest take at open), if this is a revise session
 }
 
 /** Time accounting: human budget vs autonomous execution, recorded separately. */
@@ -461,6 +462,7 @@ export interface HumainPlanTask {
   detail: string;
   decision?: string; // unresolved question; must clear before execution or the task blocks
   frame?: { frameId?: string; hook: string; workA: string; workB: string }; // frame-maker spec (work ids; frameId assigned at contract)
+  cut?: import("../humain/cuts.ts").TaskCutContext; // cut revision context (episode, take, edit index, whole revision)
   acceptance?: string[]; // acceptance test ids that verify this task
   estApiUsd: number;
   estHours: number;
