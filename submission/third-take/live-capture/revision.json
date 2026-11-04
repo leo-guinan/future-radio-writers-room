@@ -1,0 +1,86 @@
+{
+ "episode": "going-viral",
+ "title": "Going Viral",
+ "take": 2,
+ "nextTake": 3,
+ "roughCutUrl": "https://github.com/leo-guinan/future-radio-writers-room/blob/review/humain-os-prototype/submission/going-viral.mp4",
+ "edits": [
+  {
+   "i": 1,
+   "op": "set_monitor",
+   "target": "s4",
+   "why": "Moves scene 4 picture from finished-frame time back to results-table time under v4_036.",
+   "fixes": "F1"
+  }
+ ],
+ "declined": [
+  {
+   "fixes": "F2",
+   "reason": "No crop or order change made; edit preserves take 2 crops and chronological order."
+  }
+ ],
+ "reuseLine": "1 edits \u00b7 48/48 lines reused \u00b7 0 new recordings",
+ "rewriteCount": 0,
+ "voiceHours": 0,
+ "acceptance": [
+  {
+   "description": "Revision edits validate against take 2",
+   "id": "H-0001-A1",
+   "pass": true,
+   "detail": "1 edits validate against take 2"
+  },
+  {
+   "description": "Every feedback point is fixed or declined",
+   "id": "H-0001-A2",
+   "pass": true,
+   "detail": "2 feedback point(s) fixed or declined"
+  },
+  {
+   "description": "Edit count stays within 6",
+   "id": "H-0001-A3",
+   "pass": true,
+   "detail": "1 edits within 6"
+  },
+  {
+   "description": "Reuse is reported with before/after diff",
+   "id": "H-0001-A4",
+   "pass": true,
+   "detail": "48/48 lines reused; diff covers 1 edits"
+  },
+  {
+   "description": "Voice cost books 0 new recordings",
+   "id": "H-0001-A5",
+   "pass": true,
+   "detail": "0 new recording(s) booked"
+  },
+  {
+   "description": "take3.cut.json exists",
+   "id": "H-0001-A6",
+   "pass": true,
+   "detail": "take3.cut.json present in workspace"
+  },
+  {
+   "description": "edits.json exists",
+   "id": "H-0001-A7",
+   "pass": true,
+   "detail": "edits.json present in workspace"
+  },
+  {
+   "description": "diff.md exists",
+   "id": "H-0001-A8",
+   "pass": true,
+   "detail": "diff.md present in workspace"
+  },
+  {
+   "description": "H-0001-T1 completes with evidence",
+   "id": "H-0001-A9",
+   "pass": true,
+   "detail": "H-0001-T1 completed with evidence"
+  }
+ ],
+ "files": [
+  "diff.md",
+  "edits.json",
+  "take3.cut.json"
+ ]
+}

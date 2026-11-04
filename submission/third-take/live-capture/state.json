@@ -1,0 +1,310 @@
+{
+ "sessionId": "H-0001",
+ "phase": "terminal",
+ "recording": false,
+ "inputWindowMin": 2,
+ "inputRemainingMs": 0,
+ "inputClosed": true,
+ "transcriptChars": 150,
+ "transcriptChunks": 1,
+ "transcriptSaved": false,
+ "plan": {
+  "idea": "Take three. In scene four, Borges says, here is the evidence over the finished frame. Put the results table back under that line. Change nothing else.",
+  "hook": "Revise Going Viral take 2 \u2192 take 3: 1 edits",
+  "planner": "muse-spark-1.3",
+  "tasks": [
+   {
+    "title": "Edit 1/1: set_monitor s4",
+    "kind": "build",
+    "capability": "cut.edit",
+    "detail": "set_monitor s4 \u2014 Moves scene 4 picture from finished-frame time back to results-table time under v4_036. (fixes F1)",
+    "cut": {
+     "episode": "going-viral",
+     "take": 2,
+     "editIndex": 0,
+     "revision": {
+      "feedback": [
+       {
+        "id": "F1",
+        "point": "Scene 4 v4_036 'Here is the evidence' plays over the finished frame instead of the results table."
+       },
+       {
+        "id": "F2",
+        "point": "Keep take 2 legibility fixes (crops) and chronological order."
+       }
+      ],
+      "edits": [
+       {
+        "op": "set_monitor",
+        "span": "s4",
+        "from": {
+         "mark": "done",
+         "off": 6.4
+        },
+        "to": {
+         "mark": "frame",
+         "off": 0
+        },
+        "crop": [
+         240,
+         135,
+         800,
+         450
+        ],
+        "why": "Moves scene 4 picture from finished-frame time back to results-table time under v4_036.",
+        "fixes": "F1"
+       }
+      ],
+      "declined": [
+       {
+        "fixes": "F2",
+        "reason": "No crop or order change made; edit preserves take 2 crops and chronological order."
+       }
+      ]
+     }
+    },
+    "estApiUsd": 0,
+    "estHours": 0.05,
+    "estSeconds": 5,
+    "taskId": "H-0001-T1",
+    "acceptance": [
+     "H-0001-A1",
+     "H-0001-A2",
+     "H-0001-A3",
+     "H-0001-A4",
+     "H-0001-A5",
+     "H-0001-A6",
+     "H-0001-A7",
+     "H-0001-A8",
+     "H-0001-A9"
+    ]
+   }
+  ],
+  "sessionId": "H-0001"
+ },
+ "capabilities": {
+  "reuse": [
+   {
+    "capability": "event-store",
+    "source": "src/core/events.ts",
+    "evidence": "append-only hash-chained JSONL; humain sessions append here"
+   },
+   {
+    "capability": "character-memory",
+    "source": "src/agents/characters.ts, characters/borges.md",
+    "evidence": "memory role retrieves cited archive passages"
+   },
+   {
+    "capability": "character-making",
+    "source": "src/agents/characters.ts, characters/leonardo.md",
+    "evidence": "making role sketches approaches with stopping rules"
+   },
+   {
+    "capability": "character-accounting",
+    "source": "src/agents/characters.ts, characters/agnolo.md",
+    "evidence": "accounting role scores and keeps figures apart"
+   },
+   {
+    "capability": "production-loop",
+    "source": "src/production/loop.ts",
+    "evidence": "select\u2192account checklist derived from the record"
+   },
+   {
+    "capability": "cost-ledger",
+    "source": "src/core/room.ts",
+    "evidence": "three ledgers; observed/projected/disputed/unknown never blend"
+   },
+   {
+    "capability": "forecasts",
+    "source": "src/core/room.ts",
+    "evidence": "estimates booked as forecasts with due dates and resolutions"
+   },
+   {
+    "capability": "catalog-works",
+    "source": "catalog/works.json",
+    "evidence": "verified creative works with releases and checksums"
+   },
+   {
+    "capability": "visit-classification",
+    "source": "src/humain/frames.ts",
+    "evidence": "human/unique/verification visit counts with legacy migration"
+   },
+   {
+    "capability": "showrunner-gates",
+    "source": "src/showrunner/gates.ts, gates.json",
+    "evidence": "load-tightened gates for candidate selection"
+   },
+   {
+    "capability": "evidence-checks",
+    "source": "src/production/loop.ts",
+    "evidence": "fileSha + checklist pattern for verified claims"
+   },
+   {
+    "capability": "cut.edit",
+    "source": "src/humain/cuts.ts, demo/cuts/CUT_SCHEMA.md",
+    "evidence": "validateEdits + applyEdits; 1 validated edits"
+   }
+  ],
+  "build": [
+   {
+    "capability": "frame-maker",
+    "why": "No page builder exists; the demo's comparison page must be generated."
+   },
+   {
+    "capability": "visitor-counter",
+    "why": "No counter component exists; the vintage odometer is new."
+   },
+   {
+    "capability": "voice-capture",
+    "why": "Mic capture + input window is new HumAIn OS surface (this prototype provides it)."
+   }
+  ],
+  "sessionId": "H-0001"
+ },
+ "estimate": {
+  "apiUsd": 0,
+  "localHours": 0.05,
+  "executionSeconds": 5,
+  "forecastId": "F-001",
+  "sessionId": "H-0001",
+  "label": "ESTIMATE"
+ },
+ "contract": {
+  "desired": "Revise Going Viral take 2 \u2192 take 3: address 2 feedback point(s) with 1 edit(s), preserving everything else.",
+  "observed": [
+   "going-viral take is 2 (\"Going Viral\", evidence: going-viral/take2.cut.json)",
+   "take 2 holds 48 voice lines, 11 shots, 7 cues, 5 monitor spans (evidence: cut JSON scan)",
+   "capture ends at marks.end=66.67s on a 1280x720 recording (evidence: cut JSON scan)",
+   "rough cut: https://github.com/leo-guinan/future-radio-writers-room/blob/review/humain-os-prototype/submission/going-viral.mp4 (evidence: cut JSON)"
+  ],
+  "satisfied": [],
+  "modifications": [
+   "H-0001-T1 [build/cut.edit] Edit 1/1: set_monitor s4"
+  ],
+  "missing": [],
+  "acceptance": [
+   {
+    "id": "H-0001-A1",
+    "description": "Revision edits validate against take 2",
+    "check": "cut.edits_valid",
+    "target": "H-0001-T1",
+    "expected": "going-viral:take2"
+   },
+   {
+    "id": "H-0001-A2",
+    "description": "Every feedback point is fixed or declined",
+    "check": "cut.feedback_addressed",
+    "target": "H-0001-T1",
+    "expected": "going-viral:take2"
+   },
+   {
+    "id": "H-0001-A3",
+    "description": "Edit count stays within 6",
+    "check": "cut.edit_count",
+    "target": "H-0001-T1",
+    "expected": "6"
+   },
+   {
+    "id": "H-0001-A4",
+    "description": "Reuse is reported with before/after diff",
+    "check": "cut.reuse_reported",
+    "target": "H-0001-T1",
+    "expected": "going-viral:take2"
+   },
+   {
+    "id": "H-0001-A5",
+    "description": "Voice cost books 0 new recordings",
+    "check": "cut.voice_booked",
+    "target": "H-0001-T1",
+    "expected": "0"
+   },
+   {
+    "id": "H-0001-A6",
+    "description": "take3.cut.json exists",
+    "check": "workspace.file",
+    "target": "H-0001-T1",
+    "expected": "take3.cut.json"
+   },
+   {
+    "id": "H-0001-A7",
+    "description": "edits.json exists",
+    "check": "workspace.file",
+    "target": "H-0001-T1",
+    "expected": "edits.json"
+   },
+   {
+    "id": "H-0001-A8",
+    "description": "diff.md exists",
+    "check": "workspace.file",
+    "target": "H-0001-T1",
+    "expected": "diff.md"
+   },
+   {
+    "id": "H-0001-A9",
+    "description": "H-0001-T1 completes with evidence",
+    "check": "task.evidence",
+    "target": "H-0001-T1",
+    "expected": "success+evidence"
+   }
+  ],
+  "limits": {
+   "spendCeilingUsd": 5,
+   "computeDeadlineSecs": 300
+  },
+  "sessionId": "H-0001"
+ },
+ "approval": {
+  "sessionId": "H-0001",
+  "spendCeilingUsd": 5,
+  "computeDeadlineSecs": 300,
+  "computeDeadlineWall": "2026-11-04T21:10:49.013Z"
+ },
+ "frames": [],
+ "repairs": [],
+ "lastCheckpoint": null,
+ "accounting": {
+  "sessionId": "H-0001",
+  "humanBudgetMin": 60,
+  "reserveMin": 10,
+  "humanUsedSecs": 20,
+  "humanReleasedSecs": 580,
+  "autonomousSecs": 0
+ },
+ "computeRemainingMs": 298629,
+ "cut": {
+  "episode": "going-viral",
+  "take": 2,
+  "title": "Going Viral",
+  "roughCutUrl": "https://github.com/leo-guinan/future-radio-writers-room/blob/review/humain-os-prototype/submission/going-viral.mp4",
+  "lines": 48
+ },
+ "spendUsd": 0,
+ "decisions": {},
+ "blocked": [],
+ "results": [
+  {
+   "taskId": "H-0001-T1",
+   "status": "success",
+   "evidence": "edit 1/1 set_monitor s4 applied; take3.cut.json sha256 8cdf3e2b5081320640defa3c9dfb348fb88349536eb40ea20eea97cb31202fe1; 1 edits \u00b7 48/48 lines reused \u00b7 0 new recordings",
+   "detail": "Applied set_monitor s4; wrote take3.cut.json, edits.json, diff.md. 1 edits \u00b7 48/48 lines reused \u00b7 0 new recordings.",
+   "costUsd": 0,
+   "seconds": 0,
+   "sessionId": "H-0001"
+  }
+ ],
+ "artifacts": [
+  {
+   "taskId": "H-0001-T1",
+   "path": "take3.cut.json",
+   "sha256": "8cdf3e2b5081320640defa3c9dfb348fb88349536eb40ea20eea97cb31202fe1",
+   "bytes": 8902,
+   "label": "Take 3: Going Viral (1 edits \u00b7 48/48 lines reused \u00b7 0 new recordings)",
+   "sessionId": "H-0001"
+  }
+ ],
+ "terminal": {
+  "sessionId": "H-0001",
+  "reason": "done",
+  "detail": "Verified state reconciliation: 9/9 acceptance tests pass. 1 tasks, 0 repairs, 0s. Published going-viral/take3.cut.json, going-viral/edits.json, going-viral/diff.md."
+ }
+}
