@@ -28,15 +28,18 @@ Execution 20%, Demo 25%), each scored 0–10.
 
 | Category (weight) | Score | Why |
 |---|---|---|
-| **Impact (30%)** | **6** | Real need: artists choosing between versions of their work, with audience help, while keeping their own tools and audiences. HumAIn OS already builds the comparison frames and counts unique visitors (excluding refreshes and automated checks). Held back: no artists or audiences have used it yet. "Find the hundred who would pay" is a goal, not a result. We also have not checked the entry against the event's listed problem statements, which this rubric asks about. |
+| **Impact (30%)** | **7** | Real need: artists choosing between versions of their work, with audience help, while keeping their own tools and audiences. The entry is filed under the **Build for Your World** problem statement. There is now evidence of a real person helped ([`IMPACT.md`](IMPACT.md)): an artist publicly asked for marketing that "someone else does for you". Future Radio made an episode about his work, and he responded unprompted: "I just watched historical artists discuss my whole deal". Held back: that is one person, the posts have small reach, and the episode came from the Future Radio pipeline, not a HumAIn OS run. No audience has used Frame Maker yet. |
 | **Use of Meta AI Tooling (25%)** | **8** | Meta tooling is used at three layers. **Built:** Muse Code on Muse Spark wrote the whole system: 12 commits from one session, with a public redacted export that has 15,286 records ([`BUILT_WITH.md`](BUILT_WITH.md)). That work included fixing a restart bug it found in a live run. **Runs:** Voice Transcribe and Spark turn the spoken request into a costed change contract with 17 acceptance tests, enforced by code rather than trusted as prose. **Recursive:** two of those commits came from HumAIn sessions that changed HumAIn's own codebase. This is a clean, verifiable record of Meta's harness engineering a non-trivial system inside its own ecosystem. Held back: the video shows the runtime layer, and the build layer is evidenced only in documents. Meta image generation is not used. |
 | **Technical Depth & Execution (20%)** | **8** | Sound, refined engineering. Deadlines run on a monotonic clock, and spend ceilings, a watchdog and stop/revoke are enforced in code. Results land in a hash-chained event log that can be replayed. Unpriced Meta usage is booked as **unknown**, never $0. Restart recovery and atomic frame-ID allocation exist; 43/43 HumAIn tests pass. The live mode fails visibly instead of silently swapping in mocks. Held back: the unsupervised step is a fixed frame builder, not model-driven work. |
 | **Demo (25%)** | **7** | Cool to watch and under 3 minutes (2:57). The hosts' recorded voice is the system's actual input, and the run on screen is live: transcript → plan → approval → execution → 17/17 acceptance tests pass → served frames. Held back: the real UI is small inside the animation. The footage is cut out of order and partly sped up (labelled on screen). It is one run. |
-| **Weighted total** | **7.2 / 10** | 0.30×6 + 0.25×8 + 0.20×8 + 0.25×7 = 7.15 (was 6.65 before the Muse Code build record was added) |
+| **Weighted total** | **7.5 / 10** | 0.30×7 + 0.25×8 + 0.20×8 + 0.25×7 = 7.45. History: 6.65 at first; 7.15 after the Muse Code build record; 7.45 after the impact evidence and naming the problem statement. |
 
-**Biggest lever now:** *Impact* (30%) is the heaviest weight and our lowest score. The tooling
-story is strong, but only if judges see it, so the build record must appear in the form
-description, not only in this folder.
+**Form answers:** [`FORM.md`](FORM.md). They carry the build record and the impact evidence into
+the fields judges actually read.
+
+**Biggest lever now:** *Demo* (25%, scored 7). Reach on the impact story would also help: a public
+link to the Loopy exchange in the video's post, or a second person, would move Impact more than
+any code change could today.
 
 ## Stage Three — demo-video risk
 
@@ -55,5 +58,6 @@ description, not only in this folder.
 2. **Demo.** In the description, link `live-capture/` and quote "17/17 acceptance tests pass". If
    the form allows a second video, attach the 60–90 s raw screen recording of the same session, so
    judges can read the contract and results.
-3. **Impact.** In the copy, name the event's problem statement this addresses, and describe one
-   concrete artist workflow: post two cuts, share the frame, read the unique-visitor counts.
+3. **Impact.** Done: the problem statement is named (Build for Your World) and human-impact
+   evidence is added. Next: describe one concrete artist workflow (post two cuts, share the frame,
+   read the unique-visitor counts) and run it with a real artist.

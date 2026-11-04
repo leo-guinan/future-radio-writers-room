@@ -12,6 +12,9 @@
 - **How it was built:** [`BUILT_WITH.md`](BUILT_WITH.md). Meta's Muse Code harness (on
   `muse-spark-1.3-contributor`) wrote every HumAIn OS commit. The session export is public at
   [meta-hackathon-proof-of-work](https://github.com/leo-guinan/meta-hackathon-proof-of-work).
+- **Human impact:** [`IMPACT.md`](IMPACT.md). An artist felt seen by a Future Radio episode about
+  his work.
+- **Form answers:** [`FORM.md`](FORM.md). Indie track; Build for Your World.
 - **Self-assessment:** [`SCORECARD.md`](SCORECARD.md).
 
 ## What the video shows, exactly
