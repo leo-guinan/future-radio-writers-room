@@ -13,6 +13,8 @@ Execution 20%, Demo 25%), each scored 0–10.
 | **Submission demo** | *Going Viral*, [`going-viral.mp4`](going-viral.mp4), 2:57 | The take we judged good enough to submit: a live HumAIn OS run on the studio monitor. |
 | **Most Viral post (X)** | *Second Take*, [`second-take/second-take.mp4`](second-take/second-take.mp4), 2:27 | The same video put through review and revised under deadline by Meta models. It ends by handing the final note to the audience. |
 
+| **Reply under it** | *Third Take*, [`third-take/third-take.mp4`](third-take/third-take.mp4), 1:52 | One more note: 1 edit, 15 of 18 chunks reused, 46 s of video rendering. It then opens the thread as a workshop, with our pledge (see `third-take/README.md`). |
+
 Together they show the compression this project is about: the gap between "good enough to submit"
 and "we have a deadline, but we'd like one more revision".
 
