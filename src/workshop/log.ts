@@ -801,6 +801,35 @@ export function reportPeerAudit(
   return { event, confirmed: !healthy };
 }
 
+/**
+ * Coordinator spot-check tick (runs every minute from the server): each node
+ * with no audit yet this UTC hour gets challenged with probability 0.1, so
+ * checks land at random times about hourly. Failures only log; suspension and
+ * uptime rules derive from the log.
+ */
+export async function auditTick(ctx: WorkshopCtx, fetchImpl: typeof fetch = globalThis.fetch): Promise<void> {
+  if (ctx.mode !== "coordinator") return;
+  const hourStart = new Date(ctx.now());
+  hourStart.setUTCMinutes(0, 0, 0);
+  const auditedThisHour = new Set(
+    ctx.store
+      .all()
+      .filter((e) => e.type === "node.audit" && (e.payload as any).at >= hourStart.toISOString())
+      .map((e) => (e.payload as any).nodeId as string),
+  );
+  for (const e of ctx.store.all()) {
+    if (e.type !== "workshop.node_registered") continue;
+    const nodeId = (e.payload as any).nodeId as string;
+    if (auditedThisHour.has(nodeId) || Math.random() >= 0.1) continue;
+    auditedThisHour.add(nodeId);
+    try {
+      await runAudit(ctx, nodeId, undefined, fetchImpl);
+    } catch {
+      // an unauditable node (empty chain) just waits for the next tick
+    }
+  }
+}
+
 // ---------------------------------------------------------------- v5: flags, quarantine, appeals
 
 export interface FlagInput {

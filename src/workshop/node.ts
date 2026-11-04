@@ -152,6 +152,7 @@ export async function startNode(opts: NodeOptions, fetchImpl: typeof fetch = glo
   await pull(true); // throws on first failure: never serve an unverified chain
 
   const key = loadOrCreateNodeKey(opts.dataDir);
+  ctx.nodeSign = key.sign; // answer coordinator audit challenges with the node key
   if (!opts.nodeId) {
     console.log("node: no --node-id. Print a signed registration with: npm run workshop:node -- print-register --url <this node> --watts <n> --source <s> --evidence <url> --budget-wh <n> --qi <f> --quai <f> --fiat <f> --schedule <sched>");
   }

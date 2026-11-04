@@ -11,23 +11,35 @@ import {
   addIdea,
   addPlayer,
   addWorkshare,
+  appealFlag,
   assertCoordinator,
   assertOpen,
   assertServing,
   attributePlayer,
+  auditMessage,
+  authorizeNode,
+  detectGaming,
   energyReceiptsOf,
+  fileChallenge,
+  finalizeSettlement,
   hasPlayer,
   maybeClose,
+  maybePropose,
   maybeReceipt,
+  raiseFlag,
   registerNode,
+  reportPeerAudit,
   requestGeneration,
   resolveAttributionTarget,
+  resolveChallenge,
+  resolveFlag,
   setPayout,
   setVotes,
+  subjectHash,
   voidWorkshare,
   type WorkshopCtx,
 } from "./log.ts";
-import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveSettlement, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
+import { deriveAudits, deriveChallenges, deriveFlags, deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveSettlementPhase, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
 import { authConfigured, authEnv, beginAuth, requestSession, sessionCookieHeader, signSession, takeVerifier, verifyCode } from "./auth.ts";
 import { mcpHttpHandler } from "./mcp.ts";
 
@@ -74,6 +86,8 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
     ctx.store.sync();
     maybeReceipt(ctx); // receipts fix hourly work before anything else reads the log
     maybeClose(ctx);
+    maybePropose(ctx); // at close the settlement is proposed, with its hash
+    detectGaming(ctx); // bursts, clusters, and audit-fail growth raise flags
   };
   return [
     ["GET", /^\/api\/workshop$/, (_q, res) => {
@@ -102,8 +116,21 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
       assertCoordinator(ctx);
       const s = requireSession(ctx, req);
       const b = await body(req);
+      if (typeof b.website === "string" && b.website.trim()) {
+        // Canary: the page hides this field, so only automation fills it in. Log and proceed.
+        raiseFlag(ctx, { subject: s.xId, subjectKind: "player", signal: "canary:honeypot", evidence: { field: "website" } }, "system");
+      }
       const ev = addIdea(ctx, { author: s.xId, kind: String(b.kind ?? ""), title: clip(b.title, 80), pitch: clip(b.pitch, 500), incentive: clip(b.incentive, 200) });
       send(res, 201, { id: (ev.payload as any).id, eventId: ev.id });
+    }],
+    ["POST", /^\/api\/workshop\/admin\/export$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      // Canary: a decoy, unlisted route that only scraped code would call. Log the hit, play dead.
+      const s = requestSession(req, ctx.now());
+      const ip = String((req.socket as any)?.remoteAddress ?? "unknown");
+      raiseFlag(ctx, { subject: s ? s.xId : `anon:${subjectHash(ip)}`, subjectKind: "player", signal: "canary:decoy_route", evidence: { route: "/api/workshop/admin/export" } }, "system");
+      throw new WorkshopError("not_found", "Not found.", 404);
     }],
     ["PUT", /^\/api\/workshop\/votes$/, async (req, res) => {
       tick();
@@ -233,6 +260,104 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
       assertServing(ctx);
       send(res, 200, energyReceiptsOf(ctx.store, decodeURIComponent(m[1])));
     }],
+    ["POST", /^\/api\/workshop\/nodes\/([^/]+)\/authorize$/, async (req, res, m) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const ev = await authorizeNode(ctx, { nodeId: decodeURIComponent(m[1]), url: String(b.url ?? ""), byOperator: s.xId, byHandle: s.handle }, ctx.fetchImpl ?? globalThis.fetch);
+      send(res, 201, { nodeId: (ev.payload as any).nodeId, url: (ev.payload as any).url, eventId: ev.id });
+    }],
+    ["POST", /^\/api\/workshop\/audits$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const r = reportPeerAudit(ctx, {
+        reporterNode: String(b.reporterNode ?? ""),
+        target: String(b.target ?? ""),
+        k: Number(b.k),
+        hash: String(b.hash ?? ""),
+        head: String(b.head ?? ""),
+        sig: String(b.sig ?? ""),
+        byOperator: s.xId,
+      });
+      send(res, 201, { confirmed: r.confirmed, eventId: r.event.id });
+    }],
+    ["GET", /^\/api\/workshop\/audit-proof$/, (req, res) => {
+      tick();
+      assertServing(ctx);
+      if (!ctx.nodeSign || !ctx.nodeId) throw new WorkshopError("audit_proof_unavailable", "Only a running node answers audit challenges.", 503);
+      const k = Number(new URL(req.url ?? "/", "http://x").searchParams.get("k") ?? NaN);
+      const target = ctx.store.all().find((e) => e.seq === k);
+      if (!Number.isInteger(k) || !target) throw new WorkshopError("bad_audit", `No event with seq ${Number.isInteger(k) ? k : "?"} on this chain.`, 404);
+      const head = ctx.store.all().length ? ctx.store.head : "genesis";
+      const sig = ctx.nodeSign(auditMessage(ctx.nodeId, k, target.hash, head)).toString("base64");
+      send(res, 200, { nodeId: ctx.nodeId, k, hash: target.hash, head, sig });
+    }],
+    ["GET", /^\/api\/workshop\/audits$/, (req, res) => {
+      tick();
+      assertServing(ctx);
+      const nodeId = new URL(req.url ?? "/", "http://x").searchParams.get("node") ?? undefined;
+      send(res, 200, deriveAudits(ctx.store.all(), nodeId));
+    }],
+    ["GET", /^\/api\/workshop\/flags$/, (_q, res) => {
+      tick();
+      assertServing(ctx);
+      send(res, 200, deriveFlags(ctx.store.all())); // pseudonymous until appealed or resolved
+    }],
+    ["POST", /^\/api\/workshop\/flags$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const ev = raiseFlag(ctx, { subject: String(b.subject ?? ""), subjectKind: b.subjectKind, signal: clip(b.signal, 60) || "abuse_report", evidence: b.evidence, reporter: s.xId }, `x:${s.xId}`);
+      send(res, 201, { id: (ev.payload as any).id, eventId: ev.id });
+    }],
+    ["POST", /^\/api\/workshop\/flags\/([^/]+)\/appeal$/, async (req, res, m) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const ev = appealFlag(ctx, { id: decodeURIComponent(m[1]), reason: String(b.reason ?? ""), xId: s.xId, handle: s.handle });
+      send(res, 201, { id: (ev.payload as any).id, eventId: ev.id });
+    }],
+    ["POST", /^\/api\/workshop\/flags\/([^/]+)\/resolve$/, async (req, res, m) => {
+      tick();
+      assertCoordinator(ctx);
+      if (!isProducer(ctx, req)) throw new WorkshopError("producer_required", "Producer token required.", 401);
+      const b = await body(req);
+      const ev = resolveFlag(ctx, { id: decodeURIComponent(m[1]), decision: String(b.decision ?? ""), note: String(b.note ?? ""), by: "producer" });
+      send(res, 201, { id: (ev.payload as any).id, decision: (ev.payload as any).decision, eventId: ev.id });
+    }],
+    ["GET", /^\/api\/workshop\/challenges$/, (_q, res) => {
+      tick();
+      assertServing(ctx);
+      send(res, 200, deriveChallenges(ctx.store.all()));
+    }],
+    ["POST", /^\/api\/workshop\/challenges$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const ev = fileChallenge(ctx, { claim: String(b.claim ?? ""), evidence: String(b.evidence ?? ""), by: s.xId, handle: s.handle });
+      send(res, 201, { id: (ev.payload as any).id, eventId: ev.id });
+    }],
+    ["POST", /^\/api\/workshop\/challenges\/([^/]+)\/resolve$/, async (req, res, m) => {
+      tick();
+      assertCoordinator(ctx);
+      if (!isProducer(ctx, req)) throw new WorkshopError("producer_required", "Producer token required.", 401);
+      const b = await body(req);
+      const r = resolveChallenge(ctx, { id: decodeURIComponent(m[1]), decision: String(b.decision ?? ""), note: String(b.note ?? ""), by: "producer" });
+      send(res, 201, { id: (r.event.payload as any).id, decision: (r.event.payload as any).decision, reproposed: r.reproposed ? (r.reproposed.payload as any).hash : null, eventId: r.event.id });
+    }],
+    ["POST", /^\/api\/workshop\/settlement\/finalize$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      if (!isProducer(ctx, req)) throw new WorkshopError("producer_required", "Producer token required.", 401);
+      const ev = finalizeSettlement(ctx, "producer");
+      send(res, 201, { hash: (ev.payload as any).hash, eventId: ev.id });
+    }],
     ["POST", /^\/api\/workshop\/generate$/, async (req, res) => {
       tick();
       assertCoordinator(ctx);
@@ -244,7 +369,7 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
     ["GET", /^\/api\/workshop\/settlement$/, (_q, res) => {
       tick();
       assertServing(ctx);
-      send(res, 200, deriveSettlement(ctx.store.all(), ctx.config, ctx.now()));
+      send(res, 200, deriveSettlementPhase(ctx.store.all(), ctx.config, ctx.now()));
     }],
     ["POST", /^\/api\/workshop\/builds$/, async (req, res) => {
       tick();

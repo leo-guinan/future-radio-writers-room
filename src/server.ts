@@ -462,8 +462,20 @@ const workshopCtx: WorkshopCtx = {
   mode: "coordinator",
   producerToken: TOKEN,
 };
+if (process.env.WORKSHOP_REGISTRY_KEY) {
+  try {
+    const { createPrivateKey, sign } = await import("node:crypto");
+    const priv = createPrivateKey({ key: JSON.parse(process.env.WORKSHOP_REGISTRY_KEY), format: "jwk" });
+    workshopCtx.registrySign = (msg: Buffer) => sign(null, msg, priv);
+  } catch {
+    console.error("workshop: WORKSHOP_REGISTRY_KEY is not a valid JWK; the referee registry is unavailable.");
+  }
+}
 ensureOpened(workshopCtx);
 routes.push(...workshopRoutes(workshopCtx));
+setInterval(() => {
+  import("./workshop/log.ts").then(({ auditTick }) => auditTick(workshopCtx).catch((e) => console.error(`workshop: audit tick: ${e?.message ?? e}`)));
+}, 60_000);
 
 /**
  * The producer's console, remotely: run one CLI command on the server, against the live room.

@@ -5,7 +5,7 @@
 import { createInterface } from "node:readline";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { assertServing, energyReceiptsOf, WorkshopError, type WorkshopCtx } from "./log.ts";
-import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveSettlement, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
+import { deriveAudits, deriveChallenges, deriveFlags, deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveSettlementPhase, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
 
 export function asOf(ctx: WorkshopCtx): { seq: number; time: string } {
   const last = ctx.store.all().at(-1);
@@ -131,9 +131,29 @@ export function workshopTools(): Record<string, ToolDef> {
       },
     },
     settlement: {
-      description: "Per-operator settlement: computed share, payout profile, schedule as dated amounts. Obligations only.",
+      description: "Settlement lifecycle (open/proposed/challenged/final) with proposal hash, plus per-operator obligations. Obligations only.",
       inputSchema: { type: "object", properties: {} },
-      call: (ctx) => deriveSettlement(ctx.store.all(), ctx.config, ctx.now()),
+      call: (ctx) => deriveSettlementPhase(ctx.store.all(), ctx.config, ctx.now()),
+    },
+    audits: {
+      description: "Audit history for a node: coordinator spot checks and peer reports, pass or fail.",
+      inputSchema: { type: "object", properties: { node: { type: "string" } }, required: ["node"] },
+      call: (ctx, args) => {
+        const nodeId = String(args?.node ?? "");
+        if (!ctx.store.all().some((e) => e.type === "workshop.node_registered" && (e.payload as any).nodeId === nodeId))
+          throw new WorkshopError("unknown_node", `No node ${nodeId}.`, 404);
+        return deriveAudits(ctx.store.all(), nodeId);
+      },
+    },
+    flags: {
+      description: "Gaming flags with their lifecycle. Subjects are pseudonymous until appealed or resolved.",
+      inputSchema: { type: "object", properties: {} },
+      call: (ctx) => deriveFlags(ctx.store.all()),
+    },
+    challenges: {
+      description: "Settlement challenges with their resolutions.",
+      inputSchema: { type: "object", properties: {} },
+      call: (ctx) => deriveChallenges(ctx.store.all()),
     },
     how_to_play: {
       description: "Sign-in URL and the rules. Writes need X sign-in in a browser.",
