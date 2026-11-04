@@ -303,3 +303,101 @@ weight is fixed. Every other share of the player pool is earned by engagement.
   - receipt Wh comes from heartbeats only, never from claims;
   - spending workshares on generation reduces player weight correctly;
   - settlement is reproducible from the log on a node.
+
+---
+
+# v5: validate the validators, game the gamers, and settle only after community review
+
+## 1. Validator nodes are validated
+
+- **Every node has an operator X account.** The operator links it at registration, as before.
+- **The right to recruit from the thread is earned, not assumed.** A node becomes an
+  **authorized recruiter** only after its operator posts a reply in the thread containing the node's
+  key fingerprint. That reply is checked through oEmbed: the author must match the operator, and the
+  text must contain the fingerprint. The coordinator then records `node.authorized {nodeId, url}`.
+  Players who come through an unauthorized node still play and earn as players, but that node gets
+  no operator credit for them.
+- **Spot checks.** At random times each hour, the coordinator challenges every node: "give the hash
+  of event *k* and your chain head", signed with the node key, within 10 s. The result is logged as
+  `node.audit {pass|fail}`. Uptime only counts while audits pass. Three straight failures suspend the
+  node's operator credit until it passes again.
+- **Peer audits.** Any node can audit any other with the same challenge. A correct report of a
+  failing node (later confirmed by the coordinator) earns the reporting operator
+  `auditBountyPoints`.
+
+## 2. Gaming: detect it, quarantine it, and make it pay the honest players
+
+The rules are public. Only the thresholds are kept private until close, so they can't be tuned
+against.
+
+**Signals.** Each one is logged as `flag.raised {subject, signal, evidence}`, keyed by player or node:
+- bursts of sign-ins through one node;
+- clusters of accounts created after `opensAt`;
+- near-duplicate comment text across accounts;
+- workshare URLs that turn out not to be in the thread;
+- workshares submitted on a fixed schedule, like a script;
+- a node whose audit fails while its attributed players keep growing.
+
+**Canaries.** These are traps only automation can trigger:
+- a hidden form field on `/workshop` that a person never sees or fills in;
+- a decoy, unlisted route that only scraped code would call;
+- comment-format rules that only a script would break.
+
+A canary hit is a strong flag. No real person who follows the page is affected.
+
+**Quarantine, not deletion.** Flagged weight moves to a quarantine pool. Nothing is deleted, and
+flags stay pseudonymous (the subject's id hash) until the subject has had the chance to appeal.
+
+**Game the gamers.** Weight that stays quarantined at finalization is **forfeited and
+redistributed** to:
+- the honest players, pro rata;
+- plus a **bounty** to whoever reported or evidenced the abuse.
+
+So gaming the system funds the people playing it straight.
+
+**Appeals.** A flagged subject signs in and files `flag.appealed {reason}`. The producer resolves it
+publicly with `flag.resolved {upheld|cleared, note}`.
+
+## 3. Settlement is proposed, then challenged, then final
+
+1. **At close**, the coordinator appends `settlement.proposed {hash, formula, every input}`. Payouts
+   are amounts owed in the future, never paid now.
+2. **The challenge window.** It runs for `challengeWindow` (config; default: until **14 days after
+   the Most Viral result is announced**, so the outcome is decided by what actually happens). During
+   it:
+   - anyone can run a node, re-derive the settlement from the log, and compare hashes;
+   - anyone signed in can file `challenge.filed {claim, evidence}`;
+   - the producer answers every challenge publicly with `challenge.resolved {accepted|rejected, note}`;
+   - an accepted challenge that changes amounts produces a new `settlement.proposed`, and the window
+     restarts for the affected rows.
+3. **Finalization.** It happens only when the window has ended and every challenge is resolved:
+   `settlement.finalized {hash}`. Only then are obligations executed, from the prize or as the
+   Story.markets debt, in each operator's chosen mix and schedule.
+4. **Validator rewards.** Accepted challenges, peer audits and abuse reports earn bounties from a
+   `validationReserve` slice of the participants' pool (config; default 5%). Whatever is unused
+   returns to the players.
+
+## API / MCP / tests
+
+**Routes:**
+- `POST /api/workshop/nodes/:id/authorize {url}`
+- `POST /api/workshop/audits` (peer audit)
+- `GET /api/workshop/flags` (pseudonymous)
+- `POST /api/workshop/flags/:id/appeal`
+- `GET /api/workshop/settlement` (proposed / final, with hash)
+- `POST /api/workshop/challenges`
+- `GET /api/workshop/challenges`
+
+**MCP tools:** `audits(node)`, `flags()`, `settlement()` (now with status and hash), `challenges()`.
+
+**Tests:**
+- recruit authorization needs a matching oEmbed author and the fingerprint;
+- an unauthorized node gets no operator credit;
+- a failed audit suspends uptime credit, and three in a row suspend the node;
+- a canary hit raises a flag;
+- quarantined weight is forfeited and redistributed at finalization, with the bounty paid;
+- an appeal that clears a flag restores the weight;
+- settlement can't finalize while a challenge is open;
+- an accepted challenge re-proposes the settlement;
+- finalize is refused before the window ends;
+- every amount still sums exactly to `R`.
