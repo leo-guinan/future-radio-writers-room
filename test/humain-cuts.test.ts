@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { SparkPlanner } from "../src/humain/adapters.ts";
 import {
   CUT_OPS,
   MAX_EDITS,
@@ -186,4 +187,23 @@ test("revise tasks are one build per edit with cut context", () => {
   assert.deepEqual(contract.satisfied, []);
   const probed = buildReviseContract("H-0099", plan, TAKE1, revision, "going-viral", 1, (t) => ({ pass: t.check === "cut.edit_count", detail: "stub" }));
   assert.equal(probed.satisfied.length, 1);
+});
+
+test("planRevise parses a canned Spark reply and fails strict without key or shape", async () => {
+  const canned = {
+    feedback: [{ id: "F1", point: "Monitor too small." }],
+    edits: [{ op: "set_shot", shot: "MON_C", zoom: 3.0, x: 640, y: 146, why: "Enlarge the monitor framing.", fixes: "F1" }],
+    declined: [],
+  };
+  const fetchImpl = (async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(canned) } }], usage: { prompt_tokens: 10, completion_tokens: 5 } }) })) as unknown as typeof fetch;
+  const planner = new SparkPlanner("test-key", "https://x.test/chat", fetchImpl);
+  const { draft, usage } = await planner.planRevise("Make the monitor bigger.", TAKE1, "too small");
+  assert.deepEqual(draft, canned);
+  assert.deepEqual(usage, { input: 10, output: 5 });
+  assert.deepEqual(validateEdits(TAKE1, draft.edits, draft.feedback.map((f) => f.id), draft.declined), []);
+
+  const noKey = new SparkPlanner("", "https://x.test/chat", fetchImpl);
+  await assert.rejects(() => noKey.planRevise("x", TAKE1, ""), /No offline revise planner/);
+  const garbage = (async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "not json" } }] }) })) as unknown as typeof fetch;
+  await assert.rejects(() => new SparkPlanner("k", "https://x.test/chat", garbage).planRevise("x", TAKE1, ""), /unusable revision/);
 });

@@ -7,6 +7,8 @@
 // working with deterministic, $0 behavior.
 
 import type { HumainPlanTask } from "../core/types.ts";
+import { REVISE_SYSTEM_PROMPT, isCutRevision, reviseUserPrompt } from "./cuts.ts";
+import type { CutDoc, CutRevision } from "./cuts.ts";
 
 // ---------------------------------------------------------------- transcription
 
@@ -280,6 +282,39 @@ export class SparkPlanner implements Planner {
     const draft = extractDraft<CodeContractDraft>(raw);
     if (!draft || typeof draft.desired !== "string" || !Array.isArray(draft.modifications) || !draft.modifications.length || !Array.isArray(draft.acceptance) || !draft.acceptance.length)
       throw new Error(`LIVE MODE: muse-spark-1.3 returned an unusable code contract; refusing to invent one. Raw reply kept in provider logs; first 200 chars: ${raw.slice(0, 200)}`);
+    const usage = { input: Number(body.usage?.prompt_tokens) || 0, output: Number(body.usage?.completion_tokens) || 0 };
+    const cost = Number(body.cost_usd ?? body.usage?.cost);
+    return { draft, costUsd: Number.isFinite(cost) ? cost : null, usage };
+  }
+
+  /** Draft a cut revision from spoken feedback plus the cut JSON and written critiques.
+   * Always live: there is no offline revise planner, so a missing key or an
+   * unparseable reply is a visible failure, never a silent substitution. */
+  async planRevise(transcript: string, cut: CutDoc, critiques: string): Promise<{
+    draft: CutRevision;
+    costUsd: number | null;
+    usage: { input: number; output: number };
+  }> {
+    if (!this.apiKey)
+      throw new Error("Cut revision needs muse-spark-1.3 (MODEL_API_KEY). No offline revise planner exists; refusing to invent edits.");
+    const res = await this.fetchImpl(this.url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "muse-spark-1.3",
+        max_tokens: 8000, // reasoning tokens share this budget; content needs room after them
+        messages: [
+          { role: "system", content: REVISE_SYSTEM_PROMPT },
+          { role: "user", content: reviseUserPrompt(transcript, cut, critiques) },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`muse-spark-1.3 planRevise: HTTP ${res.status} ${String(await res.text().catch(() => "")).slice(0, 200)}`);
+    const body = (await res.json().catch(() => ({}))) as any;
+    const raw = String(body.choices?.[0]?.message?.content ?? body.output ?? "");
+    const draft = extractDraft<CutRevision>(raw);
+    if (!isCutRevision(draft))
+      throw new Error(`LIVE MODE: muse-spark-1.3 returned an unusable revision; refusing to invent one. First 200 chars: ${raw.slice(0, 200)}`);
     const usage = { input: Number(body.usage?.prompt_tokens) || 0, output: Number(body.usage?.completion_tokens) || 0 };
     const cost = Number(body.cost_usd ?? body.usage?.cost);
     return { draft, costUsd: Number.isFinite(cost) ? cost : null, usage };

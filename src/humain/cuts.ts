@@ -356,17 +356,13 @@ function applyOne(cut: CutDoc, e: CutEdit): void {
       cut.shots[e.shot!] = { zoom: e.zoom!, x: e.x!, y: e.y! };
       break;
     case "set_cue": {
-      const prev = cut.cues.find((c) => c.before === e.before) ?? {};
+      const prev: CutCue = cut.cues.find((c) => c.before === e.before) ?? { before: e.before!, shot: e.shot! };
       cut.cues = cut.cues.filter((c) => c.before !== e.before);
       const next: CutCue = { before: e.before!, shot: e.shot! };
       // Omitted timing carries over from the replaced cue; nothing is invented.
-      const carry = (k: "lead" | "hold_after" | "hold_through") => e[k] ?? prev[k];
-      const lead = carry("lead");
-      if (lead !== undefined) next.lead = lead;
-      const holdAfter = carry("hold_after");
-      if (holdAfter !== undefined) next.hold_after = holdAfter;
-      const holdThrough = carry("hold_through");
-      if (holdThrough !== undefined) next.hold_through = holdThrough;
+      if ((e.lead ?? prev.lead) !== undefined) next.lead = (e.lead ?? prev.lead)!;
+      if ((e.hold_after ?? prev.hold_after) !== undefined) next.hold_after = (e.hold_after ?? prev.hold_after)!;
+      if ((e.hold_through ?? prev.hold_through) !== undefined) next.hold_through = (e.hold_through ?? prev.hold_through)!;
       cut.cues.push(next);
       break;
     }
