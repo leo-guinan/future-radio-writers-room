@@ -138,6 +138,13 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
       assertServing(ctx);
       send(res, 200, ctx.store.verify());
     }],
+    ["GET", /^\/api\/workshop\/me$/, (req, res) => {
+      tick();
+      assertServing(ctx);
+      const s = requireSession(ctx, req);
+      const { byVoter } = deriveVotes(ctx.store.all());
+      send(res, 200, { xId: s.xId, handle: s.handle, votes: byVoter.get(s.xId) ?? {} });
+    }],
     ["GET", /^\/api\/workshop\/nodes$/, (_q, res) => {
       tick();
       assertServing(ctx);

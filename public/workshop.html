@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Art Bus Workshop</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+  main { max-width: 980px; margin: 1.5rem auto; padding: 0 1.2rem 4rem; }
+  .card { border: 1px solid #444; border-radius: 8px; padding: 1rem; margin: 1rem 0; background: rgba(255,255,255,.03); }
+  .countdown { font-size: 3.4rem; font-family: monospace; margin: .2rem 0; }
+  .countdown.closed { color: #e5484d; font-size: 2.4rem; }
+  .muted { opacity: .65; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border-bottom: 1px solid #333; padding: .4rem .5rem; text-align: left; vertical-align: top; }
+  #scoreboard { font-size: 1.5rem; }
+  #scoreboard td:first-child { font-family: monospace; }
+  .voteSlider { width: 160px; }
+  .budget { font-size: 1.3rem; font-family: monospace; }
+  .budget.over { color: #e5484d; }
+  input[type="text"], textarea, select { width: 100%; max-width: 560px; margin: .2rem 0 .6rem; }
+  textarea { height: 4.5rem; }
+  button { font-size: 1rem; padding: .4rem .9rem; }
+  #pledge { white-space: pre-wrap; }
+  .flag { display: inline-block; padding: .1rem .5rem; border: 1px solid #d8b25c; border-radius: 999px; font-size: 1rem; color: #d8b25c; }
+  .err { color: #e5484d; }
+  .ok { color: #7dd87d; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="/">&larr; writers' room</a></p>
+  <h1>The Art Bus Workshop</h1>
+  <p class="muted">Request games or videos, vote with 10 points, watch Future Radio build the winners. Agnolo keeps score.</p>
+
+  <section class="card">
+    <div class="countdown" id="countdown">--:--:--</div>
+    <p class="muted" id="windowLine"></p>
+    <div class="row"><span id="signinArea"><a id="signin" href="/api/workshop/auth/x/start">Sign in with X</a></span></div>
+    <p class="muted" id="counts"></p>
+  </section>
+
+  <section class="card" id="ideaCard">
+    <h2>Request a game or a video</h2>
+    <p><label>Kind<br><select id="kind"><option value="game">game</option><option value="video">video</option></select></label></p>
+    <p><label>Title (80)<br><input type="text" id="title" maxlength="80"></label></p>
+    <p><label>Pitch (500)<br><textarea id="pitch" maxlength="500"></textarea></label></p>
+    <p><label>Incentive (200)<br><input type="text" id="incentive" maxlength="200"></label></p>
+    <div class="row"><button id="submitIdea">Submit idea</button><span id="ideaMsg"></span></div>
+    <p class="muted">Sign-in required. At most 3 ideas per player.</p>
+  </section>
+
+  <section class="card" id="voteCard">
+    <h2>Vote <span class="budget" id="budget">10 / 10 left</span></h2>
+    <div class="row"><button id="saveVotes">Save my 10 points</button><span id="voteMsg"></span></div>
+    <table id="ideas"><thead><tr><th>Idea</th><th>Kind</th><th>By</th><th>Votes</th><th>My points (0–5)</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Agnolo's scoreboard</h2>
+    <table id="scoreboard"><thead><tr><th>Pts</th><th>Player</th><th>Ideas</th><th>Votes</th><th>Built</th><th>Uptime</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Nodes</h2>
+    <table id="nodes"><thead><tr><th>Node</th><th>Operator</th><th>Up</th><th>Hours</th><th>Last beat</th></tr></thead><tbody></tbody></table>
+    <p class="muted">Run one: see docs/RUN_A_NODE.md in the repo.</p>
+  </section>
+
+  <section class="card">
+    <h2>The pledge</h2>
+    <div id="pledge"></div>
+    <p id="rewardsLine" class="muted"></p>
+  </section>
+</main>
+<script src="/workshop.js"></script>
+</body>
+</html>

@@ -216,6 +216,19 @@ test("sessions verify and forgeries fail", () => {
   assert.equal(verifySession("test-secret", null, NOW), null);
 });
 
+test("me returns the session and current ballot", async () => {
+  const ctx = testCtx();
+  const routes = workshopRoutes(ctx);
+  const anon = await call(routes, "GET", "/api/workshop/me");
+  assert.equal(anon.status, 401);
+  const ada = asPlayer(ctx, "1", "ada");
+  const idea = await call(routes, "POST", "/api/workshop/ideas", { body: { kind: "game", title: "t", pitch: "p", incentive: "i" }, headers: ada });
+  await call(routes, "PUT", "/api/workshop/votes", { body: { [idea.json.id]: 3 }, headers: ada });
+  const me = await call(routes, "GET", "/api/workshop/me", { headers: ada });
+  assert.equal(me.json.handle, "ada");
+  assert.deepEqual(me.json.votes, { [idea.json.id]: 3 });
+});
+
 test("builds need the producer token and a real idea", async () => {
   const ctx = testCtx();
   const routes = workshopRoutes(ctx);
