@@ -34,6 +34,11 @@ function tickCountdown() {
 async function loadStatus() {
   const st = await api("/api/workshop");
   closesAtMs = Date.parse(st.closesAt);
+  // On a node page, sign-in goes to the coordinator with ?via= so the player
+  // is attributed to this node; the coordinator needs no extra credentials.
+  if (st.mode === "node" && st.nodeId) {
+    $("signin").href = `${st.upstream}/api/workshop/auth/x/start?via=${encodeURIComponent(st.nodeId)}`;
+  }
   $("windowLine").textContent = `Open since ${st.opensAt} · closes ${st.closesAt} · chain head ${st.head.slice(0, 12)} · seq ${st.seq}`;
   $("counts").textContent = `${st.counts.players} players · ${st.counts.ideas} ideas · ${st.counts.votePoints} vote points · ${st.counts.builds} builds · ${st.counts.nodes} nodes`;
   $("pledge").textContent = st.pledge.text;

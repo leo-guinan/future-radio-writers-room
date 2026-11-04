@@ -107,6 +107,7 @@ export async function startNode(opts: NodeOptions, fetchImpl: typeof fetch = glo
     now: () => Date.now(),
     mode: "node",
     upstream: opts.upstream,
+    nodeId: opts.nodeId,
     producerToken: "",
     verified: () => verified,
   };

@@ -5,7 +5,7 @@
 import { createInterface } from "node:readline";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { assertServing, WorkshopError, type WorkshopCtx } from "./log.ts";
-import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveStatus, deriveVotes } from "./derive.ts";
+import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
 
 export function asOf(ctx: WorkshopCtx): { seq: number; time: string } {
   const last = ctx.store.all().at(-1);
@@ -69,9 +69,36 @@ export function workshopTools(): Record<string, ToolDef> {
       },
     },
     rewards: {
-      description: "Projected (or final) reward split from the scores.",
+      description: "Pool split with the formula and every input. Projected until the prize outcome is set.",
       inputSchema: { type: "object", properties: {} },
-      call: (ctx) => deriveRewards(ctx.store.all(), ctx.config),
+      call: (ctx) => deriveRewards(ctx.store.all(), ctx.config, ctx.now()),
+    },
+    workshares: {
+      description: "Verified comment workshares, optionally for one player (x id or handle).",
+      inputSchema: { type: "object", properties: { player: { type: "string" } } },
+      call: (ctx, args) => {
+        const q = String(args?.player ?? "");
+        let list = deriveWorkshares(ctx.store.all());
+        if (q) list = list.filter((w) => w.player === q || w.handle.toLowerCase() === q.toLowerCase());
+        return list;
+      },
+    },
+    node_standings: {
+      description: "Nodes by operator weight: attribution, uptime qualification, sqrt weight, share.",
+      inputSchema: { type: "object", properties: {} },
+      call: (ctx) => {
+        const rewards = deriveRewards(ctx.store.all(), ctx.config, ctx.now());
+        return rewards.nodes.map((n) => ({
+          nodeId: n.nodeId,
+          operatorHandle: n.operatorHandle,
+          attributedPlayers: n.attributedPlayers,
+          uptimePct: n.uptimePct,
+          qualifies: n.qualifies,
+          weight: n.weight,
+          shareOfO: n.shareOfO,
+          amount: n.amount,
+        }));
+      },
     },
     recent_events: {
       description: "Raw hash-chained events after a seq.",

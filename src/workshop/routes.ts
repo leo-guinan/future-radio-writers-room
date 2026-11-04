@@ -10,16 +10,19 @@ import {
   addHeartbeat,
   addIdea,
   addPlayer,
+  addWorkshare,
   assertCoordinator,
   assertOpen,
   assertServing,
+  attributePlayer,
   hasPlayer,
   maybeClose,
   registerNode,
   setVotes,
+  voidWorkshare,
   type WorkshopCtx,
 } from "./log.ts";
-import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveStatus, deriveVotes } from "./derive.ts";
+import { deriveIdeas, deriveNodes, derivePlayers, deriveRewards, deriveScoreboard, deriveStatus, deriveVotes, deriveWorkshares } from "./derive.ts";
 import { authConfigured, authEnv, beginAuth, requestSession, sessionCookieHeader, signSession, takeVerifier, verifyCode } from "./auth.ts";
 import { mcpHttpHandler } from "./mcp.ts";
 
@@ -124,7 +127,38 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
     ["GET", /^\/api\/workshop\/rewards$/, (_q, res) => {
       tick();
       assertServing(ctx);
-      send(res, 200, deriveRewards(ctx.store.all(), ctx.config));
+      send(res, 200, deriveRewards(ctx.store.all(), ctx.config, ctx.now()));
+    }],
+    ["POST", /^\/api\/workshop\/workshares$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      const s = requireSession(ctx, req);
+      const b = await body(req);
+      const r = await addWorkshare(ctx, { player: s.xId, handle: s.handle, url: String(b.url ?? "") }, ctx.fetchImpl ?? globalThis.fetch);
+      send(res, 201, { url: (r.event.payload as any).url, counted: r.counted, reason: r.reason, tweetId: r.tweetId, tweetedAt: r.tweetedAt, day: r.day, eventId: r.event.id });
+    }],
+    ["POST", /^\/api\/workshop\/workshares\/void$/, async (req, res) => {
+      tick();
+      assertCoordinator(ctx);
+      if (!isProducer(ctx, req)) throw new WorkshopError("producer_required", "Producer token required.", 401);
+      const b = await body(req);
+      const ev = voidWorkshare(ctx, { url: String(b.url ?? ""), reason: String(b.reason ?? ""), by: "producer" });
+      send(res, 201, { url: (ev.payload as any).url, eventId: ev.id });
+    }],
+    ["GET", /^\/api\/workshop\/workshares$/, (req, res) => {
+      tick();
+      assertServing(ctx);
+      const q = new URL(req.url ?? "/", "http://x").searchParams.get("player");
+      let list = deriveWorkshares(ctx.store.all());
+      if (q) list = list.filter((w) => w.player === q || w.handle.toLowerCase() === q.toLowerCase());
+      send(res, 200, list);
+    }],
+    ["GET", /^\/api\/workshop\/nodes\/([^/]+)\/players$/, (_q, res, m) => {
+      tick();
+      assertServing(ctx);
+      const node = deriveNodes(ctx.store.all(), ctx.config, ctx.now()).find((n) => n.nodeId === m[1]);
+      if (!node) throw new WorkshopError("unknown_node", `No node ${m[1]}.`, 404);
+      send(res, 200, { nodeId: node.nodeId, count: node.attributedPlayers }); // count only, never handles
     }],
     ["GET", /^\/api\/workshop\/events$/, (req, res) => {
       tick();
@@ -174,13 +208,15 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
       send(res, 201, { ideaId: (ev.payload as any).ideaId, eventId: ev.id });
     }],
     ["GET", /^\/api\/workshop\/auth\/x\/start$/, (req, res) => {
+      const url = new URL(req.url ?? "/", "http://x");
       if (ctx.mode !== "coordinator") {
-        res.writeHead(302, { location: `${ctx.upstream}/api/workshop/auth/x/start` });
+        const q = url.searchParams.toString();
+        res.writeHead(302, { location: `${ctx.upstream}/api/workshop/auth/x/start${q ? `?${q}` : ""}` });
         return res.end();
       }
       if (!authConfigured()) throw new WorkshopError("x_auth_not_configured", "X sign-in is not configured on this coordinator.", 503);
-      const { url } = beginAuth();
-      res.writeHead(302, { location: url });
+      const { url: authUrl } = beginAuth(url.searchParams.get("via"));
+      res.writeHead(302, { location: authUrl });
       res.end();
     }],
     ["GET", /^\/api\/workshop\/auth\/x\/callback$/, async (req, res) => {
@@ -192,18 +228,20 @@ export function workshopRoutes(ctx: WorkshopCtx): Array<[string, RegExp, Handler
       if (!authConfigured()) throw new WorkshopError("x_auth_not_configured", "X sign-in is not configured on this coordinator.", 503);
       tick();
       assertOpen(ctx);
-      const verifier = takeVerifier(url.searchParams.get("state") ?? "");
+      const claimed = takeVerifier(url.searchParams.get("state") ?? "");
       const code = url.searchParams.get("code") ?? "";
-      if (!verifier || !code) throw new WorkshopError("bad_callback", "Sign-in did not complete. Start again.", 400);
+      if (!claimed || !code) throw new WorkshopError("bad_callback", "Sign-in did not complete. Start again.", 400);
       let profile;
       try {
-        profile = await verifyCode(code, verifier);
+        profile = await verifyCode(code, claimed.verifier, ctx.fetchImpl ?? globalThis.fetch);
       } catch (e: any) {
         throw new WorkshopError("x_verify_failed", `X verification failed: ${e?.message ?? e}`, 502);
       }
       // Access token already discarded inside verifyCode. One player per X id.
+      // First sign-in binds the player to the node they came through, forever.
       try {
         addPlayer(ctx, profile);
+        attributePlayer(ctx, profile.xId, claimed.via);
       } catch (e) {
         if (!(e instanceof WorkshopError && e.code === "duplicate_player")) throw e;
       }

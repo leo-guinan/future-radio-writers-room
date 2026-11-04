@@ -35,12 +35,17 @@ export interface PendingAuth {
 /** state -> verifier, single-use, 10-minute TTL. Keyed by random state. */
 export const pendingAuth = new Map<string, PendingAuth>();
 
-export function beginAuth(): { state: string; url: string } {
-  const { clientId, callbackUrl } = authEnv();
+export function beginAuth(via?: string | null): { state: string; url: string } {
+  const { clientId, callbackUrl, secret } = authEnv();
   const verifier = b64url(randomBytes(48));
   const challenge = b64url(createHash("sha256").update(verifier).digest());
-  const state = b64url(randomBytes(24));
-  pendingAuth.set(state, { verifier, expires: Date.now() + 10 * 60_000 });
+  const nonce = b64url(randomBytes(24));
+  pendingAuth.set(nonce, { verifier, expires: Date.now() + 10 * 60_000 });
+  // via travels inside the signed state, so only the coordinator needs X
+  // credentials and players cannot forge their attribution.
+  const payload = b64url(Buffer.from(JSON.stringify({ r: nonce, via: via ?? null }), "utf8"));
+  const sig = b64url(createHmac("sha256", secret).update(payload).digest());
+  const state = `${payload}.${sig}`;
   const url =
     `${X_AUTHORIZE_URL}?response_type=code&client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=${encodeURIComponent(SCOPES)}` +
@@ -48,11 +53,21 @@ export function beginAuth(): { state: string; url: string } {
   return { state, url };
 }
 
-export function takeVerifier(state: string): string | null {
-  const p = pendingAuth.get(state);
-  pendingAuth.delete(state);
-  if (!p || p.expires < Date.now()) return null;
-  return p.verifier;
+export function takeVerifier(signedState: string): { verifier: string; via: string | null } | null {
+  try {
+    const [payload, sig] = String(signedState).split(".");
+    if (!payload || !sig) return null;
+    const want = createHmac("sha256", authEnv().secret).update(payload).digest();
+    const got = unb64url(sig);
+    if (got.length !== want.length || !timingSafeEqual(got, want)) return null;
+    const { r, via } = JSON.parse(unb64url(payload).toString("utf8"));
+    const p = pendingAuth.get(r);
+    pendingAuth.delete(r);
+    if (!p || p.expires < Date.now()) return null;
+    return { verifier: p.verifier, via: typeof via === "string" ? via : null };
+  } catch {
+    return null;
+  }
 }
 
 export interface XProfile {

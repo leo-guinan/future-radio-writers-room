@@ -32,13 +32,16 @@ if it does not verify. It re-pulls every 15 s and heartbeats every 60 s.
 
 ## What operators earn
 
-- Hosting earns score: 1 point per full hour your node is up (a minute counts
-  when a heartbeat lands in it). Points are derived from the log, never stored.
+- Players who sign in through your node's page are attributed to your node
+  (first binding is permanent; your own account never counts toward it).
+- Your node's weight is `sqrt(attributed players)`, counted only while its
+  uptime is at least 50% of the window since it registered. The square root
+  gives diminishing returns: many mid-sized neighborhoods out-earn one giant.
 - Rewards come from the pledge: if Future Radio wins the Most Viral prize, the
-  participants' share (50%) is split pro rata by points, and node operators are
-  paid from their share (`nodeOperatorShareOfParticipants`, set by the producer
-  before nodes are advertised) pro rata by uptime. Until the producer sets it,
-  the API reports it as "not set" — never as 0.
+  participants' share (50%) splits into a player pool and an operator pool
+  (`nodeOperatorShareOfParticipants`, set by the producer before nodes are
+  advertised). Operators earn their pool pro rata by weight. Until the producer
+  sets it, the API reports it as "not set" — never as 0.
 - Everything is **projected** until the prize outcome is `won` or `lost`.
 - If the prize is lost, there is no payout: the same amount is recorded as a
   public debt on Story.markets, to be repaid from future earnings.
