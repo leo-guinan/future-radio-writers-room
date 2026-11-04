@@ -1,0 +1,478 @@
+{
+ "sessionId": "H-0001",
+ "phase": "terminal",
+ "recording": false,
+ "inputWindowMin": 2,
+ "inputRemainingMs": 69786,
+ "inputClosed": true,
+ "transcriptChars": 198,
+ "transcriptChunks": 1,
+ "transcriptSaved": false,
+ "plan": {
+  "idea": "Build us a way for artists to share competing versions of their work so audiences can help them choose what to publish. Use what we already have. Show me what works, what doesn't, and what it costs.",
+  "hook": "let audiences help artists choose what to publish",
+  "planner": "muse-spark-1.3",
+  "tasks": [
+   {
+    "title": "Reuse existing work catalog",
+    "kind": "reuse",
+    "capability": "catalog-works",
+    "detail": "Use what we already have: list cataloged works for comparison frames",
+    "estApiUsd": 0,
+    "estHours": 0.1,
+    "estSeconds": 30,
+    "taskId": "H-0001-T1",
+    "acceptance": [
+     "H-0001-A16"
+    ]
+   },
+   {
+    "title": "Build opening showdown frame",
+    "kind": "build",
+    "capability": "frame.build",
+    "detail": "Persistent shareable page with one hook and vintage visitor counter for audience vote",
+    "frame": {
+     "hook": "which opening grabs you?",
+     "workA": "e01-the-first-transmission",
+     "workB": "e10-the-people-vs-the-future",
+     "frameId": "F-0001"
+    },
+    "estApiUsd": 0.05,
+    "estHours": 0.5,
+    "estSeconds": 120,
+    "taskId": "H-0001-T2",
+    "acceptance": [
+     "H-0001-A1",
+     "H-0001-A2",
+     "H-0001-A3",
+     "H-0001-A4",
+     "H-0001-A5"
+    ]
+   },
+   {
+    "title": "Build vision showdown frame",
+    "kind": "build",
+    "capability": "frame.build",
+    "detail": "Persistent shareable page with one hook and vintage visitor counter for audience vote",
+    "frame": {
+     "hook": "which vision of power endures?",
+     "workA": "two-empires",
+     "workB": "ledger-of-what-happened",
+     "frameId": "F-0002"
+    },
+    "estApiUsd": 0.05,
+    "estHours": 0.5,
+    "estSeconds": 120,
+    "taskId": "H-0001-T3",
+    "acceptance": [
+     "H-0001-A6",
+     "H-0001-A7",
+     "H-0001-A8",
+     "H-0001-A9",
+     "H-0001-A10"
+    ]
+   },
+   {
+    "title": "Build call-to-action showdown frame",
+    "kind": "build",
+    "capability": "frame.build",
+    "detail": "Persistent shareable page with one hook and vintage visitor counter for audience vote",
+    "frame": {
+     "hook": "which call moves you to act?",
+     "workA": "cta-the-middle-is-yours",
+     "workB": "cta-from-minus-one-to-zero",
+     "frameId": "F-0003"
+    },
+    "estApiUsd": 0.05,
+    "estHours": 0.5,
+    "estSeconds": 120,
+    "taskId": "H-0001-T4",
+    "acceptance": [
+     "H-0001-A11",
+     "H-0001-A12",
+     "H-0001-A13",
+     "H-0001-A14",
+     "H-0001-A15"
+    ]
+   },
+   {
+    "title": "Verify frames and report costs",
+    "kind": "build",
+    "capability": "verify",
+    "detail": "Confirm each frame is persistent shareable with hook and counter; report what works, what doesn't, and total cost",
+    "estApiUsd": 0.01,
+    "estHours": 0.2,
+    "estSeconds": 60,
+    "taskId": "H-0001-T5",
+    "acceptance": [
+     "H-0001-A17"
+    ]
+   }
+  ],
+  "sessionId": "H-0001"
+ },
+ "capabilities": {
+  "reuse": [
+   {
+    "capability": "event-store",
+    "source": "src/core/events.ts",
+    "evidence": "append-only hash-chained JSONL; humain sessions append here"
+   },
+   {
+    "capability": "character-memory",
+    "source": "src/agents/characters.ts, characters/borges.md",
+    "evidence": "memory role retrieves cited archive passages"
+   },
+   {
+    "capability": "character-making",
+    "source": "src/agents/characters.ts, characters/leonardo.md",
+    "evidence": "making role sketches approaches with stopping rules"
+   },
+   {
+    "capability": "character-accounting",
+    "source": "src/agents/characters.ts, characters/agnolo.md",
+    "evidence": "accounting role scores and keeps figures apart"
+   },
+   {
+    "capability": "production-loop",
+    "source": "src/production/loop.ts",
+    "evidence": "select\u2192account checklist derived from the record"
+   },
+   {
+    "capability": "cost-ledger",
+    "source": "src/core/room.ts",
+    "evidence": "three ledgers; observed/projected/disputed/unknown never blend"
+   },
+   {
+    "capability": "forecasts",
+    "source": "src/core/room.ts",
+    "evidence": "estimates booked as forecasts with due dates and resolutions"
+   },
+   {
+    "capability": "catalog-works",
+    "source": "catalog/works.json",
+    "evidence": "verified creative works with releases and checksums"
+   },
+   {
+    "capability": "visit-classification",
+    "source": "src/humain/frames.ts",
+    "evidence": "human/unique/verification visit counts with legacy migration"
+   },
+   {
+    "capability": "showrunner-gates",
+    "source": "src/showrunner/gates.ts, gates.json",
+    "evidence": "load-tightened gates for candidate selection"
+   },
+   {
+    "capability": "evidence-checks",
+    "source": "src/production/loop.ts",
+    "evidence": "fileSha + checklist pattern for verified claims"
+   }
+  ],
+  "build": [
+   {
+    "capability": "frame-maker",
+    "why": "No page builder exists; the demo's comparison page must be generated."
+   },
+   {
+    "capability": "visitor-counter",
+    "why": "No counter component exists; the vintage odometer is new."
+   },
+   {
+    "capability": "voice-capture",
+    "why": "Mic capture + input window is new HumAIn OS surface (this prototype provides it)."
+   }
+  ],
+  "sessionId": "H-0001"
+ },
+ "estimate": {
+  "apiUsd": 0.16,
+  "localHours": 1.8,
+  "executionSeconds": 450,
+  "forecastId": "F-001",
+  "sessionId": "H-0001",
+  "label": "ESTIMATE"
+ },
+ "contract": {
+  "desired": "Build us a way for artists to share competing versions of their work so audiences can help them choose what to publish. Use what we already have. Show me what works, what doesn't, and what it costs.",
+  "observed": [
+   "registry holds 0 frame(s) (evidence: frames registry scan)",
+   "workspace H-0001 holds 0 file(s) (evidence: workspace list)"
+  ],
+  "satisfied": [],
+  "modifications": [
+   "H-0001-T1 [reuse/catalog-works] Reuse existing work catalog",
+   "H-0001-T2 [build/frame.build] Build opening showdown frame",
+   "H-0001-T3 [build/frame.build] Build vision showdown frame",
+   "H-0001-T4 [build/frame.build] Build call-to-action showdown frame",
+   "H-0001-T5 [build/verify] Verify frames and report costs"
+  ],
+  "missing": [
+   "frame-maker: No page builder exists; the demo's comparison page must be generated.",
+   "visitor-counter: No counter component exists; the vintage odometer is new.",
+   "voice-capture: Mic capture + input window is new HumAIn OS surface (this prototype provides it)."
+  ],
+  "acceptance": [
+   {
+    "id": "H-0001-A1",
+    "description": "Frame F-0001 exists in the registry",
+    "check": "frame.exists",
+    "target": "F-0001",
+    "expected": "F-0001"
+   },
+   {
+    "id": "H-0001-A2",
+    "description": "Frame F-0001 carries its hook",
+    "check": "frame.hook",
+    "target": "F-0001",
+    "expected": "which opening grabs you?"
+   },
+   {
+    "id": "H-0001-A3",
+    "description": "Frame F-0001 has a visitor counter",
+    "check": "frame.counter",
+    "target": "F-0001",
+    "expected": "data-testid=\"visitor-counter\""
+   },
+   {
+    "id": "H-0001-A4",
+    "description": "Frame F-0001 compares both works",
+    "check": "frame.works",
+    "target": "F-0001",
+    "expected": "e01-the-first-transmission,e10-the-people-vs-the-future"
+   },
+   {
+    "id": "H-0001-A5",
+    "description": "Frame F-0001 serves over HTTP",
+    "check": "frame.serves",
+    "target": "F-0001",
+    "expected": "200"
+   },
+   {
+    "id": "H-0001-A6",
+    "description": "Frame F-0002 exists in the registry",
+    "check": "frame.exists",
+    "target": "F-0002",
+    "expected": "F-0002"
+   },
+   {
+    "id": "H-0001-A7",
+    "description": "Frame F-0002 carries its hook",
+    "check": "frame.hook",
+    "target": "F-0002",
+    "expected": "which vision of power endures?"
+   },
+   {
+    "id": "H-0001-A8",
+    "description": "Frame F-0002 has a visitor counter",
+    "check": "frame.counter",
+    "target": "F-0002",
+    "expected": "data-testid=\"visitor-counter\""
+   },
+   {
+    "id": "H-0001-A9",
+    "description": "Frame F-0002 compares both works",
+    "check": "frame.works",
+    "target": "F-0002",
+    "expected": "two-empires,ledger-of-what-happened"
+   },
+   {
+    "id": "H-0001-A10",
+    "description": "Frame F-0002 serves over HTTP",
+    "check": "frame.serves",
+    "target": "F-0002",
+    "expected": "200"
+   },
+   {
+    "id": "H-0001-A11",
+    "description": "Frame F-0003 exists in the registry",
+    "check": "frame.exists",
+    "target": "F-0003",
+    "expected": "F-0003"
+   },
+   {
+    "id": "H-0001-A12",
+    "description": "Frame F-0003 carries its hook",
+    "check": "frame.hook",
+    "target": "F-0003",
+    "expected": "which call moves you to act?"
+   },
+   {
+    "id": "H-0001-A13",
+    "description": "Frame F-0003 has a visitor counter",
+    "check": "frame.counter",
+    "target": "F-0003",
+    "expected": "data-testid=\"visitor-counter\""
+   },
+   {
+    "id": "H-0001-A14",
+    "description": "Frame F-0003 compares both works",
+    "check": "frame.works",
+    "target": "F-0003",
+    "expected": "cta-the-middle-is-yours,cta-from-minus-one-to-zero"
+   },
+   {
+    "id": "H-0001-A15",
+    "description": "Frame F-0003 serves over HTTP",
+    "check": "frame.serves",
+    "target": "F-0003",
+    "expected": "200"
+   },
+   {
+    "id": "H-0001-A16",
+    "description": "Catalog reuse for H-0001-T1 is evidenced",
+    "check": "catalog.reused",
+    "target": "H-0001-T1",
+    "expected": "success+evidence"
+   },
+   {
+    "id": "H-0001-A17",
+    "description": "Workspace verification report exists",
+    "check": "workspace.file",
+    "target": "H-0001-T5",
+    "expected": "frame/verify.json"
+   }
+  ],
+  "limits": {
+   "spendCeilingUsd": 5,
+   "computeDeadlineSecs": 300
+  },
+  "sessionId": "H-0001"
+ },
+ "approval": {
+  "sessionId": "H-0001",
+  "spendCeilingUsd": 5,
+  "computeDeadlineSecs": 300,
+  "computeDeadlineWall": "2026-11-04T17:13:39.304Z"
+ },
+ "frames": [
+  {
+   "frameId": "F-0001",
+   "hook": "which opening grabs you?",
+   "workA": "e01-the-first-transmission",
+   "workB": "e10-the-people-vs-the-future",
+   "path": "F-0001/index.html",
+   "sha256": "a47afea9c89a9f48140ccd65b3d9aa15f9623229a0b1cbf6353e9c179f0c8add",
+   "visits": 0,
+   "unique": 0,
+   "verification": 0,
+   "sessionId": "H-0001"
+  },
+  {
+   "frameId": "F-0002",
+   "hook": "which vision of power endures?",
+   "workA": "two-empires",
+   "workB": "ledger-of-what-happened",
+   "path": "F-0002/index.html",
+   "sha256": "70b84faadb7f69c839656a41bdf55cd96cf54f564fde0cb19c9e4b708c0fbbb3",
+   "visits": 0,
+   "unique": 0,
+   "verification": 0,
+   "sessionId": "H-0001"
+  },
+  {
+   "frameId": "F-0003",
+   "hook": "which call moves you to act?",
+   "workA": "cta-the-middle-is-yours",
+   "workB": "cta-from-minus-one-to-zero",
+   "path": "F-0003/index.html",
+   "sha256": "aecfb136bccff3b20d7908a3de6f101ac381ce5894773b1990f67dc12ab96202",
+   "visits": 0,
+   "unique": 0,
+   "verification": 0,
+   "sessionId": "H-0001"
+  }
+ ],
+ "repairs": [],
+ "lastCheckpoint": null,
+ "accounting": {
+  "sessionId": "H-0001",
+  "humanBudgetMin": 60,
+  "reserveMin": 10,
+  "humanUsedSecs": 22,
+  "humanReleasedSecs": 578,
+  "autonomousSecs": 0
+ },
+ "computeRemainingMs": 298551,
+ "spendUsd": 0,
+ "decisions": {},
+ "blocked": [],
+ "results": [
+  {
+   "taskId": "H-0001-T1",
+   "status": "success",
+   "evidence": "catalog works e01-the-first-transmission, e10-the-people-vs-the-future",
+   "detail": "Reused catalog entries e01-the-first-transmission and e10-the-people-vs-the-future.",
+   "costUsd": 0,
+   "seconds": 0,
+   "sessionId": "H-0001"
+  },
+  {
+   "taskId": "H-0001-T2",
+   "status": "success",
+   "evidence": "frame F-0001 sha256 a47afea9c89a9f48140ccd65b3d9aa15f9623229a0b1cbf6353e9c179f0c8add; hook present, visitor counter present, both works present, sha256:a47afea9c89a",
+   "detail": "Published frame F-0001 (2517 bytes). Checks: hook present, visitor counter present, both works present, sha256:a47afea9c89a.",
+   "costUsd": 0,
+   "seconds": 0,
+   "sessionId": "H-0001"
+  },
+  {
+   "taskId": "H-0001-T3",
+   "status": "success",
+   "evidence": "frame F-0002 sha256 70b84faadb7f69c839656a41bdf55cd96cf54f564fde0cb19c9e4b708c0fbbb3; hook present, visitor counter present, both works present, sha256:70b84faadb7f",
+   "detail": "Published frame F-0002 (2532 bytes). Checks: hook present, visitor counter present, both works present, sha256:70b84faadb7f.",
+   "costUsd": 0,
+   "seconds": 0,
+   "sessionId": "H-0001"
+  },
+  {
+   "taskId": "H-0001-T4",
+   "status": "success",
+   "evidence": "frame F-0003 sha256 aecfb136bccff3b20d7908a3de6f101ac381ce5894773b1990f67dc12ab96202; hook present, visitor counter present, both works present, sha256:aecfb136bccf",
+   "detail": "Published frame F-0003 (2506 bytes). Checks: hook present, visitor counter present, both works present, sha256:aecfb136bccf.",
+   "costUsd": 0,
+   "seconds": 0,
+   "sessionId": "H-0001"
+  },
+  {
+   "taskId": "H-0001-T5",
+   "status": "success",
+   "evidence": "frames: F-0001, F-0002, F-0003",
+   "detail": "Verified 3 published frame(s).",
+   "costUsd": 0,
+   "seconds": 0,
+   "sessionId": "H-0001"
+  }
+ ],
+ "artifacts": [
+  {
+   "taskId": "H-0001-T2",
+   "path": "frames/F-0001/index.html",
+   "sha256": "a47afea9c89a9f48140ccd65b3d9aa15f9623229a0b1cbf6353e9c179f0c8add",
+   "bytes": 2517,
+   "label": "Frame F-0001: The First Transmission vs The People vs. The Future",
+   "sessionId": "H-0001"
+  },
+  {
+   "taskId": "H-0001-T3",
+   "path": "frames/F-0002/index.html",
+   "sha256": "70b84faadb7f69c839656a41bdf55cd96cf54f564fde0cb19c9e4b708c0fbbb3",
+   "bytes": 2532,
+   "label": "Frame F-0002: The Two Empires vs The Ledger of What Happened",
+   "sessionId": "H-0001"
+  },
+  {
+   "taskId": "H-0001-T4",
+   "path": "frames/F-0003/index.html",
+   "sha256": "aecfb136bccff3b20d7908a3de6f101ac381ce5894773b1990f67dc12ab96202",
+   "bytes": 2506,
+   "label": "Frame F-0003: The Middle Is Yours vs From Minus One to Zero",
+   "sessionId": "H-0001"
+  }
+ ],
+ "terminal": {
+  "sessionId": "H-0001",
+  "reason": "done",
+  "detail": "Verified state reconciliation: 17/17 acceptance tests pass. 5 tasks, 0 repairs, 0s."
+ }
+}

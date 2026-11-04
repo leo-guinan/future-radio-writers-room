@@ -1,0 +1,17 @@
+{
+ "page": 0.17,
+ "open": 2.41,
+ "record": 3.33,
+ "stop": 16.66,
+ "transcript": 21.53,
+ "closed": 24.08,
+ "plan_click": 25.01,
+ "contract": 43.22,
+ "approve": 51.18,
+ "execute": 52.52,
+ "done": 52.56,
+ "session": "H-0001",
+ "frame_id": "F-0001",
+ "frame": 61.31,
+ "end": 66.67
+}
