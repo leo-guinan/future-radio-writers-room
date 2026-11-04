@@ -11,6 +11,8 @@
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
     "room": "tsx src/cli.ts",
+    "workshop": "tsx src/server.ts",
+    "workshop:node": "tsx src/workshop/node.ts",
     "seed": "tsx src/cli.ts seed",
     "verify": "tsx src/cli.ts verify",
     "test": "node --import tsx --test test/*.test.ts",
