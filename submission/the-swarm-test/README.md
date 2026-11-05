@@ -29,7 +29,7 @@ Annalea Layton (@annalea_l) whether she'd like to be his cofounder.
 
 ## The starter repo
 
-[`future-radio-hermes/`](future-radio-hermes/) holds:
+[leo-guinan/future-radio-hermes](https://github.com/leo-guinan/future-radio-hermes) (MIT; a copy is in [`future-radio-hermes/`](future-radio-hermes/)) holds:
 
 - the Hermes plugin;
 - the exact spec;

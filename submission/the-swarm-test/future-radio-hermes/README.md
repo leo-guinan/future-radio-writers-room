@@ -6,8 +6,8 @@ A starter repo. Fork it and see what your swarm can do with it.
 packages its production process as a [Hermes Agent](https://hermes-agent.nousresearch.com/) plugin: seven tools from script to
 screen, and an acceptance test.
 
-It accompanies the episode **The Swarm Test** (5:20). The reference film is attached to the
-[v0.1.0 release](../../releases/tag/v0.1.0).
+It accompanies the episode **The Swarm Test** (5:20). Watch the reference film in the
+[writers' room](https://github.com/leo-guinan/future-radio-writers-room/blob/review/humain-os-prototype/submission/the-swarm-test/the-swarm-test.mp4).
 
 ## Why this exists
 
@@ -101,3 +101,8 @@ Then ask the agent to make the episode from `spec/lines.tsv`. It has these tools
 - **Who speaks.** Annalea and Jessyka don't speak in the film. Their public replies appear as screenshots.
 - **Nous Research** runs the Hermes Agent Plugin Hackathon: entries are due 5 PM EST on Nov 11, 2026. Nous Research hasn't seen
   or endorsed this repo or the film.
+
+## License
+
+[MIT](LICENSE). The screenshots in `prompt/` and in the cards are of other people's public posts, included for the test;
+they remain theirs.
