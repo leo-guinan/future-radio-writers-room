@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { beginAuth } from "../src/workshop/auth.ts";
-import { addIdea, addPlayer, attributePlayer, attributionOf, hasPlayer } from "../src/workshop/log.ts";
+import { loadWorkshopConfig } from "../src/workshop/config.ts";
+import { WorkshopError, addIdea, addPlayer, attributePlayer, attributionOf, hasPlayer, resolveAttributionTarget } from "../src/workshop/log.ts";
 import { deriveNodes, deriveRewards } from "../src/workshop/derive.ts";
 import { handleMcpMessage } from "../src/workshop/mcp.ts";
 import { workshopRoutes } from "../src/workshop/routes.ts";
@@ -38,6 +39,17 @@ test("a second account through the producer node is refused with the community l
   } finally {
     restore();
   }
+});
+
+test("the configured producer allow-list admits Leo and refuses strangers", () => {
+  const config = loadWorkshopConfig();
+  assert.deepEqual(config.producerNode.allow, ["1325102346792218629"]);
+  const ctx = testCtx({}, { producerNode: { ...testConfig().producerNode, allow: [...config.producerNode.allow] } });
+  assert.equal(resolveAttributionTarget(ctx, "1325102346792218629", "producer"), "producer");
+  assert.throws(
+    () => resolveAttributionTarget(ctx, "999", "producer"),
+    (e: unknown) => e instanceof WorkshopError && e.code === "sign_in_through_a_community_node",
+  );
 });
 
 test("noViaPolicy reject refuses; unassigned admits with no operator credit", async () => {

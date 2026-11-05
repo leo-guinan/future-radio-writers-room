@@ -14,7 +14,7 @@
   "workshareCapPerDay": 5,
   "rewardAmount": null,
   "generateCostWorkshares": 3,
-  "producerNode": { "nodeId": "producer", "allow": [], "maxPlayers": 1, "fixedPlayerWeight": 1, "operatorWeight": 1 },
+  "producerNode": { "nodeId": "producer", "allow": ["1325102346792218629"], "maxPlayers": 1, "fixedPlayerWeight": 1, "operatorWeight": 1 },
   "noViaPolicy": "reject",
   "validationReserve": 0.05,
   "challengeWindowDays": 14,
