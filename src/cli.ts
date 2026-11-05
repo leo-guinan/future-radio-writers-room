@@ -147,6 +147,11 @@ Character bibles
   bible show <character>                 Print the character's loadable system prompt
   bible chat <character> [--from name]   Talk with a principal or an extra locally; /propose drafts a viewer note
 
+Station (24-hour Future Radio; frame at /station, open feeds at /station/feed/*; see STATION.md)
+  station now | grid [--hours N] | rules
+  station program --text "watch tenso and react when someone mentions me"   (or --voice-file f.wav)
+  station approve P-0001 | station poll | station voice-cache DIR
+
 HumAIn OS (voice-first, human-time-bounded sessions; web UI at /humain)
   humain demo [--idea "..."] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N]
                                          Run the demo end to end (simulated speech, or real
@@ -655,6 +660,52 @@ async function main() {
     }
     case "loop":
       return out(LOOP.map((l) => `${l.stage.padEnd(9)} ${l.does}`).join("\n"));
+    case "station": {
+      const sub = pos[0] ?? "now";
+      const { loadLineup, onAir, grid } = await import("./station/schedule.ts");
+      if (sub === "now") {
+        const a = onAir(loadLineup(), Date.now() / 1000);
+        return out(`${a.ident ? "Station ident, then " : ""}${a.slot.program.title} (${Math.floor(a.offset / 60)}:${String(Math.floor(a.offset % 60)).padStart(2, "0")} in)`);
+      }
+      if (sub === "grid") {
+        const g = grid(loadLineup(), Date.now() / 1000, Number(flags.hours ?? 3));
+        return out(g.map((x) => `${new Date(x.start * 1000).toLocaleTimeString("en-US", { timeZone: "America/New_York" })}  ${x.program.title}`).join("\n"));
+      }
+      if (sub === "rules") {
+        const { loadRules } = await import("./station/rules.ts");
+        return out(JSON.stringify(loadRules(), null, 1));
+      }
+      if (sub === "program") {
+        const { propose } = await import("./station/program.ts");
+        const { readFileSync } = await import("node:fs");
+        const c = await propose({ text: flags.text, wav: flags["voice-file"] ? readFileSync(flags["voice-file"]) : undefined });
+        return out(JSON.stringify({ id: c.id, transcript: c.transcript, parser: c.parser, ops: c.ops, acceptance: c.acceptance }, null, 1) + `\nApprove with: station approve ${c.id}`);
+      }
+      if (sub === "approve") {
+        const { approve } = await import("./station/program.ts");
+        const r = approve(need(pos[1], "contract id (e.g. P-0001)"), by);
+        return out(r.verified.map((v) => `${v.pass ? "PASS" : "FAIL"}  ${v.check}`).join("\n") || "Nothing to change.");
+      }
+      if (sub === "poll") {
+        const { pollOnce } = await import("./station/watcher.ts");
+        const { makeArchive } = await import("./station/archive.ts");
+        return out(JSON.stringify(await pollOnce(makeArchive())));
+      }
+      if (sub === "voice-cache") {
+        // Seed the voice cache from a folder of takes: index.json maps "SPEAKER" -> { "line": "file.mp3" }.
+        const { cacheFile, VOICES } = await import("./station/tts.ts");
+        const { readFileSync, copyFileSync, mkdirSync } = await import("node:fs");
+        const { join, dirname } = await import("node:path");
+        const dir = need(pos[1], "folder with index.json");
+        const idx = JSON.parse(readFileSync(join(dir, "index.json"), "utf8")) as Record<string, Record<string, string>>;
+        let n = 0;
+        for (const [sp, lines] of Object.entries(idx)) for (const [text, f] of Object.entries(lines)) {
+          const c = cacheFile(VOICES[sp], text); mkdirSync(dirname(c), { recursive: true }); copyFileSync(join(dir, f), c); n++;
+        }
+        return out(`${n} lines cached`);
+      }
+      return out("station now | grid [--hours N] | rules | program --text \"...\" | --voice-file f.wav | approve P-0001 | poll");
+    }
     case "humain": {
       const { SessionController } = await import("./humain/session.ts");
       const { loadWorks } = await import("./humain/frame-maker.ts");

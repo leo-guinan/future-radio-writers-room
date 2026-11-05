@@ -9,6 +9,7 @@ COPY characters ./characters
 COPY seed ./seed
 COPY gates.json ./gates.json
 COPY public ./public
+COPY station ./station
 COPY src ./src
 COPY cast.json ./cast.json
 COPY scenes ./scenes
