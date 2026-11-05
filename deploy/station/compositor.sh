@@ -17,11 +17,15 @@ sleep 1
 pactl load-module module-null-sink sink_name=station >/dev/null
 pactl set-default-sink station
 CHROME="${CHROME:-$(command -v google-chrome || command -v chromium || command -v chromium-browser)}"
+# A fresh profile every start: a reused profile restores earlier tabs, and their audio would be
+# captured too (two copies of the station, a few milliseconds apart, sound like an echo).
+PROFILE="$(mktemp -d /tmp/station-chrome.XXXXXX)"
+trap 'rm -rf "$PROFILE"' EXIT
 "$CHROME" --no-sandbox --kiosk --no-first-run --no-default-browser-check --disable-infobars --autoplay-policy=no-user-gesture-required \
-  --window-position=0,0 --window-size="$W,$H" --user-data-dir=/tmp/station-chrome "$PAGE" >/dev/null 2>&1 &
+  --window-position=0,0 --window-size="$W,$H" --disable-session-crashed-bubble --hide-crash-restore-bubble --user-data-dir="$PROFILE" "$PAGE" >/dev/null 2>&1 &
 sleep "${STATION_WARMUP:-8}"
 DUR=(); [ -n "${STATION_SECONDS:-}" ] && DUR=(-t "$STATION_SECONDS")
-exec ffmpeg -nostdin -loglevel warning -thread_queue_size 1024 -f x11grab -framerate "$FPS" -video_size "${W}x${H}" -draw_mouse 0 -i :99 \
+ffmpeg -nostdin -loglevel warning -thread_queue_size 1024 -f x11grab -framerate "$FPS" -video_size "${W}x${H}" -draw_mouse 0 -i :99 \
   -thread_queue_size 1024 -f pulse -i station.monitor "${DUR[@]}" \
   -map 0:v -map 1:a -c:v libx264 -preset veryfast -tune zerolatency -b:v "${VK}k" -maxrate "${VK}k" -bufsize "$((VK * 2))k" -pix_fmt yuv420p -g "$((FPS * 2))" \
   -c:a aac -b:a "${AK}k" -ar 44100 -f tee "$TEE"

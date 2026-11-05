@@ -7,8 +7,7 @@ A two-episode library (1:55) streamed against thread
 
 | Film | Length | What happens |
 |---|---|---|
-| [`riff-demo.mp4`](riff-demo.mp4) | 5:40 | **Current version.** Jim O'Shaughnessy's quote post starts a riff that runs 2:17. The cast ask the archive 8 questions and get 5 good answers, then it wraps after two dull answers in a row. The repost and the likes that came in meanwhile get short segments. **The library took 4:56 to stream. The thread added 3:01.** |
-| [`live-run-demo.mp4`](live-run-demo.mp4) | 3:42 | The first version, with reactions capped at 30 seconds. The library took 3:13 to stream. |
+| [`riff-demo.mp4`](riff-demo.mp4) | 5:10 | Jim O'Shaughnessy's quote post starts a riff that runs 2:17. The cast ask the archive 8 questions and get 5 good answers, then it wraps after two dull answers in a row. The repost and the likes that came in meanwhile get short segments. **The library took 4:56 to stream. The thread added 3:01.** |
 
 ## The riff on Jim
 
@@ -26,3 +25,7 @@ Each segment is saved, so a rerun costs nothing: `POST /api/live/reair`.
 
 How it works and what was simulated: [LIVE.md](../../LIVE.md). The repost and like counts were simulated, and the answers came from
 the recorded fixture rather than a live archive connection.
+
+**Re-recorded Nov 5.** The first recordings had an echo. The compositor's browser had restored tabs from earlier runs, so two copies
+of the page played a few milliseconds apart. Each start now gets a fresh browser profile, and a page silences itself if a newer
+copy opens. The 30-second-cap demo was removed; the cap is gone anyway.

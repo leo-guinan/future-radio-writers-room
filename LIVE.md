@@ -161,7 +161,7 @@ There are also checks on the thread diffs and on memory recall, citation and the
 
 ## The demo
 
-[`submission/the-live-run/live-run-demo.mp4`](submission/the-live-run/live-run-demo.mp4) was
+[`submission/the-live-run/riff-demo.mp4`](submission/the-live-run/riff-demo.mp4) was
 recorded by the compositor, the same path that pushes to X, writing to a file. It's a short
 library of two episodes and thread `2118414208370905428`.
 

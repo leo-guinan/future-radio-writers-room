@@ -7,6 +7,17 @@
   const AUDIO = (P.get("audio") || "program,bulletins").split(",");
   const INNER = P.get("inner") || "youtube"; // youtube | local
   const KIOSK = P.get("kiosk") === "1";
+
+  // One station per browser: if another copy of this page opens, the older one goes silent, so a
+  // restored or duplicate tab can never double the audio (which sounds like an echo).
+  try {
+    const me = `${Date.now()}-${Math.random()}`;
+    const bc = new BroadcastChannel("future-radio-audio");
+    bc.onmessage = (e) => { if (e.data > me) { document.querySelectorAll("video,audio").forEach((m) => { m.muted = true; m.pause(); }); window.__silenced = true; } };
+    bc.postMessage(me);
+    const _play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () { if (window.__silenced) { this.muted = true; return Promise.resolve(); } return _play.call(this); };
+  } catch {}
   const $ = (id) => document.getElementById(id);
   const stage = $("stage");
 

@@ -167,6 +167,14 @@ recorded by the compositor itself, the same path that pushes to YouTube, writing
   the voice cache with `station voice-cache`. On the server, the same lines go through
   `ELEVENLABS_API_KEY`.
 
+## Audio hygiene
+
+- **The compositor starts Chrome with a fresh profile every time.** A reused profile restores old
+  tabs, and every tab's audio is captured: two copies of the page a few milliseconds apart sound
+  like an echo.
+- **One station per browser.** If another station or live page opens in the same browser, the
+  older one goes silent.
+
 ## Not done yet
 
 - The watcher has run against the fixture only, not the live Community Archive MCP. That needs
