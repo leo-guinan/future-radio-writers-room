@@ -14,6 +14,9 @@
   [meta-hackathon-proof-of-work](https://github.com/leo-guinan/meta-hackathon-proof-of-work).
 - **Second Take (Most Viral post):** [`second-take/`](second-take/). The demo, revised live by
   Muse Spark from a spoken note, with its evidence.
+- **The thread that followed:** [`third-take/`](third-take/) to [`take-eight/`](take-eight/), then
+  [`million-dollar-question/`](million-dollar-question/), which asks a supporter what information
+  would be worth $1M to him, with the live workshop game on the studio monitor.
 - **Human impact:** [`IMPACT.md`](IMPACT.md). An artist felt seen by a Future Radio episode about
   his work.
 - **Form answers:** [`FORM.md`](FORM.md). Indie track; Build for Your World.
