@@ -51,6 +51,8 @@ export class McpArchive implements Archive {
     if (json.error) throw new Error(`archive MCP ${method}: ${json.error.message}`);
     return json.result;
   }
+  /** Call any Community Archive MCP tool (used by the live run). */
+  async tool(name: string, args: Record<string, unknown>) { return this.call(name, args); }
   private async call(name: string, args: Record<string, unknown>) {
     if (!this.session) {
       await this.rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "future-radio-station", version: "0.1.0" } });

@@ -3,6 +3,7 @@
  "page": "/station.html?inner=local&kiosk=1",
  "video": { "width": 1280, "height": 720, "fps": 30, "video_kbps": 3500, "audio_kbps": 160 },
  "routes": [
+  { "name": "x", "url": "${X_RTMP_URL}/${X_STREAM_KEY}", "enabled": true },
   { "name": "youtube", "url": "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}", "enabled": true },
   { "name": "twitch", "url": "rtmp://live.twitch.tv/app/${TWITCH_STREAM_KEY}", "enabled": true },
   { "name": "custom", "url": "${STATION_RTMP_URL}", "enabled": true },

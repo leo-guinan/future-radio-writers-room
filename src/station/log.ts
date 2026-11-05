@@ -17,7 +17,7 @@ export function events(): StationEvent[] {
 }
 export function append(type: string, body: Record<string, unknown>): StationEvent {
   const all = events();
-  const e: StationEvent = { seq: (all.at(-1)?.seq ?? 0) + 1, t: new Date().toISOString(), type, ...body };
+  const e: StationEvent = { ...body, seq: (all.at(-1)?.seq ?? 0) + 1, t: new Date().toISOString(), type }; // the event type always wins
   mkdirSync(DATA(), { recursive: true });
   appendFileSync(file(), JSON.stringify(e) + "\n");
   all.push(e);

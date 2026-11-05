@@ -542,6 +542,11 @@ if (process.env.STATION_WATCH === "1") {
   catch (e: any) { console.error("station watcher off:", e.message); }
 }
 
+if (process.env.LIVE_AUTOSTART === "1" && process.env.LIVE_THREAD) {
+  import("./live/controller.ts").then((l) => l.start({ thread: process.env.LIVE_THREAD!, source: process.env.LIVE_SOURCE ?? "archive", library: process.env.LIVE_LIBRARY?.split(",").filter(Boolean) }))
+    .then(() => console.log(`Live run on thread ${process.env.LIVE_THREAD} (${process.env.LIVE_SOURCE ?? "archive"}).`)).catch((e) => console.error("live run:", e.message));
+}
+
 server.listen(PORT, () => {
   console.log(`Future Radio writers' room on http://localhost:${PORT}  (${llm.offline ? "offline characters" : `model ${llm.model}`}; ${room.store.all().length} events)`);
   if (!TOKEN) console.log("PRODUCER_TOKEN is not set: producer API is disabled. Use the CLI.");

@@ -10,6 +10,7 @@ import { DATA, loadRules } from "./rules.ts";
 import { approve, propose } from "./program.ts";
 import { pollOnce } from "./watcher.ts";
 import type { Archive } from "./archive.ts";
+import * as live from "../live/controller.ts";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, m: RegExpMatchArray) => Promise<void> | void;
 const OPEN = { "access-control-allow-origin": "*", "cache-control": "no-store" };
@@ -88,7 +89,23 @@ export function stationRoutes(opts: { isProducer: (req: IncomingMessage) => bool
       if (!p) return json(res, 404, { error: "No such program" });
       sendFile(req, res, join(ROOT, p.file), "video/mp4");
     }],
-    ["GET", /^\/station\/audio\/(B-\d{4}-\d+\.mp3)$/, (req, res, m) => sendFile(req, res, join(DATA(), "audio", basename(m[1])), "audio/mpeg")],
+    ["GET", /^\/station\/audio\/([\w-]+\.mp3)$/, (req, res, m) => sendFile(req, res, join(DATA(), "audio", basename(m[1])), "audio/mpeg")],
+    // The live run: the library plays once; one thread's updates interrupt it.
+    ["GET", /^\/live\/?$/, (req, res) => { res.writeHead(302, { location: "/live.html" + (req.url?.includes("?") ? req.url.slice(req.url.indexOf("?")) : "") }); res.end(); }],
+    ["GET", /^\/live\/feed\/state\.json$/, (_req, res) => json(res, 200, live.publicState() ?? { phase: "idle" })],
+    ["POST", /^\/api\/live\/start$/, wrap(async (req, res) => {
+      guard(req);
+      const b = await readJson(req);
+      json(res, 201, await live.start({ thread: String(b.thread ?? process.env.LIVE_THREAD ?? ""), source: String(b.source ?? process.env.LIVE_SOURCE ?? "push"), library: b.library, fixture: b.fixture, pollSecs: b.poll_secs }));
+    })],
+    ["POST", /^\/api\/live\/update$/, wrap(async (req, res) => {
+      guard(req);
+      const b = await readJson(req);
+      if (!["reply", "quote", "repost", "like", "bookmark", "views"].includes(b.type)) throw new Error("type must be reply, quote, repost, like, bookmark or views");
+      const u = { id: String(b.id ?? `${b.type}:push:${Date.now()}`), type: b.type, at: new Date().toISOString(), user: b.user, name: b.name, text: b.text, url: b.url, count: b.count };
+      json(res, live.queue(u) ? 202 : 409, { queued: u.id });
+    })],
+    ["POST", /^\/api\/live\/stop$/, wrap(async (req, res) => { guard(req); live.stop(); json(res, 200, { stopped: true }); })],
     // Producer: program the triggers by voice (base64 WAV) or text; approve; poll now.
     ["POST", /^\/api\/station\/program$/, wrap(async (req, res) => {
       guard(req);

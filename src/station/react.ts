@@ -16,6 +16,7 @@ export function speakable(text: string) {
     .replace(/https?:\/\/\S+/g, "")
     .replace(/^(\s*@\w{1,15})+\s*/, "")
     .replace(/@(\w{1,15})/g, "at $1")
+    .replace(/\b(0?[1-9]|1[0-2])\.(0?[1-9]|[12]\d|3[01])\.(\d{4})\b/g, (_, m, d, y) => `${["January","February","March","April","May","June","July","August","September","October","November","December"][Number(m) - 1]} ${Number(d)}, ${y}`)
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();

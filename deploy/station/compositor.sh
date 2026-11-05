@@ -7,7 +7,7 @@
 set -euo pipefail
 ROUTES="${STATION_ROUTES:-station/routes.json}"
 BASE="${STATION_BASE:-http://localhost:8787}"
-PAGE="$BASE$(node -e "process.stdout.write(require('./$ROUTES').page)")"
+PAGE="$BASE${STATION_PAGE:-$(node -e "process.stdout.write(require('./$ROUTES').page)")}"  # the live run: STATION_PAGE=/live.html?kiosk=1
 read W H FPS VK AK < <(node -e "const v=require('./$ROUTES').video;console.log(v.width,v.height,v.fps,v.video_kbps,v.audio_kbps)")
 TEE="$(node deploy/station/routes.mjs "$ROUTES")"
 export DISPLAY=:99
