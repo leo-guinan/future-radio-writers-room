@@ -6,8 +6,10 @@ import { join } from "node:path";
 import { append } from "../station/log.ts";
 import { DATA } from "../station/rules.ts";
 import { loadLineup } from "../station/schedule.ts";
-import { newRun, setScript, stats, tick } from "./run.ts";
-import { makeScript } from "./script.ts";
+import { ahead, extend, newRun, setScript, stats, tick } from "./run.ts";
+import { continueRiff, listSegments, opening, rerun, saveSegment, voiceLines } from "./script.ts";
+import { FixtureAsk, McpAsk, type AskArchive } from "./ask.ts";
+import type { Riff } from "./riff.ts";
 import { ArchiveThread, FixtureThread, PushThread, XApiThread, diff, type Snapshot, type ThreadSource } from "./thread.ts";
 import type { RunState, Update } from "./types.ts";
 
@@ -16,6 +18,8 @@ let run: RunState | null = null;
 let source: ThreadSource | null = null;
 let last: Snapshot | null = null;
 let rootText = "";
+let ask: AskArchive | null = null;
+const LOOKAHEAD = Number(process.env.LIVE_LOOKAHEAD_SECS ?? 10); // keep this much riff ready ahead of the voice
 let timers: NodeJS.Timeout[] = [];
 const seen = new Set<string>();
 
@@ -52,7 +56,40 @@ async function poll() {
   }
 }
 
-export async function start(opts: { thread: string; source: string; library?: string[]; fixture?: string; pollSecs?: number }) {
+function makeAsk(fixture?: string): AskArchive | null {
+  const f = fixture ?? process.env.LIVE_ASK_FIXTURE;
+  if (f) return FixtureAsk.fromFile(f);
+  try { return process.env.STATION_ARCHIVE_MCP_URL ? new McpAsk() : null; } catch { return null; }
+}
+
+export { listSegments };
+
+/** Keep the riff going: whenever less than LOOKAHEAD seconds are queued, ask the next question. */
+function riffLoop(u: Update, riff: Riff, n: number) {
+  let busy = false;
+  const t = setInterval(async () => {
+    const r = run;
+    const c = r?.current;
+    if (!r || !c || c.n !== n || !c.script) { if (!c || c.n !== n) clearInterval(t); return; }
+    if (c.script.done) { clearInterval(t); return; }
+    if (busy || ahead(r, Date.now()) > LOOKAHEAD) return;
+    busy = true;
+    try {
+      const lines = await continueRiff(u, riff, r, n);
+      extend(r, n, lines, riff.done, Date.now());
+      c.script.turns = riff.turns;
+      append("live.riff", { run: r.id, n, turn: riff.turns, lines: lines.map((l) => ({ speaker: l.speaker, text: l.text, ask: l.ask })), done: riff.done });
+      if (riff.done) { saveSegment(r.id, n, u, c.script, (Date.now() - c.began) / 1000); clearInterval(t); }
+      save();
+    } catch (e: any) {
+      extend(r, n, [], true, Date.now());
+      append("live.error", { error: String(e.message) });
+    } finally { busy = false; }
+  }, 400);
+  t.unref?.();
+}
+
+export async function start(opts: { thread: string; source: string; library?: string[]; fixture?: string; askFixture?: string; pollSecs?: number }) {
   stop();
   const lineup = loadLineup();
   const lib = (opts.library?.length ? opts.library.map((id) => lineup.programs.find((p) => p.id === id)!).filter(Boolean) : lineup.programs)
@@ -62,12 +99,28 @@ export async function start(opts: { thread: string; source: string; library?: st
   last = null; seen.clear();
   source = makeSource(opts.source, opts.thread, opts.fixture);
   rootText = (await source.root?.().catch(() => "")) ?? "";
+  ask = makeAsk(opts.askFixture);
   append("live.start", { run: run.id, thread: opts.thread, source: source.id, library: lib.map((p) => p.id), library_secs: stats(run, now).library_secs });
   save();
   const hooks = {
     prepare: (u: Update, s: RunState) => {
       const n = s.current!.n;
-      makeScript(u, s, n, rootText).then((sc) => { if (run) { setScript(run, n, sc); save(); } }).catch((e) => append("live.error", { error: String(e.message) }));
+      if (u.type === "reair" && u.segment) {
+        // A rerun: the saved segment as it aired, plus one cached announcement. Nothing generated.
+        const sc = rerun(u.segment);
+        sc.announce = { speaker: "MRS. BUS", text: "From the archive: a rerun.", dur: 0 };
+        voiceLines([sc.announce], `L-${s.id}-${String(n).padStart(3, "0")}-r`).then(() => { if (run) { setScript(run, n, sc); save(); } });
+        return;
+      }
+      opening(u, s, n, rootText, ask)
+        .then(({ script, riff }) => {
+          if (!run) return;
+          setScript(run, n, script);
+          if (riff && !script.done) riffLoop(u, riff, n);
+          else saveSegment(run.id, n, u, script, 0);
+          save();
+        })
+        .catch((e: any) => append("live.error", { error: String(e.message) }));
     },
     onEvent: (type: string, body: Record<string, unknown>) => append(type, { run: run!.id, ...body, state: { ...publicState(), library: undefined } }),
   };

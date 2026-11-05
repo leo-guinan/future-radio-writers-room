@@ -2,7 +2,7 @@
 // freeze -> announce -> react (30 s at most) -> return, then the program resumes where it froze.
 // The run's total length is the measurement: library + every second the thread took.
 
-export type UpdateType = "reply" | "quote" | "repost" | "like" | "bookmark" | "views";
+export type UpdateType = "reply" | "quote" | "repost" | "like" | "bookmark" | "views" | "reair";
 export interface Update {
   id: string;
   type: UpdateType;
@@ -12,9 +12,28 @@ export interface Update {
   text?: string;
   url?: string;
   count?: number; // reposts/likes/bookmarks: how many new; views: the milestone passed
+  segment?: string; // reair: the saved segment to play again
 }
-export interface Line { speaker: "MRS. BUS" | "BORGES" | "AGNOLO" | "LEONARDO"; text: string; audio?: string | null; dur: number; cite?: string }
-export interface Script { announce: Line; react: Line[]; returnLine: Line; memory: Array<{ id: string; text: string }> }
+export interface Ask { question: string; tool: string; args: Record<string, unknown>; found: number; novel: boolean }
+export interface Line {
+  speaker: "MRS. BUS" | "BORGES" | "AGNOLO" | "LEONARDO";
+  text: string;
+  audio?: string | null;
+  dur: number;
+  at?: number; // epoch ms the line starts, set when it is scheduled
+  cite?: string; // the record the line quotes
+  ask?: Ask; // the question this line put to the archive
+  post?: { user: string; name: string; text: string; date: string; url?: string }; // the post being read
+}
+export interface Script {
+  announce: Line;
+  react: Line[]; // grows while the riff runs
+  returnLine: Line;
+  memory: Array<{ id: string; text: string }>;
+  done: boolean; // the riff has wrapped
+  turns: number;
+  segment?: string; // saved as, for re-airing
+}
 export type Phase = "playing" | "freeze" | "announce" | "react" | "return" | "complete";
 export interface PhaseSpan { phase: Phase; start: number; end: number } // epoch ms
 export interface Interrupt {

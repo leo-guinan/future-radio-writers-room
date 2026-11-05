@@ -3,15 +3,17 @@
 // thread has taken; Leonardo reacts. Agnolo's numbers come from code, never from a model.
 
 import { execFileSync } from "node:child_process";
-import { join } from "node:path";
-import { readFileSync } from "node:fs";
+import { basename, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { DATA } from "../station/rules.ts";
 import { voice } from "../station/tts.ts";
 import { vet } from "../station/safety.ts";
 import { speakable } from "../station/react.ts";
 import { ROOT } from "../station/schedule.ts";
 import { recall, threadRecords } from "./memory.ts";
-import { stats } from "./run.ts";
+import { Riff } from "./riff.ts";
+import type { AskArchive } from "./ask.ts";
+import { OWNER } from "../station/rules.ts";
 import type { Line, RunState, Script, Update } from "./types.ts";
 
 const plural = (n: number, one: string, many = one + "s") => (n === 1 ? `one ${one}` : `${n} ${many}`);
@@ -27,6 +29,7 @@ export const ANNOUNCE: Record<Update["type"], (u: Update) => string> = {
   like: (u) => `Update on the thread! ${cap(plural(u.count ?? 1, "new like"))}.`,
   bookmark: (u) => `Update on the thread! ${cap(plural(u.count ?? 1, "new bookmark"))}.`,
   views: (u) => `Update on the thread! It just passed ${u.count?.toLocaleString("en-US")} views.`,
+  reair: () => "From the archive: a rerun.",
 };
 const LEO: Record<Update["type"], string[]> = {
   reply: ["A conversation! That's the whole movie.", "They answered! Keep the cameras rolling!"],
@@ -35,11 +38,13 @@ const LEO: Record<Update["type"], string[]> = {
   like: ["Every like is a frame!", "Somebody liked it! Roll on!"],
   bookmark: ["Saved for later! A future viewer!", "Bookmarked! That's a promise to come back."],
   views: ["More eyes on the screening room!", "The room is filling up!"],
+  reair: ["Still good!", "Encore!"],
 };
 const LEDGER: Record<Update["type"], (u: Update) => string> = {
   reply: () => "one reply", quote: () => "one quote post",
   repost: (u) => plural(u.count ?? 1, "repost"), like: (u) => plural(u.count ?? 1, "like"),
   bookmark: (u) => plural(u.count ?? 1, "bookmark"), views: (u) => `${u.count?.toLocaleString("en-US")} views`,
+  reair: () => "one rerun",
 };
 
 export function estimate(text: string) { return Math.max(1.2, text.split(/\s+/).length / 2.6 + 0.3); }
@@ -68,36 +73,93 @@ async function leonardo(u: Update, fallback: string): Promise<string> {
   } catch { return fallback; }
 }
 
-export async function makeScript(u: Update, s: RunState, n: number, rootText = "", now = Date.now()): Promise<Script> {
+export async function voiceLines(lines: Line[], id: string) {
+  if (!lines.length) return;
+  await voice({ id, lines } as any).catch(() => null);
+  for (const l of lines) l.dur = l.audio ? probe(join(DATA(), "audio", l.audio.split("/").pop()!)) || estimate(l.text) : estimate(l.text);
+}
+
+/** The thread sentence that names this person (or a short line of the thread for counts). */
+function focusSentence(u: Update, rootText: string, n: number) {
+  const sents = rootText.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+  const keys = [u.user, ...(u.name ?? "").split(/\s+/)].filter((k) => k && k.length > 2).map((k) => k!.toLowerCase());
+  const hit = sents.find((x) => keys.some((k) => x.toLowerCase().includes(k)));
+  if (hit) return { text: hit, id: `thread:${sents.indexOf(hit)}` };
+  const short = sents.filter((x) => x.split(/\s+/).length <= 16 && x.length > 12);
+  return short.length ? { text: short[(n - 1) % short.length], id: `thread:${sents.indexOf(short[(n - 1) % short.length])}` } : null;
+}
+
+/** The opening of a segment: the announcement, the post read as written, what the thread says.
+ * The riff (questions to the archive) continues from here while it plays. */
+export async function opening(u: Update, s: RunState, n: number, rootText: string, ask: AskArchive | null): Promise<{ script: Script; riff: Riff | null }> {
   const announce: Line = { speaker: "MRS. BUS", text: ANNOUNCE[u.type](u), dur: 0 };
   const react: Line[] = [];
-  const memory = recall(u, threadRecords(rootText));
   if (u.text) {
-    const why = vet({ id: u.id, url: u.url ?? "", user: u.user ?? "x", name: u.name ?? "", created_at: u.at, text: u.text }, { id: "live", kind: "reply", value: "", cooldown_min: 0, enabled: true, added_at: "", source: "" }, [], now / 1000, { perAccountPerDay: 99, perDay: 999, minChars: 1, maxChars: 4000, deny: (process.env.STATION_DENY ?? "").split(",") });
-    react.push({ speaker: "BORGES", text: why && !/too long/.test(why) ? `We won't read this one on air. ${why.split(":")[0]}.` : `${who(u)} wrote: "${words(speakable(u.text), 32)}"`, dur: 0 });
+    const why = vet({ id: u.id, url: u.url ?? "", user: u.user ?? "x", name: u.name ?? "", created_at: u.at, text: u.text }, { id: "live", kind: "reply", value: "", cooldown_min: 0, enabled: true, added_at: "", source: "" }, [], Date.now() / 1000, { perAccountPerDay: 99, perDay: 999, minChars: 1, maxChars: 4000, deny: (process.env.STATION_DENY ?? "").split(",").filter(Boolean) });
+    react.push({ speaker: "BORGES", text: why ? `We won't read this one on air. ${why.split(":")[0]}.` : `${who(u)} wrote: "${words(speakable(u.text), 40)}"`, dur: 0 });
   }
-  // Counts have no author to remember: Borges reads a short line of the thread itself instead.
-  const short = threadRecords(rootText).filter((r) => r.text.split(/\s+/).length <= 16);
-  const m = memory[0] ?? (!u.user && short.length ? short[(n - 1) % short.length] : undefined);
-  if (m && !memory.length) memory.push(m);
-  // Quote the sentence that bears on this person, not the start of a long record.
-  const focus = (t: string) => {
-    const sents = t.split(/(?<=[.!?])\s+/);
-    const keys = [u.user, ...(u.name ?? "").split(/\s+/)].filter((k) => k && k.length > 2).map((k) => k!.toLowerCase());
-    return sents.find((x) => keys.some((k) => x.toLowerCase().includes(k))) ?? sents[0];
+  const f = focusSentence(u, rootText, n);
+  const memory = recall(u, threadRecords(rootText));
+  if (f) react.push({ speaker: "BORGES", text: u.user ? `And the thread itself says: "${words(speakable(f.text), 34)}"` : `The thread says: "${words(speakable(f.text), 24)}"`, dur: 0, cite: f.id });
+  else if (memory[0]) react.push({ speaker: "BORGES", text: `The library remembers, from ${memory[0].title}: ${words(speakable(memory[0].text), 24)}`, dur: 0, cite: memory[0].id });
+  const riff = u.user && ask ? new Riff(u, ask, OWNER(), f?.text ?? "") : null;
+  if (riff) react.push(...(await riff.next())); // the first question, so the riff is already moving
+  if (!riff || riff.done) react.push(...(await improvise(u, wrap(u, n, riff))));
+  const script: Script = {
+    announce, react,
+    returnLine: { speaker: "MRS. BUS", text: "And now, back to our regularly scheduled programming.", dur: 0 },
+    memory: [...memory.map((r) => ({ id: r.id, text: r.text })), ...(f ? [{ id: f.id, text: f.text }] : [])],
+    done: !riff || riff.done, turns: riff?.turns ?? 0,
   };
-  react.push(m
-    ? { speaker: "BORGES", text: m.id.startsWith("thread:") && !u.user ? `The thread says: "${words(speakable(m.text), 20)}"` : `The library remembers, from ${m.title}: ${words(speakable(focus(m.text)), 16)}`, dur: 0, cite: m.id }
-    : { speaker: "BORGES", text: u.user ? `The library has no volume on ${who(u)} yet. It does now.` : "The library notes it.", dur: 0 });
-  // Agnolo books it. The exact time added is on screen (it depends on this very segment's length).
-  void stats;
-  react.push({ speaker: "AGNOLO", text: `Ledger: ${LEDGER[u.type](u)}. Interruption number ${n}. ${n === 1 ? "The clock starts now." : "The clock is running."}`, dur: 0 });
-  const pick = LEO[u.type][n % LEO[u.type].length];
-  react.push({ speaker: "LEONARDO", text: await leonardo(u, pick), dur: 0 });
-  const script: Script = { announce, react, returnLine: { speaker: "MRS. BUS", text: "And now, back to our regularly scheduled programming.", dur: 0 }, memory: memory.map((r) => ({ id: r.id, text: r.text })) };
-  // Voices (cached lines are free; uncached ones need ELEVENLABS_API_KEY and fit under the daily cap).
-  const all = [script.announce, ...script.react, script.returnLine];
-  await voice({ id: `L-${s.id}-${String(n).padStart(3, "0")}`, lines: all } as any).catch(() => null);
-  for (const l of all) l.dur = l.audio ? probe(join(DATA(), "audio", l.audio.split("/").pop()!)) || estimate(l.text) : estimate(l.text);
-  return script;
+  await voiceLines([script.announce, ...script.react, script.returnLine], `L-${s.id}-${String(n).padStart(3, "0")}-0`);
+  return { script, riff };
+}
+
+/** The closing lines: Agnolo books it, Leonardo reacts, Mrs. Bus files it for the reruns. */
+export function wrap(u: Update, n: number, riff: Riff | null): Line[] {
+  const q = riff ? `${plural(riff.asked, "question")} to the archive, ${plural(riff.answered, "good answer")}. ` : "";
+  return [
+    { speaker: "AGNOLO", text: `Ledger: ${LEDGER[u.type](u)}. Interruption number ${n}. ${q}The clock is running.`, dur: 0 },
+    { speaker: "LEONARDO", text: LEO[u.type][n % LEO[u.type].length], dur: 0 },
+    ...(riff ? [{ speaker: "MRS. BUS" as const, text: "That's a segment. Filed for the reruns.", dur: 0 }] : []),
+  ];
+}
+
+/** Leonardo's closing line improvises when ANTHROPIC_API_KEY is set (one line, about the event). */
+async function improvise(u: Update, lines: Line[]) {
+  for (const l of lines) if (l.speaker === "LEONARDO") l.text = await leonardo(u, l.text);
+  return lines;
+}
+
+/** The next turn of the riff (voiced), plus the wrap when the riff runs out of interesting answers. */
+export async function continueRiff(u: Update, riff: Riff, s: RunState, n: number): Promise<Line[]> {
+  const lines = await riff.next();
+  if (riff.done) lines.push(...(await improvise(u, wrap(u, n, riff))));
+  await voiceLines(lines, `L-${s.id}-${String(n).padStart(3, "0")}-${riff.turns}`);
+  return lines;
+}
+
+// ---------------------------------------------------------------- segments: free to re-air
+
+const segDir = () => join(DATA(), "segments");
+export function saveSegment(runId: string, n: number, u: Update, script: Script, took: number) {
+  mkdirSync(segDir(), { recursive: true });
+  const id = `S-${runId}-${String(n).padStart(3, "0")}`;
+  const strip = (l: Line) => ({ ...l, at: undefined });
+  const seg = { id, saved: new Date().toISOString(), update: u, took_secs: Math.round(took), turns: script.turns, announce: strip(script.announce), react: script.react.map(strip), returnLine: strip(script.returnLine), memory: script.memory };
+  writeFileSync(join(segDir(), `${id}.json`), JSON.stringify(seg, null, 1));
+  script.segment = id;
+  return id;
+}
+export function listSegments() {
+  if (!existsSync(segDir())) return [];
+  return readdirSync(segDir()).filter((f) => f.endsWith(".json")).map((f) => {
+    const x = JSON.parse(readFileSync(join(segDir(), f), "utf8"));
+    return { id: x.id, saved: x.saved, type: x.update.type, user: x.update.user ?? null, turns: x.turns, secs: Math.round([x.announce, ...x.react, x.returnLine].reduce((t: number, l: Line) => t + l.dur + 0.3, 0)) };
+  });
+}
+/** A rerun: the saved lines and audio, as they aired. No archive questions, no new voices. */
+export function rerun(id: string): Script {
+  const x = JSON.parse(readFileSync(join(segDir(), `${basename(id)}.json`), "utf8"));
+  return { announce: x.announce, react: x.react, returnLine: x.returnLine, memory: x.memory, done: true, turns: x.turns, segment: x.id };
 }

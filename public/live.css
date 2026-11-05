@@ -32,3 +32,9 @@ body.frozen .onair i { background: var(--amber); box-shadow: 0 0 10px var(--ambe
 .memory { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; flex-shrink: 0 }
 #update .post, #update .cast, #update .announce { flex-shrink: 0 }
 #update .caption { min-height: 52px; font-size: 19px }
+
+/* the riff: the archive question on air, and the segment's running count */
+.riff { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--dim); min-height: 18px }
+.riff .ask b { color: var(--green); font-weight: 400 }
+.riff .ask.dull b { color: var(--dim) }
+#u-post.answer { border-color: var(--green) }

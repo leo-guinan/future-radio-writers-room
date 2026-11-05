@@ -1,12 +1,15 @@
 // The live-run state machine. Pure apart from the clock and the script-maker, which are injected,
 // so the acceptance test can drive a whole run in milliseconds.
+//
+// The reaction is a generated segment, not a fixed clip: lines are appended while it plays
+// (extend), and it ends when the riff wraps (done). RIFF_LIMIT is a safety ceiling, not a format.
 
 import type { Interrupt, Line, PhaseSpan, Program, RunState, Script, Update } from "./types.ts";
 
 export const FREEZE_MIN = 1.5; // s: the frame holds still at least this long before the announcement
-export const REACT_MAX = 30; // s: the hard cap on a reaction segment
+export const RIFF_LIMIT = Number(process.env.LIVE_RIFF_LIMIT_SECS ?? 600); // s: safety ceiling on one segment
 export const RETURN_SECS = 3; // s: "back to our regularly scheduled programming"
-export const GAP = 0.25; // s between lines
+export const GAP = 0.3; // s between lines
 
 export function newRun(id: string, thread: string, library: Program[], now: number, ident = 4): RunState {
   return { id, thread, library, ident, startedAt: now, phase: "playing", idx: 0, offset: 0, resumedAt: now, current: null, queue: [], done: [], completedAt: null };
@@ -18,31 +21,35 @@ export function position(s: RunState, now: number) {
   return { idx: s.idx, offset: s.offset + (now - s.resumedAt) / 1000 };
 }
 
-/** Fit the reaction into REACT_MAX: in order, skip any line that would overrun and keep trying the
- * (usually shorter) lines after it. A single overlong first line is kept but cut at REACT_MAX. */
-export function fit(react: Line[]): Line[] {
-  const out: Line[] = [];
-  let t = 0;
-  for (const l of react) {
-    const need = (out.length ? GAP : 0) + l.dur;
-    if (t + need > REACT_MAX && out.length) continue;
-    out.push(l);
-    t += need;
+const lastEnd = (lines: Line[], from: number) => lines.reduce((t, l) => Math.max(t, (l.at ?? from) + l.dur * 1000), from);
+
+/** Place lines one after another, never before `now`. */
+function place(lines: Line[], after: number, now: number) {
+  let t = after;
+  for (const l of lines) {
+    if (l.at == null) l.at = Math.max(t, now);
+    t = l.at + (l.dur + GAP) * 1000;
   }
-  return out;
+  return t;
+}
+
+function close(c: Interrupt, now: number) {
+  const react = c.phases.find((p) => p.phase === "react")!;
+  const end = Math.max(now, lastEnd(c.script!.react, react.start) + 300);
+  react.end = Math.min(end, react.start + RIFF_LIMIT * 1000);
+  const ret = Math.max(RETURN_SECS, c.script!.returnLine.dur + 0.5);
+  c.script!.returnLine.at = react.end;
+  c.phases.push({ phase: "return", start: react.end, end: react.end + ret * 1000 });
 }
 
 export function schedule(script: Script, from: number): PhaseSpan[] {
-  const react = fit(script.react);
   const ann = script.announce.dur + 0.4;
-  const rx = Math.min(REACT_MAX, react.reduce((s, l, i) => s + l.dur + (i ? GAP : 0), 0) + 0.3);
-  script.react = react;
-  const ret = Math.max(RETURN_SECS, script.returnLine.dur + 0.5);
-  const a = from, b = a + ann * 1000, c = b + rx * 1000, d = c + ret * 1000;
+  script.announce.at = from;
+  const b = from + ann * 1000;
+  place(script.react, b, b);
   return [
-    { phase: "announce", start: a, end: b },
-    { phase: "react", start: b, end: c },
-    { phase: "return", start: c, end: d },
+    { phase: "announce", start: from, end: b },
+    { phase: "react", start: b, end: Infinity }, // open until the riff wraps
   ];
 }
 
@@ -84,13 +91,20 @@ export function tick(s: RunState, now: number, h: Hooks): boolean {
     if (c.script && now - c.began >= FREEZE_MIN * 1000) {
       c.phases[0].end = now;
       c.phases.push(...schedule(c.script, now));
+      if (c.script.done) close(c, now);
       s.phase = "announce";
-      emit("live.announce", { n: c.n, update_type: c.update.type, script: c.script, phases: c.phases });
+      emit("live.announce", { n: c.n, update_type: c.update.type });
       return true;
     }
     return false;
   }
   const span = c.phases.find((p) => p.phase === s.phase)!;
+  if (s.phase === "react" && !c.script!.done && now - span.start >= RIFF_LIMIT * 1000) {
+    c.script!.done = true; // the safety ceiling: wrap whatever is playing
+    c.script!.react = c.script!.react.filter((l) => (l.at ?? 0) < now);
+    close(c, now);
+    emit("live.limit", { n: c.n });
+  }
   if (now < span.end) return false;
   const next = c.phases[c.phases.indexOf(span) + 1];
   if (next) {
@@ -106,8 +120,28 @@ export function tick(s: RunState, now: number, h: Hooks): boolean {
   return true;
 }
 
+/** The segment's first lines are ready: the freeze can end. */
 export function setScript(s: RunState, n: number, script: Script) {
   if (s.current && s.current.n === n) s.current.script = script;
+}
+
+/** More of the riff is ready: schedule it after what is already queued; `done` wraps the segment. */
+export function extend(s: RunState, n: number, lines: Line[], done: boolean, now: number) {
+  const c = s.current;
+  if (!c || c.n !== n || !c.script || c.script.done) return;
+  c.script.react.push(...lines);
+  const react = c.phases.find((p) => p.phase === "react");
+  if (react) place(lines, lastEnd(c.script.react.filter((l) => !lines.includes(l)), react.start) + GAP * 1000, now);
+  if (done) { c.script.done = true; if (react) close(c, now); }
+}
+
+/** Seconds of riff already scheduled but not yet heard: the generator works ahead of the voice. */
+export function ahead(s: RunState, now: number) {
+  const c = s.current;
+  if (!c?.script) return Infinity;
+  const react = c.phases.find((p) => p.phase === "react");
+  if (!react) return c.script.react.reduce((t, l) => t + l.dur, 0);
+  return Math.max(0, (lastEnd(c.script.react, react.start) - now) / 1000);
 }
 
 /** The energy-to-time ledger. */
@@ -127,7 +161,6 @@ export function stats(s: RunState, now: number) {
     added_by_thread_secs: round(interrupted),
     interrupts: s.done.length,
     by_type: byType,
-    stretch: round((end - s.startedAt) / 1000 / Math.max(1, Math.min(played, library) || library)),
     complete: s.phase === "complete",
   };
 }

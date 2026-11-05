@@ -1,25 +1,28 @@
 # The Live Run
 
-**Video:** [`live-run-demo.mp4`](live-run-demo.mp4), 3:42, recorded by the compositor. It's a two-episode library (1:55)
-streamed against thread [2118414208370905428](https://x.com/leo_guinan/status/2118414208370905428).
+A two-episode library (1:55) streamed against thread
+[2118414208370905428](https://x.com/leo_guinan/status/2118414208370905428). Both films were recorded by the compositor.
 
-## The interrupts
+## The films
 
-| # | Update | Freeze → resume |
+| Film | Length | What happens |
 |---|---|---|
-| 1 | Jim O'Shaughnessy quoted the thread | 37.5 s |
-| 2 | One new repost (queued during #1) | 20.7 s |
-| 3 | Two new likes (queued during #2) | 19.7 s |
+| [`riff-demo.mp4`](riff-demo.mp4) | 5:40 | **Current version.** Jim O'Shaughnessy's quote post starts a riff that runs 2:17. The cast ask the archive 8 questions and get 5 good answers, then it wraps after two dull answers in a row. The repost and the likes that came in meanwhile get short segments. **The library took 4:56 to stream. The thread added 3:01.** |
+| [`live-run-demo.mp4`](live-run-demo.mp4) | 3:42 | The first version, with reactions capped at 30 seconds. The library took 3:13 to stream. |
 
-## The result
+## The riff on Jim
 
-| | |
+All the answers are real Community Archive results (`test/fixtures/ask-jim.json`):
+
+| Question | Answer |
 |---|---|
-| Library | 1:55 |
-| Time to stream it | 3:13 |
-| Added by the thread | 1:18 |
+| Who is he? | Greenwich and Manhattan, osv.llc, on X since 2009 |
+| Has he talked to us before? | Sep 19: "Applications for 2027 open January 1, 2027" (the same date as today's quote) |
+| What did Leo say back? | Sep 20: "I'll work on my application!" |
+| And from Leo since? | Nov 1: "No movie for Jim yet, but we have a trailer." |
+| What's he posting this week? | "Seek out what interests you… Don't be boring." |
 
-Each interrupt resumed on the exact frame where it froze: Take Six at 0:22.
+Each segment is saved, so a rerun costs nothing: `POST /api/live/reair`.
 
-How it works and what was simulated: [LIVE.md](../../LIVE.md). The updates came from the fixture in this folder. Jim's quote is
-as shown on X, and the repost and like counts are simulated.
+How it works and what was simulated: [LIVE.md](../../LIVE.md). The repost and like counts were simulated, and the answers came from
+the recorded fixture rather than a live archive connection.

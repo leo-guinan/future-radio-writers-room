@@ -1,6 +1,8 @@
 // ACCEPTANCE: a live run plays the library to the end; each thread update interrupts it with
-// freeze -> announce -> react (<= 30 s) -> return, and the program resumes exactly where it froze.
+// freeze -> announce -> riff -> return, and the program resumes exactly where it froze. The riff is
+// generated live from questions to the archive and runs as long as the answers are interesting.
 // Update types are announced by type. An active thread takes longer to finish than an inactive one.
+// Every segment is saved, and re-airs without generating anything.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
@@ -11,9 +13,11 @@ process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "live-"));
 delete process.env.ELEVENLABS_API_KEY;
 delete process.env.ANTHROPIC_API_KEY;
 
-const { newRun, tick, position, setScript, stats, REACT_MAX, FREEZE_MIN } = await import("../src/live/run.ts");
+const { newRun, tick, position, setScript, extend, stats, RIFF_LIMIT, FREEZE_MIN } = await import("../src/live/run.ts");
 const { diff } = await import("../src/live/thread.ts");
-const { makeScript, ANNOUNCE } = await import("../src/live/script.ts");
+const { opening, continueRiff, ANNOUNCE, saveSegment, rerun, listSegments } = await import("../src/live/script.ts");
+const { FixtureAsk } = await import("../src/live/ask.ts");
+const ASK = new URL("./fixtures/ask-jim.json", import.meta.url).pathname;
 const { recall } = await import("../src/live/memory.ts");
 
 const LIB = [
@@ -25,11 +29,13 @@ const IDENT = 2;
 const LIBRARY = LIB.reduce((s, p) => s + p.duration + IDENT, 0); // 96 s
 const line = (speaker: any, dur: number) => ({ speaker, text: "x", dur });
 
-/** Drive a run on a fake clock. `arrivals`: [seconds, update]; `reactSecs`: each reaction's raw length. */
-function simulate(arrivals: Array<[number, any]>, opts: { reactSecs?: number; prepareSecs?: number } = {}) {
+/** Drive a run on a fake clock. Each segment is a riff of `turns` turns (one arrives every 4 s of
+ * generation); `never` makes a riff that never wraps (to test the safety ceiling). */
+function simulate(arrivals: Array<[number, any]>, opts: { turns?: number; prepareSecs?: number; never?: boolean } = {}) {
   const t0 = 1_000_000;
   const s = newRun("T", "1", LIB, t0, IDENT);
   const pending: Array<{ at: number; n: number }> = [];
+  const riffs = new Map<number, { left: number; next: number }>();
   const log: Array<{ t: number; phase: string; idx: number; offset: number; n?: number }> = [];
   const events: Array<{ type: string; body: any; t: number }> = [];
   let now = t0;
@@ -38,12 +44,19 @@ function simulate(arrivals: Array<[number, any]>, opts: { reactSecs?: number; pr
     onEvent: (type: string, body: any) => events.push({ type, body, t: now }),
   };
   const queue = [...arrivals].sort((a, b) => a[0] - b[0]);
-  for (; s.phase !== "complete" && now < t0 + 3600_000; now += 50) {
+  for (; s.phase !== "complete" && now < t0 + 7200_000; now += 50) {
     while (queue.length && now >= t0 + queue[0][0] * 1000) s.queue.push(queue.shift()![1]);
     for (const p of pending.filter((p) => now >= p.at)) {
-      const r = opts.reactSecs ?? 12;
-      setScript(s, p.n, { announce: line("MRS. BUS", 2.5), react: [line("BORGES", r * 0.5), line("AGNOLO", r * 0.3), line("LEONARDO", r * 0.2)], returnLine: line("MRS. BUS", 2.8), memory: [] });
+      const turns = opts.turns ?? 3;
+      setScript(s, p.n, { announce: line("MRS. BUS", 2.5), react: [line("BORGES", 6), line("LEONARDO", 2), line("BORGES", 5)], returnLine: line("MRS. BUS", 2.8), memory: [], done: turns <= 1 && !opts.never, turns: 1 });
+      riffs.set(p.n, { left: turns - 1, next: now + 4000 });
       pending.splice(pending.indexOf(p), 1);
+    }
+    const c = s.current;
+    const r = c && riffs.get(c.n);
+    if (c?.script && r && !c.script.done && now >= r.next && (r.left > 0 || opts.never)) {
+      r.left--; r.next = now + 4000;
+      extend(s, c.n, [line("AGNOLO", 2), line("BORGES", 7)], !opts.never && r.left <= 0, now);
     }
     tick(s, now, hooks);
     const pos = position(s, now);
@@ -74,13 +87,38 @@ test("ACCEPTANCE 2: the background freezes first, at least 1.5 s, and holds whil
   assert.ok((a - f) / 1000 >= 6 && (a - f) / 1000 >= FREEZE_MIN);
 });
 
-test("ACCEPTANCE 3: a reaction never runs longer than 30 seconds", () => {
-  const { s, events } = simulate([[5, u("reply", { name: "A" })], [40, u("quote", { name: "B" })]], { reactSecs: 55 });
-  for (const e of events.filter((e) => e.type === "live.announce")) {
-    const r = e.body.phases.find((p: any) => p.phase === "react");
-    assert.ok((r.end - r.start) / 1000 <= REACT_MAX, `react span ${(r.end - r.start) / 1000}s`);
-  }
-  assert.equal(s.phase, "complete");
+test("ACCEPTANCE 3: the riff runs as long as it grows, ends when it wraps, and has a safety ceiling", () => {
+  const short = simulate([[5, u("reply", { name: "A" })]], { turns: 1 });
+  const long = simulate([[5, u("reply", { name: "A" })]], { turns: 12 });
+  const took = (r: any) => r.s.done[0].ended / 1000 - r.s.done[0].began / 1000;
+  assert.ok(took(long) > took(short) + 60, `a longer riff holds the air longer (${took(short)}s vs ${took(long)}s)`);
+  const capped = simulate([[5, u("reply", { name: "A" })]], { never: true });
+  assert.ok(capped.events.some((e) => e.type === "live.limit"), "a riff that never wraps is wrapped by the ceiling");
+  const react = capped.log.filter((l) => l.phase === "react");
+  assert.ok(react.at(-1)!.t - react[0].t <= RIFF_LIMIT + 0.1, "the ceiling holds");
+  assert.equal(capped.s.phase, "complete");
+});
+
+test("ACCEPTANCE 3b: the cast ask the archive, and stop when the answers stop being interesting", async () => {
+  const ask = FixtureAsk.fromFile(ASK);
+  const s = newRun("J", "1", LIB, Date.now(), IDENT);
+  const jim = { id: "q", type: "quote" as const, at: "", user: "jposhaughnessy", name: "Jim O'Shaughnessy", text: "I'm all for experiments that could help people applying for the @osvllc Fellowship.\nApplications open 01.01.2027" };
+  const root = "The one I show @jposhaughnessy when I ask him if he'd like everyone who applies to the OSV fellowship to receive a personalized movie that helps them build support for their desired futures.";
+  const { script, riff } = await opening(jim, s, 1, root, ask);
+  const lines = [...script.react];
+  while (riff && !riff.done) lines.push(...(await continueRiff(jim, riff, s, 1)));
+  const asks = lines.filter((l) => l.ask);
+  assert.ok(asks.length >= 3, "several questions went to the archive");
+  assert.ok(ask.calls.some((c) => c.startsWith("account:")) && ask.calls.some((c) => c.startsWith("search:")), "it looked the person up and searched their history");
+  const sept = lines.find((l) => l.cite === "2101376453329699121");
+  assert.match(sept!.text, /Applications for 2027 open January 1, 2027/, "it found Jim's earlier post with the same date");
+  // Interest: every read answer is new; after two dull answers in a row the riff wraps.
+  const cites = lines.filter((l) => l.cite && /^\d+$/.test(l.cite)).map((l) => l.cite);
+  assert.equal(new Set(cites).size, cites.length, "nothing is read twice");
+  const dull = asks.filter((l) => !l.ask!.novel);
+  assert.ok(dull.every((l) => !l.post && l.text.split(" ").length <= 8), "a dull answer gets one short line, not a reading");
+  assert.ok(riff!.done && (riff!.stale >= 2 || riff!.turns === 8));
+  assert.match(lines.at(-1)!.text, /Filed for the reruns/);
 });
 
 test("ACCEPTANCE 4: every update type is announced as itself", () => {
@@ -91,6 +129,7 @@ test("ACCEPTANCE 4: every update type is announced as itself", () => {
     like: ANNOUNCE.like(u("like", { count: 1 })),
     bookmark: ANNOUNCE.bookmark(u("bookmark", { count: 3 })),
     views: ANNOUNCE.views(u("views", { count: 1000 })),
+    reair: ANNOUNCE.reair(u("reair")),
   };
   assert.match(said.reply, /A reply, from Steph Curdy/);
   assert.match(said.quote, /Jim O'Shaughnessy quoted it/);
@@ -98,6 +137,7 @@ test("ACCEPTANCE 4: every update type is announced as itself", () => {
   assert.match(said.like, /One new like\./);
   assert.match(said.bookmark, /3 new bookmarks/);
   assert.match(said.views, /passed 1,000 views/);
+  assert.match(said.reair, /a rerun/);
 });
 
 test("ACCEPTANCE 5: the run ends with the library, and its length is library + the thread's time", () => {
@@ -106,7 +146,7 @@ test("ACCEPTANCE 5: the run ends with the library, and its length is library + t
   const busy = simulate([[3, u("reply", { name: "A" })], [8, u("like", { count: 1 })], [9, u("repost", { count: 1 })], [60, u("views", { count: 100 })]]);
   const added = busy.s.done.reduce((t, d) => t + (d.ended - d.began) / 1000, 0);
   assert.ok(Math.abs(busy.elapsed - (LIBRARY + added)) < 0.3, `active: ${busy.elapsed}s = ${LIBRARY} + ${added}`);
-  assert.ok(busy.elapsed > quiet.elapsed + 4 * 20, "an active thread takes longer to stream against");
+  assert.ok(busy.elapsed > quiet.elapsed + 4 * 15, "an active thread takes longer to stream against");
   const st = stats(busy.s, busy.s.completedAt!);
   assert.equal(st.interrupts, 4);
   assert.ok(st.complete && st.remaining_secs === 0);
@@ -123,15 +163,17 @@ test("thread diffs become typed updates; the first look is a baseline, not news"
   assert.deepEqual(diff(b, b), []);
 });
 
-test("reactions pull memory, cite it, and book the time with real numbers", async () => {
-  const s = newRun("M", "1", LIB, Date.now(), IDENT);
-  const up = { id: "x", type: "reply" as const, at: "", user: "jessyka_boat", name: "Jessyka Boatright", text: "Love this experiment!" };
-  assert.ok(recall(up).some((r) => r.id.startsWith("ep:the-swarm-test")), "Borges finds the episode that remembers Jessyka");
-  const sc = await makeScript(up, s, 1, "This tweet is a public experiment on the value of information.");
-  assert.match(sc.announce.text, /A reply, from Jessyka Boatright/);
-  const borges = sc.react.filter((l) => l.speaker === "BORGES");
-  assert.match(borges[0].text, /Jessyka Boatright wrote: "Love this experiment!"/);
-  assert.ok(borges[1].cite?.startsWith("ep:"), "the memory line carries its record id");
-  assert.match(sc.react.find((l) => l.speaker === "AGNOLO")!.text, /Interruption number 1\. The clock starts now\./);
-  assert.ok(sc.react.reduce((t, l) => t + l.dur, 0) > 0);
+test("ACCEPTANCE 6: a saved segment re-airs as it aired, with no new questions and no new voices", async () => {
+  const ask = FixtureAsk.fromFile(ASK);
+  const s = newRun("R", "1", LIB, Date.now(), IDENT);
+  const jim = { id: "q2", type: "quote" as const, at: "", user: "jposhaughnessy", name: "Jim O'Shaughnessy", text: "Applications open 01.01.2027" };
+  const { script, riff } = await opening(jim, s, 1, "", ask);
+  while (riff && !riff.done) script.react.push(...(await continueRiff(jim, riff, s, 1)));
+  const id = saveSegment(s.id, 1, jim, script, 90);
+  assert.ok(listSegments().some((x) => x.id === id));
+  const calls = ask.calls.length;
+  const again = rerun(id);
+  assert.equal(ask.calls.length, calls, "no archive questions");
+  assert.deepEqual(again.react.map((l) => [l.speaker, l.text, l.audio ?? null]), script.react.map((l) => [l.speaker, l.text, l.audio ?? null]));
+  assert.ok(again.done);
 });

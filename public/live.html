@@ -12,7 +12,7 @@
 <body>
 <!--
   The live run: the library plays once, start to finish. Updates on one thread interrupt it:
-  freeze -> announce -> react (30 s at most) -> return. Interrupts pause the program; the run's
+  freeze -> announce -> riff (questions to the archive, as long as it is interesting) -> return. Interrupts pause the program; the run's
   length is the library plus the thread's time. State: /live/feed/state.json (open, CORS *).
   ?feed=https://another.station   ?kiosk=1 (compositor)   ?bg=transparent
 -->
@@ -46,7 +46,7 @@
       <div class="memory" id="u-memory" hidden></div>
       <div class="cast" id="u-cast"></div>
       <div class="caption"><span class="sp" id="u-sp"></span><span id="u-line"></span></div>
-      <div class="cap"><i id="u-cap"></i><span id="u-capt">30</span></div>
+      <div class="riff"><span id="u-ask" class="ask"></span><span id="u-riff"></span></div>
     </div>
     <div id="back" hidden><div class="k">FUTURE RADIO</div><div class="logo">Back to our regularly scheduled programming</div><div id="back-title"></div></div>
     <div id="end" hidden><div class="k">THE LIBRARY IS COMPLETE</div><div class="logo" id="end-runtime"></div><div id="end-detail"></div></div>

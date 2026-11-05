@@ -69,7 +69,7 @@
 
   // ---------------------------------------------------------------- the interrupt
   let lastN = 0;
-  const LABEL = { reply: "REPLY", quote: "QUOTE POST", repost: "REPOSTS", like: "LIKES", bookmark: "BOOKMARKS", views: "VIEWS" };
+  const LABEL = { reply: "REPLY", quote: "QUOTE POST", repost: "REPOSTS", like: "LIKES", bookmark: "BOOKMARKS", views: "VIEWS", reair: "RERUN" };
   function interrupt(c, phase, t) {
     const u = c.update;
     if (c.n !== lastN) { lastN = c.n; sting(); $("freeze-at").textContent = `${S.library[c.frozen.idx]?.title ?? ""} · ${mmss(c.frozen.offset)}`; }
@@ -82,33 +82,42 @@
     if (showUpdate) {
       $("u-kicker").textContent = `UPDATE · ${LABEL[u.type]} · INTERRUPTION #${c.n}`;
       $("u-announce").textContent = sc.announce.text;
-      $("u-post").hidden = !u.text;
-      if (u.text) {
-        $("u-av").textContent = (u.name || u.user || "?").trim()[0];
-        $("u-name").textContent = u.name || u.user;
-        $("u-handle").textContent = u.user ? `@${u.user}` : "";
-        $("u-text").textContent = u.text;
-      }
-      const mem = sc.react.find((l) => l.cite);
-      $("u-memory").hidden = !mem;
-      if (mem) $("u-memory").innerHTML = `<b>MEMORY · ${esc(mem.cite)}</b><br>${esc(sc.memory.find((m) => m.id === mem.cite)?.text ?? "")}`;
-      $("u-cast").innerHTML = ["MRS. BUS", "BORGES", "AGNOLO", "LEONARDO"].map((s) => `<span data-s="${s}">${s}</span>`).join("");
+      if (!u.text) $("u-post").hidden = true;
+      $("u-memory").hidden = true;
+      if (!$("u-cast").children.length || $("u-cast").dataset.n !== String(c.n)) { $("u-cast").dataset.n = String(c.n); $("u-cast").innerHTML = ["MRS. BUS", "BORGES", "AGNOLO", "LEONARDO"].map((s) => `<span data-s="${s}">${s}</span>`).join(""); }
     }
-    // Which line is on, by the server's schedule.
+    // Which line is on, by the server's schedule (each line carries its start time).
     let speaking = null;
-    const a = span("announce"), r = span("react"), b = span("return");
+    const a = span("announce"), b = span("return");
     if (phase === "announce" && a) { speaking = sc.announce; play(`${c.n}:a`, sc.announce.audio); }
-    if (phase === "react" && r) {
-      let at = r.start;
-      for (const [i, l] of sc.react.entries()) {
-        if (t >= at && t < at + l.dur * 1000 + 250) { speaking = l; play(`${c.n}:r${i}`, l.audio); }
-        at += (l.dur + 0.25) * 1000;
-      }
-      const left = Math.max(0, 30 - (t - r.start) / 1000);
-      $("u-cap").style.transform = `scaleX(${left / 30})`;
-      $("u-capt").textContent = `${Math.ceil(left)}s`;
-    } else { $("u-cap").style.transform = "scaleX(1)"; $("u-capt").textContent = "30s"; }
-    if (phase === "return" && b) { play(`${c.n}:b`, sc.returnLine.audio); $("back-title").textContent = `Resuming ${S.library[c.frozen.idx]?.title ?? ""} at ${mmss(c.frozen.offset)}`; }
+    if (phase === "react") {
+      sc.react.forEach((l, i) => { if (l.at != null && t >= l.at && t < l.at + l.dur * 1000 + 300) { speaking = l; play(`${c.n}:r${i}:${l.at}`, l.audio); } });
+      const r = span("react");
+      const asked = sc.react.filter((l) => l.ask && l.at != null && l.at <= t);
+      const good = asked.filter((l) => l.ask.novel).length;
+      $("u-riff").textContent = `RIFF ${mmss((t - r.start) / 1000)} · ${asked.length} question${asked.length === 1 ? "" : "s"} · ${good} good answer${good === 1 ? "" : "s"}${sc.done ? "" : " · still asking"}`;
+    }
+    const cur = speaking && speaking.ask ? speaking : null;
+    if (cur) {
+      const args = Object.entries(cur.ask.args).map(([k, v]) => `${k}: ${v}`).join(", ");
+      $("u-ask").className = "ask" + (cur.ask.novel ? "" : " dull");
+      $("u-ask").innerHTML = `ASKING THE ARCHIVE · <b>${esc(cur.ask.tool)}(${esc(args)}) → ${cur.ask.found}</b>`;
+    } else if (phase !== "react") $("u-ask").textContent = "";
+    // The post on the card: the one being read now (an answer from the archive), else the update.
+    const shown = speaking?.post ? { ...speaking.post, answer: true } : u.text ? { user: u.user, name: u.name, text: u.text, answer: false } : null;
+    if (shown && showUpdate) {
+      $("u-post").hidden = false;
+      $("u-post").classList.toggle("answer", shown.answer);
+      $("u-av").textContent = (shown.name || shown.user || "?").trim()[0];
+      $("u-name").textContent = shown.name || shown.user;
+      $("u-handle").textContent = (shown.user ? `@${shown.user}` : "") + (shown.date ? ` · ${new Date(shown.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · from the archive` : "");
+      $("u-text").textContent = shown.text;
+    }
+    if (speaking?.cite && !speaking.post) {
+      const m = sc.memory.find((x) => x.id === speaking.cite);
+      if (m) { $("u-memory").hidden = false; $("u-memory").innerHTML = `<b>MEMORY · ${esc(m.id)}</b><br>${esc(m.text)}`; }
+    }
+    if (phase === "return" && b) { play(`${c.n}:b`, sc.returnLine.audio); $("back-title").textContent = `Resuming ${S.library[c.frozen.idx]?.title ?? ""} at ${mmss(c.frozen.offset)}${sc.segment ? ` · segment ${sc.segment} saved for reruns` : ""}`; }
     if (speaking) {
       $("u-sp").textContent = speaking.speaker;
       $("u-line").textContent = speaking.text;

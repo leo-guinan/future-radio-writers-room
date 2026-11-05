@@ -96,13 +96,20 @@ export function stationRoutes(opts: { isProducer: (req: IncomingMessage) => bool
     ["POST", /^\/api\/live\/start$/, wrap(async (req, res) => {
       guard(req);
       const b = await readJson(req);
-      json(res, 201, await live.start({ thread: String(b.thread ?? process.env.LIVE_THREAD ?? ""), source: String(b.source ?? process.env.LIVE_SOURCE ?? "push"), library: b.library, fixture: b.fixture, pollSecs: b.poll_secs }));
+      json(res, 201, await live.start({ thread: String(b.thread ?? process.env.LIVE_THREAD ?? ""), source: String(b.source ?? process.env.LIVE_SOURCE ?? "push"), library: b.library, fixture: b.fixture, askFixture: b.ask_fixture, pollSecs: b.poll_secs }));
     })],
     ["POST", /^\/api\/live\/update$/, wrap(async (req, res) => {
       guard(req);
       const b = await readJson(req);
       if (!["reply", "quote", "repost", "like", "bookmark", "views"].includes(b.type)) throw new Error("type must be reply, quote, repost, like, bookmark or views");
       const u = { id: String(b.id ?? `${b.type}:push:${Date.now()}`), type: b.type, at: new Date().toISOString(), user: b.user, name: b.name, text: b.text, url: b.url, count: b.count };
+      json(res, live.queue(u) ? 202 : 409, { queued: u.id });
+    })],
+    ["GET", /^\/live\/feed\/segments\.json$/, (_req, res) => json(res, 200, { segments: live.listSegments() })],
+    ["POST", /^\/api\/live\/reair$/, wrap(async (req, res) => {
+      guard(req);
+      const b = await readJson(req);
+      const u = { id: `reair:${b.segment}:${Date.now()}`, type: "reair" as const, at: new Date().toISOString(), segment: String(b.segment) };
       json(res, live.queue(u) ? 202 : 409, { queued: u.id });
     })],
     ["POST", /^\/api\/live\/stop$/, wrap(async (req, res) => { guard(req); live.stop(); json(res, 200, { stopped: true }); })],
