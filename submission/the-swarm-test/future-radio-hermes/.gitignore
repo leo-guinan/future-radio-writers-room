@@ -1,0 +1,5 @@
+fr-work/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.mp4

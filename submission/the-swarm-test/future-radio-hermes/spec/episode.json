@@ -1,0 +1,1043 @@
+{
+ "title": "The Swarm Test",
+ "series": "Future Radio",
+ "runtime": 320,
+ "video": {
+  "width": 1280,
+  "height": 720,
+  "fps": 30
+ },
+ "title_card": {
+  "lines": [
+   "FUTURE RADIO",
+   "THE SWARM TEST"
+  ],
+  "from": 0.4,
+  "to": 3.4
+ },
+ "credits": {
+  "from": 301.81,
+  "to": 307.61,
+  "lines": [
+   "FUTURE RADIO",
+   "THE SWARM TEST",
+   "",
+   "FOR JESSYKA, WHO POINTED",
+   "Annalea Layton and Jessyka Boatright do not speak in this film.",
+   "Their words are their public replies, shown as screenshots.",
+   "The starter repo is an invitation. No partnership has been agreed.",
+   "Nous Research has not seen or endorsed this film."
+  ],
+  "anchor": "e6_010",
+  "offset_from_line_end": 1.6
+ },
+ "voices": {
+  "model": "eleven_v4",
+  "by_speaker": {
+   "LEONARDO": "s5t7B6IvxVOp3Y7HQT6Q",
+   "BORGES": "TLugb594bskyzPlFSOkh",
+   "AGNOLO": "yowh82B72eMNrxcxHgBh",
+   "MRS. BUS": "xN5u3GiLKTdbPJybr6kp",
+   "EVAL": "2WmCrP0cJGnh2QX210KX"
+  },
+  "takes": [
+   {
+    "file": "takes/e1_xN5u.mp3",
+    "speaker_voice": "xN5u3GiLKTdbPJybr6kp",
+    "lines": [
+     "e1_001"
+    ]
+   },
+   {
+    "file": "takes/e1_s5t7.mp3",
+    "speaker_voice": "s5t7B6IvxVOp3Y7HQT6Q",
+    "lines": [
+     "e1_002",
+     "e1_004",
+     "e1_007"
+    ]
+   },
+   {
+    "file": "takes/e1_TLug.mp3",
+    "speaker_voice": "TLugb594bskyzPlFSOkh",
+    "lines": [
+     "e1_003",
+     "e1_006",
+     "e1_008"
+    ]
+   },
+   {
+    "file": "takes/e1_yowh.mp3",
+    "speaker_voice": "yowh82B72eMNrxcxHgBh",
+    "lines": [
+     "e1_005"
+    ]
+   },
+   {
+    "file": "takes/e2_TLug.mp3",
+    "speaker_voice": "TLugb594bskyzPlFSOkh",
+    "lines": [
+     "e2_001",
+     "e2_004",
+     "e2_005",
+     "e2_006",
+     "e2_008",
+     "e2_010"
+    ]
+   },
+   {
+    "file": "takes/e2_s5t7.mp3",
+    "speaker_voice": "s5t7B6IvxVOp3Y7HQT6Q",
+    "lines": [
+     "e2_002",
+     "e2_007",
+     "e2_011",
+     "e2_013"
+    ]
+   },
+   {
+    "file": "takes/e2_yowh.mp3",
+    "speaker_voice": "yowh82B72eMNrxcxHgBh",
+    "lines": [
+     "e2_003",
+     "e2_009",
+     "e2_012"
+    ]
+   },
+   {
+    "file": "takes/e3_s5t7.mp3",
+    "speaker_voice": "s5t7B6IvxVOp3Y7HQT6Q",
+    "lines": [
+     "e3_001",
+     "e3_004",
+     "e3_006",
+     "e3_008",
+     "e3_010"
+    ]
+   },
+   {
+    "file": "takes/e3_TLug.mp3",
+    "speaker_voice": "TLugb594bskyzPlFSOkh",
+    "lines": [
+     "e3_002",
+     "e3_005",
+     "e3_007"
+    ]
+   },
+   {
+    "file": "takes/e3_yowh.mp3",
+    "speaker_voice": "yowh82B72eMNrxcxHgBh",
+    "lines": [
+     "e3_003",
+     "e3_009"
+    ]
+   },
+   {
+    "file": "takes/e4_TLug.mp3",
+    "speaker_voice": "TLugb594bskyzPlFSOkh",
+    "lines": [
+     "e4_001",
+     "e4_002",
+     "e4_003",
+     "e4_004",
+     "e4_005",
+     "e4_007",
+     "e4_008",
+     "e4_009",
+     "e4_010"
+    ]
+   },
+   {
+    "file": "takes/e4_yowh.mp3",
+    "speaker_voice": "yowh82B72eMNrxcxHgBh",
+    "lines": [
+     "e4_006"
+    ]
+   },
+   {
+    "file": "takes/e4_s5t7.mp3",
+    "speaker_voice": "s5t7B6IvxVOp3Y7HQT6Q",
+    "lines": [
+     "e4_011"
+    ]
+   },
+   {
+    "file": "takes/e5_yowh.mp3",
+    "speaker_voice": "yowh82B72eMNrxcxHgBh",
+    "lines": [
+     "e5_001",
+     "e5_003",
+     "e5_007",
+     "e5_009",
+     "e5_016",
+     "e5_019"
+    ]
+   },
+   {
+    "file": "takes/e5_s5t7.mp3",
+    "speaker_voice": "s5t7B6IvxVOp3Y7HQT6Q",
+    "lines": [
+     "e5_002",
+     "e5_004",
+     "e5_006",
+     "e5_008",
+     "e5_012",
+     "e5_014",
+     "e5_015",
+     "e5_018"
+    ]
+   },
+   {
+    "file": "takes/e5_TLug.mp3",
+    "speaker_voice": "TLugb594bskyzPlFSOkh",
+    "lines": [
+     "e5_005",
+     "e5_011",
+     "e5_013",
+     "e5_017"
+    ]
+   },
+   {
+    "file": "takes/e5_2WmC.mp3",
+    "speaker_voice": "2WmCrP0cJGnh2QX210KX",
+    "lines": [
+     "e5_010"
+    ]
+   },
+   {
+    "file": "takes/e6_xN5u.mp3",
+    "speaker_voice": "xN5u3GiLKTdbPJybr6kp",
+    "lines": [
+     "e6_001",
+     "e6_003",
+     "e6_005",
+     "e6_007"
+    ]
+   },
+   {
+    "file": "takes/e6_s5t7.mp3",
+    "speaker_voice": "s5t7B6IvxVOp3Y7HQT6Q",
+    "lines": [
+     "e6_002",
+     "e6_008",
+     "e6_009"
+    ]
+   },
+   {
+    "file": "takes/e6_TLug.mp3",
+    "speaker_voice": "TLugb594bskyzPlFSOkh",
+    "lines": [
+     "e6_004",
+     "e6_010"
+    ]
+   },
+   {
+    "file": "takes/e6_yowh.mp3",
+    "speaker_voice": "yowh82B72eMNrxcxHgBh",
+    "lines": [
+     "e6_006"
+    ]
+   },
+   {
+    "file": "takes/e7_s5t7.mp3",
+    "speaker_voice": "s5t7B6IvxVOp3Y7HQT6Q",
+    "lines": [
+     "e7_001"
+    ]
+   },
+   {
+    "file": "takes/e7_TLug.mp3",
+    "speaker_voice": "TLugb594bskyzPlFSOkh",
+    "lines": [
+     "e7_002"
+    ]
+   },
+   {
+    "file": "takes/e7_yowh.mp3",
+    "speaker_voice": "yowh82B72eMNrxcxHgBh",
+    "lines": [
+     "e7_003"
+    ]
+   }
+  ]
+ },
+ "audio_prep": {
+  "tempo": 1.04,
+  "lufs": -18,
+  "pad_s": 0.04,
+  "trim_threshold_db": -45
+ },
+ "tolerances": {
+  "line_order": "exact",
+  "line_start_s": 0.5,
+  "card_start_s": 0.5,
+  "runtime_s": 1.0
+ },
+ "lines": [
+  {
+   "id": "e1_001",
+   "scene": 1,
+   "speaker": "MRS. BUS",
+   "text": "Two replies for the station. One from Annalea. One from Jessyka.",
+   "start": 2.6,
+   "dur": 4.3,
+   "gap_before": 2.6
+  },
+  {
+   "id": "e1_002",
+   "scene": 1,
+   "speaker": "LEONARDO",
+   "text": "Annalea answered?",
+   "start": 7.04,
+   "dur": 1.2,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e1_003",
+   "scene": 1,
+   "speaker": "BORGES",
+   "text": "\"He will throw ideas. My swarm and me will build anything in seconds.\"",
+   "start": 8.38,
+   "dur": 5.0,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e1_004",
+   "scene": 1,
+   "speaker": "LEONARDO",
+   "text": "Seconds!",
+   "start": 13.52,
+   "dur": 1.0,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e1_005",
+   "scene": 1,
+   "speaker": "AGNOLO",
+   "text": "Seconds is a claim.",
+   "start": 14.66,
+   "dur": 1.667,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e1_006",
+   "scene": 1,
+   "speaker": "BORGES",
+   "text": "And Jessyka: \"Awww, this makes me happy. You two will go bonkers. I'm curious to see what you both create together.\"",
+   "start": 16.47,
+   "dur": 8.933,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e1_007",
+   "scene": 1,
+   "speaker": "LEONARDO",
+   "text": "Jessyka! Who is Jessyka?",
+   "start": 25.54,
+   "dur": 2.167,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e1_008",
+   "scene": 1,
+   "speaker": "BORGES",
+   "text": "The reason we met Annalea at all.",
+   "start": 28.25,
+   "dur": 2.433,
+   "gap_before": 0.54
+  },
+  {
+   "id": "e2_001",
+   "scene": 2,
+   "speaker": "BORGES",
+   "text": "This morning Leo wrote that he took one look at Annalea's site and recognized why Jessyka told him to reach out, and ask if she wanted to be his cofounder.",
+   "start": 31.9,
+   "dur": 9.7,
+   "gap_before": 1.22
+  },
+  {
+   "id": "e2_002",
+   "scene": 2,
+   "speaker": "LEONARDO",
+   "text": "Jessyka recommended a cofounder!",
+   "start": 41.74,
+   "dur": 2.167,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_003",
+   "scene": 2,
+   "speaker": "AGNOLO",
+   "text": "Recommendations are cheap. Good ones are not. What's her record?",
+   "start": 44.05,
+   "dur": 4.266,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_004",
+   "scene": 2,
+   "speaker": "BORGES",
+   "text": "June, twenty twenty-five. She's posting vlogs of her coding nights, and getting Google sign-in working.",
+   "start": 48.45,
+   "dur": 7.6,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_005",
+   "scene": 2,
+   "speaker": "BORGES",
+   "text": "July. She tells Leo to offer a fractional CTO service to vibe coders. He does.",
+   "start": 56.27,
+   "dur": 7.434,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e2_006",
+   "scene": 2,
+   "speaker": "BORGES",
+   "text": "The same month, she builds him a site. Leo wrote that it did the one thing he couldn't manage in five years. It packaged him.",
+   "start": 63.93,
+   "dur": 8.8,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e2_007",
+   "scene": 2,
+   "speaker": "LEONARDO",
+   "text": "She translated him!",
+   "start": 72.87,
+   "dur": 1.433,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_008",
+   "scene": 2,
+   "speaker": "BORGES",
+   "text": "He called her a Leo Translator. His Babelfish.",
+   "start": 74.44,
+   "dur": 4.033,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_009",
+   "scene": 2,
+   "speaker": "AGNOLO",
+   "text": "A translator who also builds. That's rare.",
+   "start": 78.61,
+   "dur": 3.434,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_010",
+   "scene": 2,
+   "speaker": "BORGES",
+   "text": "She was one of the first through his program. And in October, Leo wrote that she took his philosophy and ran with it, and inspired him to enter a hackathon.",
+   "start": 82.19,
+   "dur": 9.9,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_011",
+   "scene": 2,
+   "speaker": "LEONARDO",
+   "text": "So she sees people clearly, and points them at each other.",
+   "start": 92.23,
+   "dur": 3.133,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_012",
+   "scene": 2,
+   "speaker": "AGNOLO",
+   "text": "Which is exactly the job nobody pays for.",
+   "start": 95.5,
+   "dur": 2.6,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e2_013",
+   "scene": 2,
+   "speaker": "LEONARDO",
+   "text": "Then we put it in the record. Thank you, Jessyka.",
+   "start": 98.54,
+   "dur": 3.067,
+   "gap_before": 0.44
+  },
+  {
+   "id": "e3_001",
+   "scene": 3,
+   "speaker": "LEONARDO",
+   "text": "Borges, Annalea says her swarm builds anything in seconds.",
+   "start": 103.23,
+   "dur": 4.133,
+   "gap_before": 1.62
+  },
+  {
+   "id": "e3_002",
+   "scene": 3,
+   "speaker": "BORGES",
+   "text": "Then we should give it something worth building.",
+   "start": 107.5,
+   "dur": 2.7,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e3_003",
+   "scene": 3,
+   "speaker": "AGNOLO",
+   "text": "And a way to tell if it worked.",
+   "start": 110.34,
+   "dur": 1.733,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e3_004",
+   "scene": 3,
+   "speaker": "LEONARDO",
+   "text": "A test!",
+   "start": 112.21,
+   "dur": 0.734,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e3_005",
+   "scene": 3,
+   "speaker": "BORGES",
+   "text": "Nous Research just opened the Hermes Agent Plugin Hackathon. Seven days. Twenty thousand dollars in prizes. Entries due November eleventh, at five p.m. Eastern.",
+   "start": 113.09,
+   "dur": 11.966,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e3_006",
+   "scene": 3,
+   "speaker": "LEONARDO",
+   "text": "What's a plugin?",
+   "start": 125.19,
+   "dur": 0.934,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e3_007",
+   "scene": 3,
+   "speaker": "BORGES",
+   "text": "A folder. A manifest called plugin dot yaml. A register function. And tools the agent can call.",
+   "start": 126.27,
+   "dur": 8.133,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e3_008",
+   "scene": 3,
+   "speaker": "LEONARDO",
+   "text": "Then we put Future Radio in the folder!",
+   "start": 134.54,
+   "dur": 2.267,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e3_009",
+   "scene": 3,
+   "speaker": "AGNOLO",
+   "text": "All of it?",
+   "start": 136.95,
+   "dur": 0.633,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e3_010",
+   "scene": 3,
+   "speaker": "LEONARDO",
+   "text": "All of it! Script to screen!",
+   "start": 137.72,
+   "dur": 2.133,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e4_001",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "Then let's be precise. Here is how an episode is made.",
+   "start": 140.99,
+   "dur": 4.834,
+   "gap_before": 1.14
+  },
+  {
+   "id": "e4_002",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "One. The script becomes a table: an id, a speaker, and a line.",
+   "start": 146.05,
+   "dur": 6.4,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e4_003",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "Two. Each character records one take per scene, with long pauses between the lines.",
+   "start": 152.67,
+   "dur": 6.533,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e4_004",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "Three. The take is cut at its longest silences, one clip per line.",
+   "start": 159.42,
+   "dur": 5.733,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e4_005",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "Four. Each clip is trimmed, leveled, sped up four percent, and given a mouth.",
+   "start": 165.37,
+   "dur": 6.2,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e4_006",
+   "scene": 4,
+   "speaker": "AGNOLO",
+   "text": "Four percent?",
+   "start": 171.71,
+   "dur": 1.234,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e4_007",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "Everyone talks a little slowly at first.",
+   "start": 173.09,
+   "dur": 2.766,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e4_008",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "Five. The monitor cards are drawn as web pages and photographed.",
+   "start": 176.07,
+   "dur": 4.634,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e4_009",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "Six. A timeline places every line, every card, every sound, and every camera move.",
+   "start": 180.93,
+   "dur": 7.366,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e4_010",
+   "scene": 4,
+   "speaker": "BORGES",
+   "text": "Seven. The studio renders the frames, mixes the sound, and writes the film.",
+   "start": 188.51,
+   "dur": 5.7,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e4_011",
+   "scene": 4,
+   "speaker": "LEONARDO",
+   "text": "Seven steps! Seven tools!",
+   "start": 194.35,
+   "dur": 2.6,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_001",
+   "scene": 5,
+   "speaker": "AGNOLO",
+   "text": "And the acceptance test?",
+   "start": 198.09,
+   "dur": 1.3,
+   "gap_before": 1.14
+  },
+  {
+   "id": "e5_002",
+   "scene": 5,
+   "speaker": "LEONARDO",
+   "text": "The plugin has to produce an episode.",
+   "start": 199.53,
+   "dur": 2.2,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_003",
+   "scene": 5,
+   "speaker": "AGNOLO",
+   "text": "Which episode?",
+   "start": 201.87,
+   "dur": 0.967,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_004",
+   "scene": 5,
+   "speaker": "LEONARDO",
+   "text": "This one.",
+   "start": 202.98,
+   "dur": 0.833,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_005",
+   "scene": 5,
+   "speaker": "BORGES",
+   "text": "This one?",
+   "start": 204.25,
+   "dur": 0.934,
+   "gap_before": 0.44
+  },
+  {
+   "id": "e5_006",
+   "scene": 5,
+   "speaker": "LEONARDO",
+   "text": "Same lines, same voices, same order. Every card on screen at the same moment. Same runtime.",
+   "start": 205.33,
+   "dur": 7.133,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_007",
+   "scene": 5,
+   "speaker": "AGNOLO",
+   "text": "To within what tolerance?",
+   "start": 212.6,
+   "dur": 1.5,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_008",
+   "scene": 5,
+   "speaker": "LEONARDO",
+   "text": "You decide, Agnolo. You're the strict one.",
+   "start": 214.24,
+   "dur": 2.533,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_009",
+   "scene": 5,
+   "speaker": "AGNOLO",
+   "text": "Line order, exact. Each line starts within half a second. Each card within half a second. Total runtime within one second.",
+   "start": 217.21,
+   "dur": 8.7,
+   "gap_before": 0.44
+  },
+  {
+   "id": "e5_010",
+   "scene": 5,
+   "speaker": "EVAL",
+   "text": "A film that grades its own remake! I have notes!",
+   "start": 226.05,
+   "dur": 3.4,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_011",
+   "scene": 5,
+   "speaker": "BORGES",
+   "text": "That's the first test. The plugin makes the movie.",
+   "start": 229.59,
+   "dur": 3.667,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_012",
+   "scene": 5,
+   "speaker": "LEONARDO",
+   "text": "And the second test is for the swarm.",
+   "start": 233.4,
+   "dur": 2.233,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_013",
+   "scene": 5,
+   "speaker": "BORGES",
+   "text": "Go on.",
+   "start": 235.77,
+   "dur": 0.434,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_014",
+   "scene": 5,
+   "speaker": "LEONARDO",
+   "text": "We give her two things. The prompt that started this episode, and the architecture. Nothing else.",
+   "start": 236.65,
+   "dur": 6.066,
+   "gap_before": 0.44
+  },
+  {
+   "id": "e5_015",
+   "scene": 5,
+   "speaker": "LEONARDO",
+   "text": "Can her swarm reverse engineer the movie?",
+   "start": 242.93,
+   "dur": 2.567,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e5_016",
+   "scene": 5,
+   "speaker": "AGNOLO",
+   "text": "Scored by the same test.",
+   "start": 245.64,
+   "dur": 1.667,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_017",
+   "scene": 5,
+   "speaker": "BORGES",
+   "text": "Forward, the plugin turns a script into a film. Backward, the swarm turns a request into the script, the cards, and the timing.",
+   "start": 247.45,
+   "dur": 9.7,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_018",
+   "scene": 5,
+   "speaker": "LEONARDO",
+   "text": "If it can do that in seconds, I'll throw ideas all day.",
+   "start": 257.29,
+   "dur": 3.433,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e5_019",
+   "scene": 5,
+   "speaker": "AGNOLO",
+   "text": "You already do.",
+   "start": 261.06,
+   "dur": 1.1,
+   "gap_before": 0.34
+  },
+  {
+   "id": "e6_001",
+   "scene": 6,
+   "speaker": "MRS. BUS",
+   "text": "All right. Where's this one going?",
+   "start": 263.3,
+   "dur": 2.1,
+   "gap_before": 1.14
+  },
+  {
+   "id": "e6_002",
+   "scene": 6,
+   "speaker": "LEONARDO",
+   "text": "A starter repo. Public. She forks it.",
+   "start": 265.54,
+   "dur": 3.2,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e6_003",
+   "scene": 6,
+   "speaker": "MRS. BUS",
+   "text": "What's in it?",
+   "start": 268.88,
+   "dur": 0.767,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e6_004",
+   "scene": 6,
+   "speaker": "BORGES",
+   "text": "The prompt. The architecture. A plugin skeleton for Hermes. The episode's exact spec. And the acceptance test.",
+   "start": 269.79,
+   "dur": 10.0,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e6_005",
+   "scene": 6,
+   "speaker": "MRS. BUS",
+   "text": "And what does she owe us?",
+   "start": 279.93,
+   "dur": 1.5,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e6_006",
+   "scene": 6,
+   "speaker": "AGNOLO",
+   "text": "Nothing. It's an invitation, not a contract. No partnership has been agreed.",
+   "start": 281.57,
+   "dur": 5.133,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e6_007",
+   "scene": 6,
+   "speaker": "MRS. BUS",
+   "text": "Good. Then it's a game, not a job.",
+   "start": 286.84,
+   "dur": 2.8,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e6_008",
+   "scene": 6,
+   "speaker": "LEONARDO",
+   "text": "Annalea. He throws ideas. Here's one.",
+   "start": 290.38,
+   "dur": 3.333,
+   "gap_before": 0.74
+  },
+  {
+   "id": "e6_009",
+   "scene": 6,
+   "speaker": "LEONARDO",
+   "text": "Fork it, and show us what your swarm can do.",
+   "start": 293.93,
+   "dur": 2.834,
+   "gap_before": 0.22
+  },
+  {
+   "id": "e6_010",
+   "scene": 6,
+   "speaker": "BORGES",
+   "text": "And Jessyka. Thank you for pointing.",
+   "start": 297.21,
+   "dur": 3.0,
+   "gap_before": 0.44
+  },
+  {
+   "id": "e7_001",
+   "scene": 7,
+   "speaker": "LEONARDO",
+   "text": "Borges, how long is a second?",
+   "start": 309.75,
+   "dur": 2.4,
+   "gap_before": 9.54
+  },
+  {
+   "id": "e7_002",
+   "scene": 7,
+   "speaker": "BORGES",
+   "text": "That depends on who is measuring.",
+   "start": 312.29,
+   "dur": 2.266,
+   "gap_before": 0.14
+  },
+  {
+   "id": "e7_003",
+   "scene": 7,
+   "speaker": "AGNOLO",
+   "text": "Ours bill by the hour.",
+   "start": 314.99,
+   "dur": 1.5,
+   "gap_before": 0.44
+  }
+ ],
+ "cards": [
+  {
+   "id": "c0",
+   "start": 8.38,
+   "html": "cards/c0.html",
+   "about": "Annalea's reply (screenshot)",
+   "anchor": "e1_003",
+   "offset": 0.0
+  },
+  {
+   "id": "c1",
+   "start": 16.47,
+   "html": "cards/c1.html",
+   "about": "Jessyka's reply (screenshot)",
+   "anchor": "e1_006",
+   "offset": 0.0
+  },
+  {
+   "id": "c2",
+   "start": 31.9,
+   "html": "cards/c2.html",
+   "about": "Leo's Nov 5 post: why Jessyka said reach out",
+   "anchor": "e2_001",
+   "offset": 0.0
+  },
+  {
+   "id": "c3",
+   "start": 48.45,
+   "html": "cards/c3.html",
+   "about": "Jessyka's record, from Leo's side of the archive",
+   "anchor": "e2_004",
+   "offset": 0.0
+  },
+  {
+   "id": "c4",
+   "start": 98.54,
+   "html": "cards/c4.html",
+   "about": "Thank you, Jessyka",
+   "anchor": "e2_013",
+   "offset": 0.0
+  },
+  {
+   "id": "c5",
+   "start": 113.09,
+   "html": "cards/c5.html",
+   "about": "Nous Research Hermes Agent Plugin Hackathon post (screenshot)",
+   "anchor": "e3_005",
+   "offset": 0.0
+  },
+  {
+   "id": "c6",
+   "start": 126.27,
+   "html": "cards/c6.html",
+   "about": "Anatomy of a Hermes plugin",
+   "anchor": "e3_007",
+   "offset": 0.0
+  },
+  {
+   "id": "c7",
+   "start": 146.05,
+   "html": "cards/c7.html",
+   "about": "Script to screen: seven steps, seven tools",
+   "anchor": "e4_002",
+   "offset": 0.0
+  },
+  {
+   "id": "c8",
+   "start": 217.21,
+   "html": "cards/c8.html",
+   "about": "Test 1, forward: Agnolo's tolerances",
+   "anchor": "e5_009",
+   "offset": 0.0
+  },
+  {
+   "id": "c9",
+   "start": 247.45,
+   "html": "cards/c9.html",
+   "about": "Two tests, one scorecard",
+   "anchor": "e5_017",
+   "offset": 0.0
+  },
+  {
+   "id": "c10",
+   "start": 269.79,
+   "html": "cards/c10.html",
+   "about": "Mrs. Bus dispatch: the starter repo",
+   "anchor": "e6_004",
+   "offset": 0.0
+  },
+  {
+   "id": "c11",
+   "start": 309.35,
+   "html": "cards/c11.html",
+   "about": "Post-credits: how long is a second?",
+   "anchor": "e7_001",
+   "offset": -0.4
+  }
+ ],
+ "tail_s": 3.51
+}
