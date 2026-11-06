@@ -185,6 +185,7 @@ X has opened the broadcast but isn't receiving a stream it can play. Work down t
 | Call | What it does |
 |---|---|
 | `POST /api/live/start {thread, source, library?, poll_secs?}` | start a run (producer) |
+| `POST /api/live/resume` | put a stopped run back on the air from its held frame (a restarted server resumes a running run by itself) |
 | `POST /api/live/update` | push one update (producer) |
 | `GET /live/feed/state.json` | the whole run, open: phase, position, the current interrupt with its script and phase times, and the ledger |
 

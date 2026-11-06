@@ -34,7 +34,7 @@ export interface Script {
   turns: number;
   segment?: string; // saved as, for re-airing
 }
-export type Phase = "playing" | "freeze" | "announce" | "react" | "return" | "complete";
+export type Phase = "playing" | "freeze" | "announce" | "react" | "return" | "complete" | "stopped";
 export interface PhaseSpan { phase: Phase; start: number; end: number } // epoch ms
 export interface Interrupt {
   n: number;
@@ -60,4 +60,8 @@ export interface RunState {
   queue: Update[];
   done: Array<{ n: number; type: UpdateType; user?: string; began: number; ended: number }>;
   completedAt: number | null;
+  opts?: RunOpts; // how it was started, so a restarted server can pick the run back up
+  savedAt?: number; // last heartbeat: where the run was when the server last wrote it
+  offAirSecs?: number; // time the server was down or the run stopped: not broadcast, not counted
 }
+export interface RunOpts { source: string; fixture?: string; askFixture?: string; pollSecs?: number }

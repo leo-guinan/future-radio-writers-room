@@ -542,10 +542,16 @@ if (process.env.STATION_WATCH === "1") {
   catch (e: any) { console.error("station watcher off:", e.message); }
 }
 
-if (process.env.LIVE_AUTOSTART === "1" && process.env.LIVE_THREAD) {
-  import("./live/controller.ts").then((l) => l.start({ thread: process.env.LIVE_THREAD!, source: process.env.LIVE_SOURCE ?? "archive", library: process.env.LIVE_LIBRARY?.split(",").filter(Boolean) }))
-    .then(() => console.log(`Live run on thread ${process.env.LIVE_THREAD} (${process.env.LIVE_SOURCE ?? "archive"}).`)).catch((e) => console.error("live run:", e.message));
-}
+// A run that was on the air when the server stopped picks up where it was. LIVE_AUTOSTART starts a
+// new run only when there is nothing to resume on that thread.
+import("./live/controller.ts").then(async (l) => {
+  const r = await l.resume();
+  if (r) return console.log(`Live run ${r.run} resumed on thread ${r.thread} (program ${r.idx + 1}, ${Math.round(r.offset)}s in).`);
+  if (process.env.LIVE_AUTOSTART === "1" && process.env.LIVE_THREAD && l.current()?.thread !== process.env.LIVE_THREAD || (process.env.LIVE_AUTOSTART === "1" && process.env.LIVE_THREAD && ["complete", undefined].includes(l.current()?.phase))) {
+    await l.start({ thread: process.env.LIVE_THREAD!, source: process.env.LIVE_SOURCE ?? "archive", library: process.env.LIVE_LIBRARY?.split(",").filter(Boolean) });
+    console.log(`Live run on thread ${process.env.LIVE_THREAD} (${process.env.LIVE_SOURCE ?? "archive"}).`);
+  }
+}).catch((e) => console.error("live run:", e.message));
 
 server.listen(PORT, () => {
   console.log(`Future Radio writers' room on http://localhost:${PORT}  (${llm.offline ? "offline characters" : `model ${llm.model}`}; ${room.store.all().length} events)`);

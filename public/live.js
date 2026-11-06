@@ -162,7 +162,7 @@
     const frozen = S.phase !== "playing" && S.phase !== "complete";
     document.body.classList.toggle("frozen", frozen);
     document.body.classList.toggle("live", S.phase === "playing");
-    $("onair-label").textContent = frozen ? "UPDATE" : S.phase === "complete" ? "COMPLETE" : "ON AIR";
+    $("onair-label").textContent = S.phase === "stopped" ? "STOPPED" : frozen ? "UPDATE" : S.phase === "complete" ? "COMPLETE" : "ON AIR";
     if (S.phase === "complete") {
       vid.pause(); $("update").hidden = true; $("back").hidden = true; $("end").hidden = false;
       $("end-runtime").textContent = `${mmss(S.stats.elapsed_secs)} to stream ${mmss(S.stats.library_secs)}`;

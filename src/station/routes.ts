@@ -113,6 +113,7 @@ export function stationRoutes(opts: { isProducer: (req: IncomingMessage) => bool
       json(res, live.queue(u) ? 202 : 409, { queued: u.id });
     })],
     ["POST", /^\/api\/live\/stop$/, wrap(async (req, res) => { guard(req); live.stop(); json(res, 200, { stopped: true }); })],
+    ["POST", /^\/api\/live\/resume$/, wrap(async (req, res) => { guard(req); const s = await live.resume({ stopped: true }); json(res, s ? 200 : 409, s ?? { error: "No run to resume (none, already running, or complete)" }); })],
     // Producer: program the triggers by voice (base64 WAV) or text; approve; poll now.
     ["POST", /^\/api\/station\/program$/, wrap(async (req, res) => {
       guard(req);

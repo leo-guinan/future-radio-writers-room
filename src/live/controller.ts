@@ -6,12 +6,12 @@ import { join } from "node:path";
 import { append } from "../station/log.ts";
 import { DATA } from "../station/rules.ts";
 import { loadLineup } from "../station/schedule.ts";
-import { ahead, extend, newRun, setScript, stats, tick } from "./run.ts";
+import { ahead, extend, newRun, park, setScript, stats, tick, unpark } from "./run.ts";
 import { continueRiff, listSegments, opening, rerun, saveSegment, voiceLines } from "./script.ts";
 import { FixtureAsk, McpAsk, type AskArchive } from "./ask.ts";
 import type { Riff } from "./riff.ts";
 import { ArchiveThread, FixtureThread, PushThread, XApiThread, diff, type Snapshot, type ThreadSource } from "./thread.ts";
-import type { RunState, Update } from "./types.ts";
+import type { RunOpts, RunState, Update } from "./types.ts";
 
 const file = () => join(DATA(), "live-run.json");
 let run: RunState | null = null;
@@ -27,7 +27,7 @@ export function current() {
   if (!run && existsSync(file())) run = JSON.parse(readFileSync(file(), "utf8"));
   return run;
 }
-const save = () => { mkdirSync(DATA(), { recursive: true }); writeFileSync(file(), JSON.stringify(run)); };
+const save = () => { if (!run) return; run.savedAt = Date.now(); mkdirSync(DATA(), { recursive: true }); writeFileSync(file(), JSON.stringify(run)); };
 
 function makeSource(kind: string, thread: string, fixture?: string): ThreadSource {
   if (kind === "x") return new XApiThread(thread);
@@ -96,11 +96,37 @@ export async function start(opts: { thread: string; source: string; library?: st
     .map((p) => ({ id: p.id, title: p.title, duration: p.duration, media: `/station/media/${p.id}.mp4`, youtube: p.youtube || null }));
   const now = Date.now();
   run = newRun(`R${now.toString(36)}`, opts.thread, lib, now, Number(process.env.LIVE_IDENT_SECS ?? 4));
+  run.opts = { source: opts.source, fixture: opts.fixture, askFixture: opts.askFixture, pollSecs: opts.pollSecs };
   last = null; seen.clear();
-  source = makeSource(opts.source, opts.thread, opts.fixture);
+  append("live.start", { run: run.id, thread: opts.thread, source: opts.source, library: lib.map((p) => p.id), library_secs: stats(run, now).library_secs });
+  await attach(run.opts);
+  return publicState();
+}
+
+/**
+ * Pick up a run the server was running before it restarted (or one that was stopped, when
+ * `stopped` is true). The program continues from where it was; the time away is off air. Without
+ * this the saved run was served with nothing ticking it, and every page sat on "Up next".
+ */
+export async function resume(o: { stopped?: boolean } = {}) {
+  const r = current();
+  if (!r || r.phase === "complete" || timers.length) return null;
+  if (r.phase === "stopped" && !o.stopped) return null; // stopped on purpose: stays stopped
+  const now = Date.now();
+  const offSince = r.phase === "stopped" ? r.resumedAt : r.savedAt ?? r.resumedAt;
+  park(r, now);
+  unpark(r, now, offSince);
+  for (const u of r.queue) seen.add(u.id);
+  append("live.resume", { run: r.id, thread: r.thread, idx: r.idx, offset: Math.round(r.offset), off_air_secs: Math.round((now - offSince) / 1000) });
+  await attach(r.opts ?? { source: "push" });
+  return publicState();
+}
+
+async function attach(opts: RunOpts) {
+  const r = run!;
+  source = makeSource(opts.source, r.thread, opts.fixture);
   rootText = (await source.root?.().catch(() => "")) ?? "";
   ask = makeAsk(opts.askFixture);
-  append("live.start", { run: run.id, thread: opts.thread, source: source.id, library: lib.map((p) => p.id), library_secs: stats(run, now).library_secs });
   save();
   const hooks = {
     prepare: (u: Update, s: RunState) => {
@@ -125,15 +151,18 @@ export async function start(opts: { thread: string; source: string; library?: st
     onEvent: (type: string, body: Record<string, unknown>) => append(type, { run: run!.id, ...body, state: { ...publicState(), library: undefined } }),
   };
   timers.push(setInterval(() => { if (run && tick(run, Date.now(), hooks)) save(); }, 200));
+  timers.push(setInterval(save, 5000)); // heartbeat: a restart resumes within 5 s of where it was
   await poll();
   timers.push(setInterval(poll, (opts.pollSecs ?? Number(process.env.LIVE_POLL_SECS ?? 30)) * 1000));
   for (const t of timers) t.unref?.();
-  return publicState();
 }
 
+/** Stop ticking. The run is parked (frame held, shown as STOPPED) until /api/live/resume or a new start. */
 export function stop() {
+  const was = timers.length > 0;
   for (const t of timers) clearInterval(t);
   timers = [];
+  if (was && run && run.phase !== "complete") { park(run, Date.now()); save(); append("live.stop", { run: run.id, idx: run.idx, offset: Math.round(run.offset) }); }
 }
 
 export function publicState() {

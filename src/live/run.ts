@@ -59,7 +59,7 @@ export interface Hooks { prepare: (u: Update, s: RunState) => void; onEvent?: (t
 export function tick(s: RunState, now: number, h: Hooks): boolean {
   const emit = h.onEvent ?? (() => {});
   let changed = false;
-  if (s.phase === "complete") return false;
+  if (s.phase === "complete" || s.phase === "stopped") return false;
 
   if (s.phase === "playing") {
     let { idx, offset } = position(s, now);
@@ -157,7 +157,7 @@ export function stats(s: RunState, now: number) {
     library_secs: round(library),
     played_secs: round(Math.min(played, library)),
     remaining_secs: round(Math.max(0, library - played)),
-    elapsed_secs: round((end - s.startedAt) / 1000),
+    elapsed_secs: round((end - s.startedAt) / 1000 - (s.offAirSecs ?? 0)),
     added_by_thread_secs: round(interrupted),
     interrupts: s.done.length,
     by_type: byType,
@@ -165,3 +165,24 @@ export function stats(s: RunState, now: number) {
   };
 }
 const round = (x: number) => Math.round(x * 10) / 10;
+
+/** Take the run off the air at `now`: the program holds its frame and an unfinished interruption
+ *  goes back to the front of the queue (its script was lost with the old process). */
+export function park(s: RunState, now: number) {
+  if (s.phase === "complete") return;
+  if (s.current) {
+    s.queue.unshift(s.current.update);
+    s.idx = s.current.frozen.idx; s.offset = s.current.frozen.offset; s.current = null;
+  } else if (s.phase === "playing") {
+    const p = position(s, s.savedAt && s.savedAt < now ? s.savedAt : now);
+    s.idx = p.idx; s.offset = p.offset;
+  }
+  s.phase = "stopped"; s.resumedAt = now;
+}
+
+/** Back on the air: playing from the parked frame; the time away is not broadcast time. */
+export function unpark(s: RunState, now: number, offSince: number) {
+  if (s.phase !== "stopped") return;
+  s.offAirSecs = (s.offAirSecs ?? 0) + Math.max(0, now - offSince) / 1000;
+  s.phase = "playing"; s.resumedAt = now;
+}
