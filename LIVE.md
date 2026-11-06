@@ -124,6 +124,40 @@ Borges may only say what a record says, and every memory line carries its record
    Watch it yourself at `http://localhost:8787/live`.
 4. Go live from Media Studio.
 
+### When X shows LIVE but the player stays black
+
+X has opened the broadcast but isn't receiving a stream it can play. Work down this list:
+
+1. **Read the compositor's log.**
+
+   ```bash
+   docker compose logs compositor --tail 40
+   ```
+
+   - `route x: on → rtmps://…/x/abc…yz` is where it's pushing, with the key masked.
+   - `route x: off (X_RTMP_URL, X_STREAM_KEY not set)` means `.env` didn't reach the container.
+     Recreate it: `docker compose --profile broadcast up -d --force-recreate compositor`.
+   - `error opening`, `Connection refused`, `Input/output error` or `All tee outputs failed` means
+     X refused the push. Check the URL and the key. Media Studio's stream key changes when you
+     regenerate it.
+   - A `frame=… fps=30 … speed=1x` line every 10 s means the stream is flowing.
+2. **Send a test pattern.** This uses no browser, only colour bars and a tone:
+
+   ```bash
+   docker compose --profile broadcast run --rm -e STATION_TEST_PATTERN=1 compositor
+   ```
+
+   - If the bars show up in Media Studio's preview, the path to X works, and the issue is the page
+     capture (check `docker compose logs room`).
+   - If they don't, the issue is the URL, the key, or the broadcast setup.
+3. **Media Studio:**
+   - The source must be the one whose key is in `.env`.
+   - The broadcast must use that source.
+   - Its preview must show the picture before you press **Go Live**.
+4. **The URL:** `X_RTMP_URL` is the full ingest URL Media Studio shows, for example
+   `rtmps://….pscp.tv:443/x`. A trailing `/` is fine. The key goes in `X_STREAM_KEY` and nowhere
+   else.
+
 ### Where updates come from
 
 | `LIVE_SOURCE` | What it sees | Cost |
