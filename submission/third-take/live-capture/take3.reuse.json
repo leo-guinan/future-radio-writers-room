@@ -1,0 +1,28 @@
+{
+ "take": 3,
+ "cut": "/home/claude/future-radio-studio/episodes/going-viral/cut/take3.cut.json",
+ "runtime_s": 177,
+ "chunk_s": 10,
+ "chunks": 18,
+ "reused": 15,
+ "rendered": 3,
+ "reused_seconds": 147,
+ "rendered_ranges": [
+  [
+   120,
+   130
+  ],
+  [
+   130,
+   140
+  ],
+  [
+   140,
+   150
+  ]
+ ],
+ "video_render_s": 45.7,
+ "audio_render_s": 7.7,
+ "total_s": 85.4,
+ "full_render_estimate_s": 274.0
+}

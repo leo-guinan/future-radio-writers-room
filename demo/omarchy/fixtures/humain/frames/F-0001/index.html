@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Midnight versus noon: who really visits?</title>
+<style>
+  body { background: #0d0d12; color: #e8e0c8; font-family: Georgia, serif; max-width: 860px; margin: 2rem auto; padding: 0 1.2rem; }
+  .hook { font-size: 1.9rem; border-bottom: 3px double #8a6d3b; padding-bottom: .6rem; }
+  .works { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
+  .work { border: 1px solid #8a6d3b; border-radius: 8px; padding: 1rem; background: #14141c; }
+  .work h2 { margin-top: 0; font-size: 1.2rem; }
+  .work a { color: #d8b25c; }
+  .counter { text-align: center; margin-top: 2rem; font-family: "Courier New", monospace; }
+  .odometer { display: inline-block; background: #000; border: 3px inset #666; border-radius: 6px; padding: .3rem .8rem; letter-spacing: .35rem; font-size: 2rem; color: #7dff8a; }
+  .made { text-align: center; opacity: .6; font-size: .85rem; margin-top: 1rem; }
+</style>
+</head>
+<body>
+  <p><a href="/humain.html" style="color:#d8b25c">&larr; HumAIn OS session</a></p>
+  <h1 class="hook">Midnight versus noon: who really visits?</h1>
+  <div class="works">
+    <div class="work" data-work="e01-the-first-transmission">
+      <h2>The First Transmission</h2>
+      <p>Kind: episode &middot; 9m 01s</p>
+      <p><a href="https://www.youtube.com/watch?v=a0c80hyyz90">Watch / listen</a></p>
+    </div>
+    <div class="work" data-work="e10-the-people-vs-the-future">
+      <h2>The People vs. The Future</h2>
+      <p>Kind: episode &middot; 8m 23s</p>
+      <p><a href="https://www.youtube.com/watch?v=mcNeg4t1qnc">Watch / listen</a></p>
+    </div>
+  </div>
+  <div class="counter" data-testid="visitor-counter">
+    <div>You are visitor</div>
+    <div class="odometer" id="odometer">000000</div>
+    <div>since the static began</div>
+    <div class="server-counts" data-testid="server-counts"><strong data-c="unique">0</strong> unique souls across <strong data-c="human">0</strong> visits (<strong data-c="verify">0</strong> verification passes)</div>
+  </div>
+  <p class="made">Framed by HumAIn OS Frame Maker prototype. Counter is per-browser (localStorage).</p>
+<script>
+(function () {
+  var key = "humain-visitor-count";
+  var n = 1;
+  try { n = (parseInt(localStorage.getItem(key) || "0", 10) || 0) + 1; localStorage.setItem(key, String(n)); }
+  catch (e) { n = 1; }
+  document.getElementById("odometer").textContent = String(n).padStart(6, "0");
+})();
+</script>
+</body>
+</html>

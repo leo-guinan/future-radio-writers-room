@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Shantell+Sans:wght@600;800&display=swap" rel="stylesheet">
+<style>body{margin:0;width:1280px;height:720px;background:#0f1214;color:#f3ecdc;font-family:'IBM Plex Mono',monospace;display:flex;flex-direction:column;justify-content:center;padding:0 80px;box-sizing:border-box}
+.k{color:#e7a23c;font-size:28px;letter-spacing:.12em}.h{font-family:'Shantell Sans',sans-serif;font-weight:800;font-size:76px;line-height:1.02;margin:12px 0 22px}
+.r{font-size:29px;line-height:1.5}.r b{color:#e8c27a}.f{margin-top:22px;font-size:22px;color:#9fb3a8}.ok{color:#7dd87d}.no{color:#e5484d}.t{color:#8fb8ff}
+.shot{padding:0;justify-content:flex-start}.shot{align-items:center;justify-content:center;background:#000}.shot img{max-width:1280px;max-height:720px;display:block}
+.tag{display:inline-block;border:2px solid #556;border-radius:20px;padding:0 12px;font-size:20px;color:#cfd6e0;margin-left:10px}
+table{font-size:24px;border-collapse:collapse}td{padding:5px 18px 5px 0;vertical-align:top}td:first-child{white-space:nowrap}</style></head><body><div class="k">ANATOMY OF A HERMES PLUGIN</div><div class="r" style="font-size:28px;margin-top:10px;line-height:1.6">
+~/.hermes/plugins/<b>future-radio</b>/<br>
+&nbsp;&nbsp;plugin.yaml &nbsp;&nbsp;&nbsp;<span class="t"># name, version, provides_tools</span><br>
+&nbsp;&nbsp;__init__.py &nbsp;&nbsp;&nbsp;<span class="t"># register(ctx)</span><br>
+&nbsp;&nbsp;schemas.py &nbsp;&nbsp;&nbsp;&nbsp;<span class="t"># what the model sees</span><br>
+&nbsp;&nbsp;tools.py &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t"># what runs</span></div>
+<div class="f">ctx.register_tool(name, toolset, schema, handler) · handlers return JSON, never raise</div></body></html>

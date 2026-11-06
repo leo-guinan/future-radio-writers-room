@@ -1,0 +1,127 @@
+{
+ "name": "Future Radio",
+ "tz": "America/New_York",
+ "anchor": "2026-11-05T00:00:00-05:00",
+ "ident_secs": 6,
+ "programs": [
+  {
+   "id": "the-bloom-party",
+   "title": "The Bloom Party",
+   "file": "submission/the-bloom-party/the-bloom-party.mp4",
+   "youtube": "",
+   "duration": 358.0
+  },
+  {
+   "id": "the-swarm-test",
+   "title": "The Swarm Test",
+   "file": "submission/the-swarm-test/the-swarm-test.mp4",
+   "youtube": "",
+   "duration": 320.0
+  },
+  {
+   "id": "the-question-ive-been-waiting-for",
+   "title": "The Question I've Been Waiting For",
+   "file": "submission/the-question-ive-been-waiting-for/the-question-ive-been-waiting-for.mp4",
+   "youtube": "",
+   "duration": 350.0
+  },
+  {
+   "id": "the-object-in-the-circle",
+   "title": "The Object in the Circle",
+   "file": "submission/the-object-in-the-circle/the-object-in-the-circle.mp4",
+   "youtube": "",
+   "duration": 354.0
+  },
+  {
+   "id": "the-lab-that-already-exists",
+   "title": "The Lab That Already Exists",
+   "file": "submission/the-lab-that-already-exists/the-lab-that-already-exists.mp4",
+   "youtube": "",
+   "duration": 860.5
+  },
+  {
+   "id": "leos-answer",
+   "title": "Leo's Answer",
+   "file": "submission/leos-answer/leos-answer.mp4",
+   "youtube": "",
+   "duration": 169.5
+  },
+  {
+   "id": "million-dollar-question",
+   "title": "The Million-Dollar Question",
+   "file": "submission/million-dollar-question/million-dollar-question.mp4",
+   "youtube": "",
+   "duration": 126.5
+  },
+  {
+   "id": "the-reply",
+   "title": "The Reply",
+   "file": "submission/the-reply/the-reply.mp4",
+   "youtube": "",
+   "duration": 161.5
+  },
+  {
+   "id": "the-right-person",
+   "title": "The Right Person",
+   "file": "submission/the-right-person/the-right-person.mp4",
+   "youtube": "",
+   "duration": 149.5
+  },
+  {
+   "id": "going-viral",
+   "title": "Going Viral",
+   "file": "submission/going-viral.mp4",
+   "youtube": "",
+   "duration": 177.0
+  },
+  {
+   "id": "second-take",
+   "title": "Second Take: the first cut, revised by Meta Muse Spark",
+   "file": "submission/second-take/second-take.mp4",
+   "youtube": "",
+   "duration": 147.0
+  },
+  {
+   "id": "third-take",
+   "title": "Third Take: one note, one fix, and the thread becomes a workshop",
+   "file": "submission/third-take/third-take.mp4",
+   "youtube": "",
+   "duration": 112.0
+  },
+  {
+   "id": "fourth-take",
+   "title": "Fourth Take: a market, forming",
+   "file": "submission/fourth-take/fourth-take.mp4",
+   "youtube": "",
+   "duration": 124.0
+  },
+  {
+   "id": "fifth-take",
+   "title": "Fifth Take: nodes recruit, comments are workshares",
+   "file": "submission/fifth-take/fifth-take.mp4",
+   "youtube": "",
+   "duration": 97.0
+  },
+  {
+   "id": "take-six",
+   "title": "Take Six: thirty seconds",
+   "file": "submission/take-six/take-six.mp4",
+   "youtube": "",
+   "duration": 30.0
+  },
+  {
+   "id": "take-seven",
+   "title": "Take Seven: EVAL rates the thirty seconds",
+   "file": "submission/take-seven/take-seven.mp4",
+   "youtube": "",
+   "duration": 142.0
+  },
+  {
+   "id": "take-eight",
+   "title": "Take Eight: who are the real referees?",
+   "file": "submission/take-eight/take-eight.mp4",
+   "youtube": "",
+   "duration": 79.0
+  }
+ ]
+}

@@ -1,0 +1,50 @@
+{
+  "episode": "going-viral",
+  "fromTake": 2,
+  "take": 3,
+  "feedback": [
+    {
+      "id": "F1",
+      "point": "Scene 4 v4_036 'Here is the evidence' plays over the finished frame instead of the results table."
+    },
+    {
+      "id": "F2",
+      "point": "Keep take 2 legibility fixes (crops) and chronological order."
+    }
+  ],
+  "edits": [
+    {
+      "op": "set_monitor",
+      "span": "s4",
+      "from": {
+        "mark": "done",
+        "off": 6.4
+      },
+      "to": {
+        "mark": "frame",
+        "off": 0
+      },
+      "crop": [
+        240,
+        135,
+        800,
+        450
+      ],
+      "why": "Moves scene 4 picture from finished-frame time back to results-table time under v4_036.",
+      "fixes": "F1"
+    }
+  ],
+  "declined": [
+    {
+      "fixes": "F2",
+      "reason": "No crop or order change made; edit preserves take 2 crops and chronological order."
+    }
+  ],
+  "reuse": {
+    "preserved": 48,
+    "total": 48
+  },
+  "rewriteCount": 0,
+  "voiceEstimateHours": 0,
+  "reuseLine": "1 edits · 48/48 lines reused · 0 new recordings"
+}

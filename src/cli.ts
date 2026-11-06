@@ -147,6 +147,24 @@ Character bibles
   bible show <character>                 Print the character's loadable system prompt
   bible chat <character> [--from name]   Talk with a principal or an extra locally; /propose drafts a viewer note
 
+Station (24-hour Future Radio; frame at /station, open feeds at /station/feed/*; see STATION.md)
+  station now | grid [--hours N] | rules
+  station program --text "watch tenso and react when someone mentions me"   (or --voice-file f.wav)
+  station approve P-0001 | station poll | station voice-cache DIR
+
+HumAIn OS (voice-first, human-time-bounded sessions; web UI at /humain)
+  humain demo [--idea "..."] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N]
+                                         Run the demo end to end (simulated speech, or real
+                                         muse-voice-transcribe-1.0 with MODEL_API_KEY;
+                                         --live fails visibly without Meta APIs)
+  humain revise EPISODE [--feedback "..."] [--ceiling N] [--secs N] [--voice-file f.wav] [--live]
+                                         Revise a cut (take N -> N+1) from spoken
+                                         feedback; strict muse-spark-1.3, no offline planner
+  humain replay H-0001                   Terminal replay of a session's events from the log
+  humain evidence H-0001                 Observed/estimated/unknown costs, time, reuse evidence
+  humain frames                          Persistent shareable frames and their visit counts
+  humain budget                          Today's human time usage against the 60-minute budget
+
 Agnolo's screen
   scorecard                              Observed / projected / disputed / unknown, three ledgers
   ledger add --ledger operations|historical|effort --kind expense|receipt|hours|obligation
@@ -642,6 +660,260 @@ async function main() {
     }
     case "loop":
       return out(LOOP.map((l) => `${l.stage.padEnd(9)} ${l.does}`).join("\n"));
+    case "station": {
+      const sub = pos[0] ?? "now";
+      const { loadLineup, onAir, grid } = await import("./station/schedule.ts");
+      if (sub === "now") {
+        const a = onAir(loadLineup(), Date.now() / 1000);
+        return out(`${a.ident ? "Station ident, then " : ""}${a.slot.program.title} (${Math.floor(a.offset / 60)}:${String(Math.floor(a.offset % 60)).padStart(2, "0")} in)`);
+      }
+      if (sub === "grid") {
+        const g = grid(loadLineup(), Date.now() / 1000, Number(flags.hours ?? 3));
+        return out(g.map((x) => `${new Date(x.start * 1000).toLocaleTimeString("en-US", { timeZone: "America/New_York" })}  ${x.program.title}`).join("\n"));
+      }
+      if (sub === "rules") {
+        const { loadRules } = await import("./station/rules.ts");
+        return out(JSON.stringify(loadRules(), null, 1));
+      }
+      if (sub === "program") {
+        const { propose } = await import("./station/program.ts");
+        const { readFileSync } = await import("node:fs");
+        const c = await propose({ text: flags.text, wav: flags["voice-file"] ? readFileSync(flags["voice-file"]) : undefined });
+        return out(JSON.stringify({ id: c.id, transcript: c.transcript, parser: c.parser, ops: c.ops, acceptance: c.acceptance }, null, 1) + `\nApprove with: station approve ${c.id}`);
+      }
+      if (sub === "approve") {
+        const { approve } = await import("./station/program.ts");
+        const r = approve(need(pos[1], "contract id (e.g. P-0001)"), by);
+        return out(r.verified.map((v) => `${v.pass ? "PASS" : "FAIL"}  ${v.check}`).join("\n") || "Nothing to change.");
+      }
+      if (sub === "poll") {
+        const { pollOnce } = await import("./station/watcher.ts");
+        const { makeArchive } = await import("./station/archive.ts");
+        return out(JSON.stringify(await pollOnce(makeArchive())));
+      }
+      if (sub === "voice-cache") {
+        // Seed the voice cache from a folder of takes: index.json maps "SPEAKER" -> { "line": "file.mp3" }.
+        const { cacheFile, VOICES } = await import("./station/tts.ts");
+        const { readFileSync, copyFileSync, mkdirSync } = await import("node:fs");
+        const { join, dirname } = await import("node:path");
+        const dir = need(pos[1], "folder with index.json");
+        const idx = JSON.parse(readFileSync(join(dir, "index.json"), "utf8")) as Record<string, Record<string, string>>;
+        let n = 0;
+        for (const [sp, lines] of Object.entries(idx)) for (const [text, f] of Object.entries(lines)) {
+          const c = cacheFile(VOICES[sp], text); mkdirSync(dirname(c), { recursive: true }); copyFileSync(join(dir, f), c); n++;
+        }
+        return out(`${n} lines cached`);
+      }
+      return out("station now | grid [--hours N] | rules | program --text \"...\" | --voice-file f.wav | approve P-0001 | poll");
+    }
+    case "humain": {
+      const { SessionController } = await import("./humain/session.ts");
+      const { loadWorks } = await import("./humain/frame-maker.ts");
+      const { executePlan } = await import("./humain/reconcile.ts");
+      const { MetaVoiceTranscriber, makePlanner } = await import("./humain/adapters.ts");
+      const { inventory } = await import("./humain/capabilities.ts");
+      const { bookEstimate, estimatePlan } = await import("./humain/estimate.ts");
+      const { buildContract } = await import("./humain/contract.ts");
+      const sub = pos[0] ?? "demo";
+      if (sub === "replay") {
+        const id = need(pos[1], "session id (e.g. H-0001)");
+        const events = room.store.all().filter((e) => e.type.startsWith("humain.") && (e.payload as any).sessionId === id);
+        if (!events.length) throw new RuleError("usage", `No HumAIn OS events for ${id}.`);
+        for (const e of events) out(`${e.seq} ${e.id} ${e.ts} ${e.type} by ${e.actor}\n    ${JSON.stringify(e.payload).slice(0, 300)}`);
+        return;
+      }
+      if (sub === "demo") {
+        if (flags.live) process.env.HUMAIN_LIVE = "1";
+        const { isLive } = await import("./humain/adapters.ts");
+        const { HUMAN_BUDGET_MIN } = await import("./humain/session.ts");
+        const idea = flags.idea ?? "Build a webpage comparing The First Transmission and The People vs The Future with one hook and a vintage visitor counter.";
+        const s = SessionController.open(room, by, 2, flags["save-transcript"] === "true", Number(flags.reserve ?? 10));
+        out(`Session ${s.sessionId}: 2-minute input window (simulated speech). Human budget ${HUMAN_BUDGET_MIN} min/day, reserved ${s.reserveMin} min.${isLive() ? " LIVE MODE: Meta APIs or visible failure." : ""}`);
+        s.startRecording("demo: simulated microphone");
+        if (flags["voice-file"]) {
+          if (!MetaVoiceTranscriber.available()) throw new RuleError("usage", "--voice-file needs MODEL_API_KEY for muse-voice-transcribe-1.0.");
+          const { readFileSync: readAudio } = await import("node:fs");
+          const t = new MetaVoiceTranscriber();
+          const { chunks, costUsd } = await t.transcribe(readAudio(flags["voice-file"]), "audio/wav");
+          for (const c of chunks) s.ingestTranscript(c.text, c.final, t.id);
+          out(`Voice: ${chunks.length} chunk(s) via ${t.id} (cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
+          if (typeof costUsd === "number" && costUsd > 0)
+            room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: costUsd, unit: "usd", status: "observed", label: `muse-voice-transcribe-1.0 ${s.sessionId}`, evidence: s.sessionId }, "producer");
+        } else {
+          s.ingestTranscript(idea, true, "cli-demo/typed");
+        }
+        s.closeInput("demo: finished speaking");
+        const planner = makePlanner();
+        const { draft, costUsd, usage } = await planner.plan(s.ideaText(), { works: loadWorks() });
+        const { allocateFrameIds: allocDemoFrames } = await import("./humain/frames.ts");
+        const demoFrameDrafts = draft.tasks.filter((t) => t.frame);
+        const demoAllocated = allocDemoFrames(demoFrameDrafts.length);
+        demoFrameDrafts.forEach((t, i) => {
+          t.frame = { ...t.frame!, frameId: demoAllocated[i] };
+        });
+        const plan = s.recordPlan({ idea: s.ideaText(), hook: draft.hook, planner: planner.id, tasks: draft.tasks.map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
+        out(`Plan (${planner.id}): hook "${plan.hook}" · ${plan.tasks.length} tasks (tokens in/out ${usage.input}/${usage.output}, cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
+        if (typeof costUsd === "number" && costUsd > 0)
+          room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: costUsd, unit: "usd", status: "observed", label: `${planner.id} plan ${s.sessionId}`, evidence: s.sessionId }, "producer");
+        else if (!planner.id.startsWith("offline/") && usage.input + usage.output > 0)
+          room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: usage.input + usage.output, unit: "tokens", status: "unknown", label: `${planner.id} plan ${s.sessionId} (unpriced)`, evidence: s.sessionId }, "producer");
+        const inv = inventory();
+        s.recordCapabilities({ reuse: inv.reuse, build: inv.build });
+        out(`Capabilities: reuse ${inv.reuse.length} (${inv.reuse.map((r) => r.capability).join(", ")}) · build ${inv.build.length}`);
+        const est = estimatePlan(plan);
+        const recorded = s.recordEstimate({ ...est, forecastId: bookEstimate(room, by, s.sessionId, est) });
+        out(`ESTIMATE: $${est.apiUsd} API · ${est.localHours}h local · ${est.executionSeconds}s (forecast, not a receipt)`);
+        const { contract, frameTasks } = buildContract(s.sessionId, plan, { sessionId: s.sessionId, reuse: inv.reuse, build: inv.build }, recorded);
+        s.recordContract(contract, frameTasks);
+        out(`Contract: desired vs observed (${contract.observed.length} facts), satisfied ${contract.satisfied.length}, modifications ${contract.modifications.length}, acceptance ${contract.acceptance.length} tests`);
+        s.approve(Number(flags.ceiling ?? 5), Number(flags.secs ?? 300));
+        await executePlan(room, s, by);
+        const st = s.state();
+        for (const r of st.results) out(`  ${r.taskId} ${r.status} — ${r.detail}`);
+        for (const f of st.frames) out(`  frame ${f.frameId}: "${f.hook.slice(0, 60)}" sha256:${f.sha256.slice(0, 12)} human:${f.visits} unique:${f.unique} verification:${f.verification}`);
+        if (st.lastCheckpoint) out(`  checkpoint: ${st.lastCheckpoint.reason} — remaining: ${st.lastCheckpoint.remaining.join("; ") || "none"}`);
+        if (st.accounting) {
+          const a = st.accounting;
+          out(`  time: human used ${a.humanUsedSecs}s of ${a.reserveMin * 60}s reserved (${a.humanReleasedSecs}s released) · autonomous ${a.autonomousSecs}s · daily budget ${a.humanBudgetMin} min`);
+        }
+        out(`Done: ${st.terminal?.detail} Spend $${st.spendUsd}. Replay: npm run room -- humain replay ${s.sessionId}`);
+        return;
+      }
+      if (sub === "revise") {
+        if (flags.live) process.env.HUMAIN_LIVE = "1";
+        const { SparkPlanner, isLive } = await import("./humain/adapters.ts");
+        const { HUMAN_BUDGET_MIN } = await import("./humain/session.ts");
+        const { VOICE_HOURS_PER_RECORDING, buildReviseContract, buildReviseTasks, loadCritiques, loadCut, preservedLines, applyEdits, reuseLine, rewriteCount, validateEdits } = await import("./humain/cuts.ts");
+        const { runAcceptance } = await import("./humain/observe.ts");
+        const episode = need(pos[1], "episode (e.g. going-viral)");
+        let cut;
+        let take;
+        try {
+          ({ cut, take } = loadCut(episode));
+        } catch (e: any) {
+          throw new RuleError("usage", e?.message ?? String(e));
+        }
+        const feedback = flags.feedback ?? flags.idea ?? "Make the monitor easier to read and keep the story as is.";
+        const s = SessionController.open(room, by, 2, flags["save-transcript"] === "true", Number(flags.reserve ?? 10), episode);
+        out(`Session ${s.sessionId}: revising ${cut.title} take ${take} (2-minute input window, simulated speech). Human budget ${HUMAN_BUDGET_MIN} min/day, reserved ${s.reserveMin} min.${isLive() ? " LIVE MODE: Meta APIs or visible failure." : ""}`);
+        s.startRecording("revise: simulated microphone");
+        if (flags["voice-file"]) {
+          if (!MetaVoiceTranscriber.available()) throw new RuleError("usage", "--voice-file needs MODEL_API_KEY for muse-voice-transcribe-1.0.");
+          const { readFileSync: readAudio } = await import("node:fs");
+          const t = new MetaVoiceTranscriber();
+          const { chunks, costUsd } = await t.transcribe(readAudio(flags["voice-file"]), "audio/wav");
+          for (const c of chunks) s.ingestTranscript(c.text, c.final, t.id);
+          out(`Voice: ${chunks.length} chunk(s) via ${t.id} (cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
+          if (typeof costUsd === "number" && costUsd > 0)
+            room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: costUsd, unit: "usd", status: "observed", label: `muse-voice-transcribe-1.0 ${s.sessionId}`, evidence: s.sessionId }, "producer");
+        } else {
+          s.ingestTranscript(feedback, true, "cli-revise/typed");
+        }
+        s.closeInput("revise: finished speaking");
+        if (!SparkPlanner.available()) throw new RuleError("usage", "humain revise needs MODEL_API_KEY for muse-spark-1.3 (strict live mode; no offline revise planner).");
+        const planner = new SparkPlanner();
+        const { draft, costUsd, usage } = await planner.planRevise(s.ideaText(), cut, loadCritiques(episode, take));
+        const errs = validateEdits(cut, draft.edits, draft.feedback.map((f) => f.id), draft.declined);
+        if (errs.length) throw new RuleError("humain", `Spark's revision failed validation (nothing was applied): ${errs.join("; ")}`);
+        const plan = s.recordPlan({ idea: s.ideaText(), hook: `Revise ${cut.title} take ${take} → take ${take + 1}: ${draft.edits.length} edits`, planner: planner.id, tasks: buildReviseTasks(s.sessionId, episode, take, draft).map((t, i) => ({ ...t, taskId: `${s.sessionId}-T${i + 1}` })) });
+        out(`Revision (${planner.id}): ${draft.edits.length} edits, ${draft.feedback.length} feedback points, ${draft.declined.length} declined (tokens in/out ${usage.input}/${usage.output}, cost ${costUsd === null ? "unknown" : `$${costUsd}`})`);
+        if (typeof costUsd === "number" && costUsd > 0)
+          room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: costUsd, unit: "usd", status: "observed", label: `${planner.id} revise ${s.sessionId}`, evidence: s.sessionId }, "producer");
+        else if (usage.input + usage.output > 0)
+          room.addLedgerEntry(by, { ledger: "operations", kind: "expense", amount: usage.input + usage.output, unit: "tokens", status: "unknown", label: `${planner.id} revise ${s.sessionId} (unpriced)`, evidence: s.sessionId }, "producer");
+        const inv = inventory();
+        s.recordCapabilities({ reuse: [...inv.reuse, { capability: "cut.edit", source: "src/humain/cuts.ts, demo/cuts/CUT_SCHEMA.md", evidence: `validateEdits + applyEdits; ${draft.edits.length} validated edits` }], build: inv.build });
+        const est = estimatePlan(plan);
+        const recorded = s.recordEstimate({ ...est, forecastId: bookEstimate(room, by, s.sessionId, est) });
+        out(`ESTIMATE: $${est.apiUsd} API · ${est.localHours}h local · ${est.executionSeconds}s (forecast, not a receipt)`);
+        const rw = rewriteCount(draft);
+        room.addLedgerEntry(by, { ledger: "effort", kind: "hours", amount: Math.round(rw * VOICE_HOURS_PER_RECORDING * 100) / 100, unit: "hours", status: "projected", label: `ESTIMATE ${s.sessionId} voice re-recordings (${rw} new)`, who: by }, "producer");
+        out(`Voice cost: ${rw} new recording(s) → ${Math.round(rw * VOICE_HOURS_PER_RECORDING * 100) / 100}h estimated (booked as projected)`);
+        const contract = buildReviseContract(s.sessionId, plan, cut, draft, episode, take, (t) => runAcceptance(t, s.sessionId, []));
+        s.recordContract(contract, []);
+        out(`Contract: desired vs observed (${contract.observed.length} facts), satisfied ${contract.satisfied.length}, modifications ${contract.modifications.length}, acceptance ${contract.acceptance.length} tests`);
+        const { preserved, total } = preservedLines(cut, applyEdits(cut, draft.edits));
+        out(`Reuse: ${reuseLine(draft.edits.length, preserved, total, rw)}`);
+        s.approve(Number(flags.ceiling ?? 5), Number(flags.secs ?? 300));
+        await executePlan(room, s, by);
+        const st = s.state();
+        for (const r of st.results) out(`  ${r.taskId} ${r.status} — ${r.detail}`);
+        if (st.lastCheckpoint) out(`  checkpoint: ${st.lastCheckpoint.reason} — remaining: ${st.lastCheckpoint.remaining.join("; ") || "none"}`);
+        if (st.accounting) {
+          const a = st.accounting;
+          out(`  time: human used ${a.humanUsedSecs}s of ${a.reserveMin * 60}s reserved (${a.humanReleasedSecs}s released) · autonomous ${a.autonomousSecs}s · daily budget ${a.humanBudgetMin} min`);
+        }
+        out(`Done: ${st.terminal?.detail} Spend $${st.spendUsd}. Replay: npm run room -- humain replay ${s.sessionId}`);
+        return;
+      }
+      if (sub === "frames") {
+        const { listFrames } = await import("./humain/frames.ts");
+        const frames = listFrames();
+        for (const f of frames) out(`${f.frameId} "${f.hook.slice(0, 70)}" human:${f.counts.human} unique:${f.counts.unique} verification:${f.counts.verification} sha256:${f.sha256.slice(0, 12)} /api/humain/frames/${f.frameId}`);
+        const t = { human: 0, unique: 0, verification: 0 };
+        for (const f of frames) {
+          t.human += f.counts.human;
+          t.unique += f.counts.unique;
+          t.verification += f.counts.verification;
+        }
+        out(`totals: ${frames.length} frame(s) human:${t.human} unique:${t.unique} verification:${t.verification}`);
+        return;
+      }
+      if (sub === "evidence") {
+        const id = need(pos[1], "session id (e.g. H-0001)");
+        const evs = room.store.all().filter((e) => e.type.startsWith("humain.") && (e.payload as any).sessionId === id);
+        if (!evs.length) throw new RuleError("usage", `No HumAIn OS events for ${id}.`);
+        const one = (t: string) => evs.filter((e) => e.type === t).at(-1)?.payload as any;
+        const money = (n: number) => `$${(Math.round(n * 10000) / 10000).toFixed(4)}`;
+        out(`Evidence for ${id} (observed ≠ estimated ≠ unknown; human ≠ machine):`);
+        const mine = room.ledger.filter((l) => l.label.includes(id) || (l.evidence ?? "").includes(id));
+        const show = (title: string, rows: typeof mine) => {
+          out(`-- ${title} --`);
+          if (!rows.length) out("  (none)");
+          for (const l of rows) out(`  ${l.ledger}/${l.kind} ${l.amount}${l.unit === "usd" ? "" : ` ${l.unit}`} ${l.unit === "usd" ? money(l.amount) : ""} [${l.status}] ${l.label}`);
+        };
+        show("OBSERVED costs (receipts with evidence)", mine.filter((l) => l.status === "observed"));
+        show("ESTIMATED costs (forecasts, never receipts)", mine.filter((l) => l.status === "projected"));
+        show("UNKNOWN costs (usage without a price)", mine.filter((l) => l.status === "unknown" || l.status === "disputed"));
+        const est = one("humain.estimate");
+        if (est) out(`  contract estimate: ${money(est.apiUsd)} API · ${est.localHours}h local · ${est.executionSeconds}s [${est.label}]`);
+        const a = one("humain.accounting");
+        out("-- TIME --");
+        if (a) {
+          out(`  human: used ${a.humanUsedSecs}s of ${a.reserveMin * 60}s reserved (${a.humanReleasedSecs}s released) · daily budget ${a.humanBudgetMin} min`);
+          out(`  autonomous: ${a.autonomousSecs}s execution (recorded separately)`);
+        } else out("  (session has not ended; no accounting yet)");
+        const caps = one("humain.capabilities");
+        const contract = one("humain.contract");
+        out("-- CAPABILITIES --");
+        if (caps) {
+          out(`  reused (${caps.reuse.length}): ${caps.reuse.map((r: any) => r.capability).join(", ") || "(none)"}`);
+          out(`  newly built (${caps.build.length}): ${caps.build.map((b: any) => b.capability).join(", ") || "(none)"}`);
+        }
+        if (contract) {
+          out(`  satisfied before execution: ${contract.satisfied.length}`);
+          out(`  missing: ${contract.missing.join("; ") || "(none)"}`);
+          out(`  acceptance: ${contract.acceptance.length} tests`);
+        }
+        const stop = one("humain.stopped");
+        if (stop) out(`outcome: ${stop.reason} — ${stop.detail}`);
+        return;
+      }
+      if (sub === "budget") {
+        const { HUMAN_BUDGET_MIN } = await import("./humain/session.ts");
+        const today = new Date().toISOString().slice(0, 10);
+        const accts = room.store.all().filter((e) => e.type === "humain.accounting" && e.ts.startsWith(today));
+        let used = 0;
+        for (const e of accts) {
+          const a = e.payload as { sessionId: string; humanUsedSecs: number; autonomousSecs: number };
+          used += a.humanUsedSecs;
+          out(`${a.sessionId}: human ${a.humanUsedSecs}s · autonomous ${a.autonomousSecs}s`);
+        }
+        out(`Today: human ${used}s of ${HUMAN_BUDGET_MIN * 60}s budget (${Math.round(used / 60 * 10) / 10}/${HUMAN_BUDGET_MIN} min).`);
+        return;
+      }
+      throw new RuleError("usage", "humain demo [--idea ...] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] [--reserve N] | humain revise EPISODE [--feedback ...] [--ceiling N] [--secs N] [--voice-file f.wav] [--live] | humain replay H-0001 | humain evidence H-0001 | humain frames | humain budget");
+    }
     default:
       throw new RuleError("usage", `Unknown command '${cmd}'. Run \`npm run room -- help\`.`);
   }

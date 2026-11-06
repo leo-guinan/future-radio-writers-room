@@ -1,0 +1,446 @@
+{
+ "schema": "future-radio.cut/1",
+ "episode": "going-viral",
+ "title": "Going Viral",
+ "take": 1,
+ "rough_cut_url": "https://github.com/leo-guinan/future-radio-writers-room/blob/review/humain-os-prototype/submission/going-viral.mp4",
+ "runtime_s": 177,
+ "capture": {
+  "session": "H-0001",
+  "fps": 6,
+  "width": 1280,
+  "height": 720,
+  "marks": {
+   "page": 0.17,
+   "open": 2.41,
+   "record": 3.33,
+   "stop": 16.66,
+   "transcript": 21.53,
+   "closed": 24.08,
+   "plan_click": 25.01,
+   "contract": 43.22,
+   "approve": 51.18,
+   "execute": 52.52,
+   "done": 52.56,
+   "frame": 61.31,
+   "end": 66.67
+  }
+ },
+ "lines": [
+  {
+   "id": "v1_001",
+   "speaker": "LEONARDO",
+   "text": "I've entered us in a competition!"
+  },
+  {
+   "id": "v1_002",
+   "speaker": "AGNOLO",
+   "text": "For what?"
+  },
+  {
+   "id": "v1_003",
+   "speaker": "LEONARDO",
+   "text": "Building things with artificial intelligence. There's even a prize for going viral!"
+  },
+  {
+   "id": "v1_004",
+   "speaker": "BORGES",
+   "text": "How does one go viral?"
+  },
+  {
+   "id": "v1_005",
+   "speaker": "LEONARDO",
+   "text": "That's what we're going to find out."
+  },
+  {
+   "id": "v1_006",
+   "speaker": "LEONARDO",
+   "text": "Build us a way for artists to share competing versions of their work, so audiences can help them choose what to publish. Use what we already have. Show me what works, what doesn't, and what it costs."
+  },
+  {
+   "id": "v1_007",
+   "speaker": "LEONARDO",
+   "text": "There. Now it builds."
+  },
+  {
+   "id": "v1_008",
+   "speaker": "AGNOLO",
+   "text": "While we do what?"
+  },
+  {
+   "id": "v1_009",
+   "speaker": "LEONARDO",
+   "text": "Discuss the future."
+  },
+  {
+   "id": "v2_010",
+   "speaker": "BORGES",
+   "text": "I've been researching virality. It appears to be a system for distributing information through people."
+  },
+  {
+   "id": "v2_011",
+   "speaker": "AGNOLO",
+   "text": "Does it distribute money?"
+  },
+  {
+   "id": "v2_012",
+   "speaker": "BORGES",
+   "text": "Not necessarily."
+  },
+  {
+   "id": "v2_013",
+   "speaker": "AGNOLO",
+   "text": "Then why are we competing?"
+  },
+  {
+   "id": "v2_014",
+   "speaker": "LEONARDO",
+   "text": "Because artists need audiences."
+  },
+  {
+   "id": "v2_015",
+   "speaker": "AGNOLO",
+   "text": "Artists need customers."
+  },
+  {
+   "id": "v2_016",
+   "speaker": "LEONARDO",
+   "text": "They need to find the people who care about what they make."
+  },
+  {
+   "id": "v2_017",
+   "speaker": "BORGES",
+   "text": "Which raises a question. Is going viral valuable because many people see something, or because the right people see it?"
+  },
+  {
+   "id": "v2_018",
+   "speaker": "AGNOLO",
+   "text": "One million people watching me starve is not a business model."
+  },
+  {
+   "id": "v2_019",
+   "speaker": "LEONARDO",
+   "text": "Exactly! What if the million people watching could help you find the hundred who would pay to keep you creating?"
+  },
+  {
+   "id": "v2_020",
+   "speaker": "BORGES",
+   "text": "Then attention becomes a search mechanism."
+  },
+  {
+   "id": "v2_021",
+   "speaker": "AGNOLO",
+   "text": "Provided it eventually finds a wallet."
+  },
+  {
+   "id": "v3_022",
+   "speaker": "BORGES",
+   "text": "There's another problem. Many artists fear machines will replace them."
+  },
+  {
+   "id": "v3_023",
+   "speaker": "LEONARDO",
+   "text": "Then we're building the wrong machines."
+  },
+  {
+   "id": "v3_024",
+   "speaker": "AGNOLO",
+   "text": "Ours is building something right now."
+  },
+  {
+   "id": "v3_025",
+   "speaker": "LEONARDO",
+   "text": "Yes, but it's not making art to compete with us. It's building instruments we can use."
+  },
+  {
+   "id": "v3_026",
+   "speaker": "BORGES",
+   "text": "Like a paintbrush?"
+  },
+  {
+   "id": "v3_027",
+   "speaker": "LEONARDO",
+   "text": "An energy paintbrush! You bring an idea. The machine helps you explore it, produce it, test it, and find a market."
+  },
+  {
+   "id": "v3_028",
+   "speaker": "AGNOLO",
+   "text": "And if the machine becomes the artist?"
+  },
+  {
+   "id": "v3_029",
+   "speaker": "LEONARDO",
+   "text": "Then we've lost the point. I want artists to own their tools, choose their methods, and keep their audiences."
+  },
+  {
+   "id": "v3_030",
+   "speaker": "BORGES",
+   "text": "Even change the machines themselves?"
+  },
+  {
+   "id": "v3_031",
+   "speaker": "LEONARDO",
+   "text": "Especially that. We're starting with Meta's models. Next, we'll see what can run locally, what can be open source, and what we can replace without losing the art."
+  },
+  {
+   "id": "v3_032",
+   "speaker": "AGNOLO",
+   "text": "So this isn't a competition to build the best artist?"
+  },
+  {
+   "id": "v3_033",
+   "speaker": "LEONARDO",
+   "text": "It's a competition to build a better paintbrush."
+  },
+  {
+   "id": "v4_034",
+   "speaker": "BORGES",
+   "text": "Leonardo. The machine has finished."
+  },
+  {
+   "id": "v4_035",
+   "speaker": "LEONARDO",
+   "text": "Did it work?"
+  },
+  {
+   "id": "v4_036",
+   "speaker": "BORGES",
+   "text": "The acceptance tests passed. Here is the evidence."
+  },
+  {
+   "id": "v4_037",
+   "speaker": "AGNOLO",
+   "text": "And the cost?"
+  },
+  {
+   "id": "v4_038",
+   "speaker": "BORGES",
+   "text": "Some costs are recorded. Some remain unknown."
+  },
+  {
+   "id": "v4_039",
+   "speaker": "AGNOLO",
+   "text": "At least it's learning to tell the truth."
+  },
+  {
+   "id": "v4_040",
+   "speaker": "LEONARDO",
+   "text": "Good. Then we know what to improve tomorrow."
+  },
+  {
+   "id": "v5_041",
+   "speaker": "BORGES",
+   "text": "But we still haven't gone viral."
+  },
+  {
+   "id": "v5_042",
+   "speaker": "LEONARDO",
+   "text": "Maybe we shouldn't try to make the machine famous."
+  },
+  {
+   "id": "v5_043",
+   "speaker": "AGNOLO",
+   "text": "What should we make famous?"
+  },
+  {
+   "id": "v5_044",
+   "speaker": "LEONARDO",
+   "text": "The artists who use it."
+  },
+  {
+   "id": "v5_045",
+   "speaker": "LEONARDO",
+   "text": "If you're an artist, tell us what tool you wish existed. Help us build it. Help us test it. Then make something the world hasn't seen."
+  },
+  {
+   "id": "v5_046",
+   "speaker": "AGNOLO",
+   "text": "And sell it!"
+  },
+  {
+   "id": "v5_047",
+   "speaker": "BORGES",
+   "text": "Arm the artists."
+  },
+  {
+   "id": "v5_048",
+   "speaker": "LEONARDO",
+   "text": "Your energy paintbrush. Not your market competition."
+  }
+ ],
+ "shots": {
+  "TRIO": {
+   "zoom": 1.02,
+   "x": 660,
+   "y": 340
+  },
+  "WIDE": {
+   "zoom": 0.9,
+   "x": 640,
+   "y": 330
+  },
+  "LB": {
+   "zoom": 1.45,
+   "x": 790,
+   "y": 320
+  },
+  "LA": {
+   "zoom": 1.45,
+   "x": 480,
+   "y": 330
+  },
+  "L_C": {
+   "zoom": 2.0,
+   "x": 600,
+   "y": 290
+  },
+  "B_C": {
+   "zoom": 2.1,
+   "x": 962,
+   "y": 388
+  },
+  "A_C": {
+   "zoom": 2.1,
+   "x": 350,
+   "y": 388
+  },
+  "MON": {
+   "zoom": 1.75,
+   "x": 640,
+   "y": 175
+  },
+  "MON_C": {
+   "zoom": 2.7,
+   "x": 640,
+   "y": 146
+  },
+  "MON_R": {
+   "zoom": 2.45,
+   "x": 640,
+   "y": 128
+  },
+  "LMON": {
+   "zoom": 1.45,
+   "x": 610,
+   "y": 220
+  }
+ },
+ "cues": [
+  {
+   "before": "v1_006",
+   "shot": "LMON",
+   "lead": 1.4,
+   "hold_after": 0.4
+  },
+  {
+   "before": "v1_007",
+   "shot": "MON",
+   "lead": 0.2,
+   "hold_after": 0.2
+  },
+  {
+   "before": "v2_016",
+   "shot": "MON_C",
+   "lead": 0.3,
+   "hold_after": 0.2
+  },
+  {
+   "before": "v3_024",
+   "shot": "MON_C",
+   "lead": 0.3,
+   "hold_after": 0.6
+  },
+  {
+   "before": "v4_034",
+   "shot": "MON_R",
+   "lead": 0.5,
+   "hold_through": "v4_036",
+   "hold_after": 1.2
+  },
+  {
+   "before": "v4_038",
+   "shot": "MON_R",
+   "lead": 0.3,
+   "hold_after": 0.3
+  },
+  {
+   "before": "v5_045",
+   "shot": "TRIO",
+   "lead": 0.5,
+   "hold_through": "END"
+  }
+ ],
+ "monitor": [
+  {
+   "span": "s1_tail",
+   "note": "after the command until scene 2: transcript and planning",
+   "from": {
+    "mark": "stop",
+    "off": 0.85
+   },
+   "to": {
+    "mark": "contract",
+    "off": 0
+   },
+   "crop": null
+  },
+  {
+   "span": "s2",
+   "note": "scene 2: contract, approval, execution",
+   "from": {
+    "mark": "contract",
+    "off": 0
+   },
+   "to": {
+    "mark": "execute",
+    "off": 0.6
+   },
+   "crop": null
+  },
+  {
+   "span": "s3",
+   "note": "scene 3: the served comparison frame",
+   "from": {
+    "mark": "frame",
+    "off": 0
+   },
+   "to": {
+    "mark": "frame",
+    "off": 5
+   },
+   "crop": null
+  },
+  {
+   "span": "s4",
+   "note": "scene 4: results table, acceptance tests and cost",
+   "from": {
+    "mark": "done",
+    "off": 0.6
+   },
+   "to": {
+    "mark": "done",
+    "off": 6.4
+   },
+   "crop": null
+  },
+  {
+   "span": "s5",
+   "note": "scene 5 and end card: held still",
+   "from": {
+    "mark": "frame",
+    "off": 1
+   },
+   "to": {
+    "mark": "frame",
+    "off": 1
+   },
+   "crop": null
+  }
+ ],
+ "end_card": [
+  "FUTURE RADIO",
+  "ARM THE ARTISTS",
+  "",
+  "JOIN THE WRITERS' ROOM"
+ ]
+}

@@ -22,6 +22,10 @@ import { openScene, publicScene, runScene, sceneOrThrow } from "./scenes/scenes.
 import { designDir, selectDesignedVoice } from "./scenes/abilities.ts";
 import { modelReport, publicTrial, revealTrial, runTrial, type EpisodeCards } from "./scenes/trials.ts";
 import { cacheKey, cachedPath, lineAudio, patronVoicesToday, spokenText, TTS_MODEL, voiceFor } from "./scenes/voice.ts";
+import { humainRoutes } from "./humain/routes.ts";
+import { stationRoutes } from "./station/routes.ts";
+import { makeArchive } from "./station/archive.ts";
+import { startWatcher } from "./station/watcher.ts";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TOKEN = process.env.PRODUCER_TOKEN ?? "";
@@ -448,6 +452,11 @@ const routes: Array<[string, RegExp, Handler]> = [
   }],
   ["GET", /^\/healthz$/, (_q, res) => send(res, 200, { ok: true, chain: room.store.verify() })],
 ];
+routes.push(...humainRoutes(room, PRODUCER));
+// The station: 24-hour grid, archive watcher, open feeds (see STATION.md).
+let stationArchive: ReturnType<typeof makeArchive> | null = null;
+const archive = () => (stationArchive ??= makeArchive());
+routes.unshift(...stationRoutes({ isProducer, producer: PRODUCER, archive }));
 
 /**
  * The producer's console, remotely: run one CLI command on the server, against the live room.
@@ -488,7 +497,7 @@ function requireProducer(req: IncomingMessage) {
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json" };
 
 function serveStatic(path: string, res: ServerResponse) {
-  const requested = path === "/" ? "/index.html" : path === "/room" ? "/room.html" : path;
+  const requested = path === "/" ? "/index.html" : path === "/room" ? "/room.html" : path === "/humain" ? "/humain.html" : path;
   const rel = normalize(requested).replace(/^(\.\.[/\\])+/, "");
   const file = join(PUBLIC_DIR, rel);
   if (!file.startsWith(PUBLIC_DIR) || !existsSync(file)) return send(res, 404, { error: "Not found" });
@@ -527,6 +536,22 @@ if (reposEnabled() && SYNC_EVERY > 0)
   }, SYNC_EVERY * 1000).unref();
 // The showrunner also makes rounds on its own.
 if (SHOWRUNNER_AUTO && SHOWRUNNER_EVERY > 0) setInterval(() => activeEpisodes().forEach(scheduleTick), SHOWRUNNER_EVERY * 1000).unref();
+
+if (process.env.STATION_WATCH === "1") {
+  try { startWatcher(archive()); console.log(`Station watcher on (${archive().id}, every ${process.env.STATION_POLL_SECS ?? 300}s).`); }
+  catch (e: any) { console.error("station watcher off:", e.message); }
+}
+
+// A run that was on the air when the server stopped picks up where it was. LIVE_AUTOSTART starts a
+// new run only when there is nothing to resume on that thread.
+import("./live/controller.ts").then(async (l) => {
+  const r = await l.resume();
+  if (r) return console.log(`Live run ${r.run} resumed on thread ${r.thread} (program ${r.idx + 1}, ${Math.round(r.offset)}s in).`);
+  if (process.env.LIVE_AUTOSTART === "1" && process.env.LIVE_THREAD && l.current()?.thread !== process.env.LIVE_THREAD || (process.env.LIVE_AUTOSTART === "1" && process.env.LIVE_THREAD && ["complete", undefined].includes(l.current()?.phase))) {
+    await l.start({ thread: process.env.LIVE_THREAD!, source: process.env.LIVE_SOURCE ?? "archive", library: process.env.LIVE_LIBRARY?.split(",").filter(Boolean) });
+    console.log(`Live run on thread ${process.env.LIVE_THREAD} (${process.env.LIVE_SOURCE ?? "archive"}).`);
+  }
+}).catch((e) => console.error("live run:", e.message));
 
 server.listen(PORT, () => {
   console.log(`Future Radio writers' room on http://localhost:${PORT}  (${llm.offline ? "offline characters" : `model ${llm.model}`}; ${room.store.all().length} events)`);

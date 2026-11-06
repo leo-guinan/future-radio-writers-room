@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Future Radio · 24 Hours</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Shantell+Sans:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/station.css">
+</head>
+<body>
+<!--
+  Future Radio, the station. Two independent tracks, both open:
+    program  the scheduled episode (YouTube embed, or the station's own file with ?inner=local)
+    station  this frame, the archive wire and the cast's bulletins (their own audio)
+  Filter:  ?layers=frame,program,bulletins,wire   ?audio=program,bulletins   ?bg=transparent
+  Connect: ?feed=https://another.station        (any station's open feeds; CORS is open)
+  Feeds:   /station/feed/schedule.json  now.json  events.json  rules.json  live (SSE)
+-->
+<div id="stage">
+  <div id="frame" class="layer">
+    <header>
+      <div class="logo">Future Radio</div>
+      <div class="tag">24 hours · permissionless · <span id="feedname"></span></div>
+      <div class="onair"><i></i>ON AIR</div>
+      <div class="clock" id="clock">--:--</div>
+    </header>
+    <footer>
+      <div class="np"><span class="k">NOW PLAYING</span><span id="np-title">…</span></div>
+      <div class="bar"><i id="np-bar"></i></div>
+      <div class="fine">Pull it, fork it, layer it: <b id="feedurl">/station/feed</b> · bulletins are automated, quote public posts as written, and air without review</div>
+    </footer>
+  </div>
+
+  <div id="screen">
+    <div id="program" class="layer"><div id="yt"></div><video id="vid" playsinline></video>
+      <div id="ident"><div class="logo">Future Radio</div><div class="k">STATION IDENT · UP NEXT</div><div id="ident-next"></div></div>
+    </div>
+    <div id="bulletin" class="layer" hidden>
+      <div class="kicker" id="b-kicker"></div>
+      <div class="post">
+        <div class="who"><div class="av" id="b-av"></div><div><span class="nm" id="b-name"></span> <span class="hd" id="b-handle"></span></div></div>
+        <div class="tx" id="b-text"></div>
+        <div class="ft" id="b-label"></div>
+      </div>
+      <div class="cast" id="b-cast"></div>
+      <div class="caption"><span class="sp" id="b-sp"></span><span id="b-line"></span></div>
+    </div>
+  </div>
+
+  <aside id="wire" class="layer">
+    <div class="k">UP NEXT</div>
+    <ol id="next"></ol>
+    <div class="k">ARCHIVE WIRE</div>
+    <ol id="events"><li class="dim">Listening…</li></ol>
+    <div class="k">LISTENING FOR</div>
+    <div id="rules" class="dim"></div>
+  </aside>
+</div>
+<button id="tune" hidden>▶ Tune in</button>
+<script src="/station.js"></script>
+</body>
+</html>

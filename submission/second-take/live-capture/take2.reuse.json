@@ -1,0 +1,64 @@
+{
+ "take": 2,
+ "cut": "/home/claude/future-radio-studio/episodes/going-viral/cut/take2.cut.json",
+ "runtime_s": 177,
+ "chunk_s": 10,
+ "chunks": 18,
+ "reused": 6,
+ "rendered": 12,
+ "reused_seconds": 57,
+ "rendered_ranges": [
+  [
+   30,
+   40
+  ],
+  [
+   40,
+   50
+  ],
+  [
+   50,
+   60
+  ],
+  [
+   60,
+   70
+  ],
+  [
+   70,
+   80
+  ],
+  [
+   80,
+   90
+  ],
+  [
+   90,
+   100
+  ],
+  [
+   100,
+   110
+  ],
+  [
+   110,
+   120
+  ],
+  [
+   120,
+   130
+  ],
+  [
+   130,
+   140
+  ],
+  [
+   140,
+   150
+  ]
+ ],
+ "video_render_s": 156.9,
+ "audio_render_s": 8.2,
+ "total_s": 182.6,
+ "full_render_estimate_s": 235.4
+}

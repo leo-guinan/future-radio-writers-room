@@ -1,0 +1,62 @@
+:root { --ground: #0f1214; --panel: #15191c; --line: #2c3338; --cream: #f3ecdc; --amber: #e7a23c; --dim: #8b98a1; --red: #e5484d; --green: #8fd18a; --pink: #f08bb4 }
+* { box-sizing: border-box }
+html, body { margin: 0; height: 100%; background: var(--ground); overflow: hidden }
+body.transparent, body.transparent #stage { background: transparent }
+#stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; background: var(--ground); color: var(--cream); font-family: 'IBM Plex Mono', ui-monospace, monospace; overflow: hidden }
+.layer[hidden] { display: none !important }
+.k { color: var(--amber); font-size: 13px; letter-spacing: .14em }
+.dim { color: var(--dim) }
+.logo { font-family: 'Shantell Sans', system-ui, sans-serif; font-weight: 800; letter-spacing: .02em }
+
+header { position: absolute; left: 0; right: 0; top: 0; height: 72px; display: flex; align-items: center; gap: 22px; padding: 0 32px; border-bottom: 2px solid var(--line); background: linear-gradient(#1a1f23, var(--ground)) }
+header .logo { font-size: 34px; color: var(--cream) }
+header .tag { font-size: 14px; color: var(--dim); flex: 1 }
+.onair { display: flex; align-items: center; gap: 8px; font-size: 14px; letter-spacing: .2em; color: #5a6168; border: 2px solid #3a4248; border-radius: 6px; padding: 4px 10px }
+.onair i { width: 10px; height: 10px; border-radius: 50%; background: #3a4248 }
+body.live .onair { color: var(--red); border-color: var(--red) }
+body.live .onair i { background: var(--red); box-shadow: 0 0 10px var(--red) }
+.clock { font-size: 22px; font-variant-numeric: tabular-nums; min-width: 110px; text-align: right }
+
+#screen { position: absolute; left: 32px; top: 92px; width: 896px; height: 504px; border: 3px solid #3a4248; border-radius: 10px; overflow: hidden; background: #000; box-shadow: 0 0 0 8px #1a1f23, 0 10px 40px #000a }
+body.transparent #screen { background: transparent }
+#program, #program #yt, #program video, #program iframe { position: absolute; inset: 0; width: 100%; height: 100% }
+#program video { object-fit: contain; background: #000 }
+#ident { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: radial-gradient(circle at 50% 40%, #1d2428, #090b0c) }
+#ident .logo { font-size: 72px }
+#ident-next { font-size: 22px }
+body.ident #ident { display: flex }
+
+#bulletin { position: absolute; inset: 0; background: rgba(15,18,20,.94); padding: 26px 34px; display: flex; flex-direction: column; gap: 14px; animation: in .35s ease-out }
+@keyframes in { from { opacity: 0; transform: translateY(8px) } to { opacity: 1 } }
+#bulletin .kicker { color: var(--pink); font-size: 14px; letter-spacing: .14em }
+.post { background: var(--panel); border: 2px solid var(--line); border-radius: 18px; padding: 18px 22px }
+.who { display: flex; align-items: center; gap: 12px; font-size: 16px }
+.av { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--pink), var(--green)); display: flex; align-items: center; justify-content: center; font-family: 'Shantell Sans', sans-serif; font-weight: 800; color: var(--ground); font-size: 20px }
+.nm { font-weight: 600 }
+.hd { color: var(--dim) }
+.tx { font-size: 20px; line-height: 1.45; margin-top: 10px; max-height: 175px; overflow: hidden; white-space: pre-wrap }
+.ft { margin-top: 10px; font-size: 13px; color: var(--dim) }
+.cast { display: flex; gap: 10px }
+.cast span { font-size: 13px; letter-spacing: .1em; padding: 4px 10px; border: 2px solid var(--line); border-radius: 20px; color: var(--dim); transition: all .2s }
+.cast span.on { color: var(--ground); background: var(--amber); border-color: var(--amber) }
+.caption { margin-top: auto; font-family: 'Shantell Sans', sans-serif; font-weight: 600; font-size: 21px; line-height: 1.35; min-height: 58px }
+.caption .sp { color: var(--amber); font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: .12em; margin-right: 10px }
+
+#wire { position: absolute; left: 956px; top: 92px; width: 296px; height: 504px; display: flex; flex-direction: column; gap: 10px; font-size: 14px }
+#wire ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+#next li { display: flex; gap: 10px } #next li b { color: var(--dim); font-weight: 400; min-width: 70px }
+#events { flex: 1; overflow: hidden }
+#events li { border-left: 3px solid var(--pink); padding: 2px 0 2px 10px; line-height: 1.35 }
+#events li.skip { border-color: #3a4248; color: var(--dim) }
+#events li.rule { border-color: var(--green) }
+#events li small { display: block; color: var(--dim) }
+#rules { font-size: 13px; line-height: 1.5 }
+
+footer { position: absolute; left: 32px; right: 32px; top: 618px; height: 90px; display: flex; flex-direction: column; gap: 8px }
+.np { display: flex; gap: 14px; align-items: baseline; font-size: 20px; white-space: nowrap; overflow: hidden }
+.bar { height: 6px; background: #252b30; border-radius: 3px; overflow: hidden }
+.bar i { display: block; height: 100%; width: 0; background: var(--amber) }
+.fine { font-size: 12px; color: var(--dim) }
+.fine b { color: var(--cream); font-weight: 400 }
+
+#tune { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font: 600 22px 'IBM Plex Mono', monospace; color: var(--ground); background: var(--amber); border: 0; border-radius: 10px; padding: 16px 28px; cursor: pointer; z-index: 10 }

@@ -1,0 +1,69 @@
+{
+ "_doc": "Demo timeline for thread 2118414208370905428. Root text: from the Community Archive. Jim O'Shaughnessy's quote post: as shown on X (Nov 5, 2:49 PM ET). The repost and like counts after it are simulated.",
+ "root_text": "This tweet is a public experiment on the value of information.\n\nThere's one criteria attached to it already: if it's the most viral tweet in the Meta hackathon, that gives it a value of $20K.\n\nBut it's a movie that is written and produced to trigger a conversation with a single person. @Steph_Curdy \n\nThis makes zero sense, until you consider that the Meta hackathon created a window of virality. The demo was supposed to be a single tweet that goes viral.\n\nInstead, I used it to show a very specific capability. \n\nConversation via movie.\n\nThis tweet is simply the first frame in a 4 day long movie filming.\n\nThe end result is a portfolio of results I can use to create the movie I'm really working on. The one I show @jposhaughnessy when I ask him if he'd like everyone who applies to the OSV fellowship to receive a personalized movie that helps them build support for their desired futures, regardless of whether or not they receive the fellowship.\n\nI'm using it to feature the people that have impacted me over the last six years of exploration.\n\nAnd hopefully help them avoid the mistakes that don't teach them anything useful, by just giving them a compression that creates a market for their specific skillset.\n\nInstead of relying on random algorithms to elevate something specific.\n\nJim, I'd love it if you could give me a retweet and comment on the thread to help it start to move.\n\nI tried learning how to create a movie, and, being an engineer, created a movie factory instead.\n\nSo this seems like a great way to make GEB more accessible. \n\nAnd without further ado, I present the screening room of possible human futures that arm the artists and enable a new Renaissance for the world.\n\nFilming and being filmed until Nov 8 at 11:59PM ET.",
+ "steps": [
+  {
+   "at_secs": 0,
+   "snapshot": {
+    "likes": 1,
+    "reposts": 1,
+    "replies": [],
+    "quotes": []
+   }
+  },
+  {
+   "at_secs": 22,
+   "snapshot": {
+    "likes": 1,
+    "reposts": 1,
+    "replies": [],
+    "quotes": [
+     {
+      "id": "jim-quote",
+      "user": "jposhaughnessy",
+      "name": "Jim O'Shaughnessy",
+      "text": "I\u2019m all for experiments that could help people applying for the @osvllc Fellowship.\nApplications open 01.01.2027",
+      "url": "https://x.com/jposhaughnessy",
+      "created_at": "2026-11-05T19:49:00.000Z"
+     }
+    ]
+   }
+  },
+  {
+   "at_secs": 58,
+   "snapshot": {
+    "likes": 1,
+    "reposts": 2,
+    "replies": [],
+    "quotes": [
+     {
+      "id": "jim-quote",
+      "user": "jposhaughnessy",
+      "name": "Jim O'Shaughnessy",
+      "text": "I\u2019m all for experiments that could help people applying for the @osvllc Fellowship.\nApplications open 01.01.2027",
+      "url": "https://x.com/jposhaughnessy",
+      "created_at": "2026-11-05T19:49:00.000Z"
+     }
+    ]
+   }
+  },
+  {
+   "at_secs": 62,
+   "snapshot": {
+    "likes": 3,
+    "reposts": 2,
+    "replies": [],
+    "quotes": [
+     {
+      "id": "jim-quote",
+      "user": "jposhaughnessy",
+      "name": "Jim O'Shaughnessy",
+      "text": "I\u2019m all for experiments that could help people applying for the @osvllc Fellowship.\nApplications open 01.01.2027",
+      "url": "https://x.com/jposhaughnessy",
+      "created_at": "2026-11-05T19:49:00.000Z"
+     }
+    ]
+   }
+  }
+ ]
+}

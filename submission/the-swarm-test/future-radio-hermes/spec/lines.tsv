@@ -1,0 +1,74 @@
+e1_001	MRS. BUS	Two replies for the station. One from Annalea. One from Jessyka.
+e1_002	LEONARDO	Annalea answered?
+e1_003	BORGES	"He will throw ideas. My swarm and me will build anything in seconds."
+e1_004	LEONARDO	Seconds!
+e1_005	AGNOLO	Seconds is a claim.
+e1_006	BORGES	And Jessyka: "Awww, this makes me happy. You two will go bonkers. I'm curious to see what you both create together."
+e1_007	LEONARDO	Jessyka! Who is Jessyka?
+e1_008	BORGES	The reason we met Annalea at all.
+e2_001	BORGES	This morning Leo wrote that he took one look at Annalea's site and recognized why Jessyka told him to reach out, and ask if she wanted to be his cofounder.
+e2_002	LEONARDO	Jessyka recommended a cofounder!
+e2_003	AGNOLO	Recommendations are cheap. Good ones are not. What's her record?
+e2_004	BORGES	June, twenty twenty-five. She's posting vlogs of her coding nights, and getting Google sign-in working.
+e2_005	BORGES	July. She tells Leo to offer a fractional CTO service to vibe coders. He does.
+e2_006	BORGES	The same month, she builds him a site. Leo wrote that it did the one thing he couldn't manage in five years. It packaged him.
+e2_007	LEONARDO	She translated him!
+e2_008	BORGES	He called her a Leo Translator. His Babelfish.
+e2_009	AGNOLO	A translator who also builds. That's rare.
+e2_010	BORGES	She was one of the first through his program. And in October, Leo wrote that she took his philosophy and ran with it, and inspired him to enter a hackathon.
+e2_011	LEONARDO	So she sees people clearly, and points them at each other.
+e2_012	AGNOLO	Which is exactly the job nobody pays for.
+e2_013	LEONARDO	Then we put it in the record. Thank you, Jessyka.
+e3_001	LEONARDO	Borges, Annalea says her swarm builds anything in seconds.
+e3_002	BORGES	Then we should give it something worth building.
+e3_003	AGNOLO	And a way to tell if it worked.
+e3_004	LEONARDO	A test!
+e3_005	BORGES	Nous Research just opened the Hermes Agent Plugin Hackathon. Seven days. Twenty thousand dollars in prizes. Entries due November eleventh, at five p.m. Eastern.
+e3_006	LEONARDO	What's a plugin?
+e3_007	BORGES	A folder. A manifest called plugin dot yaml. A register function. And tools the agent can call.
+e3_008	LEONARDO	Then we put Future Radio in the folder!
+e3_009	AGNOLO	All of it?
+e3_010	LEONARDO	All of it! Script to screen!
+e4_001	BORGES	Then let's be precise. Here is how an episode is made.
+e4_002	BORGES	One. The script becomes a table: an id, a speaker, and a line.
+e4_003	BORGES	Two. Each character records one take per scene, with long pauses between the lines.
+e4_004	BORGES	Three. The take is cut at its longest silences, one clip per line.
+e4_005	BORGES	Four. Each clip is trimmed, leveled, sped up four percent, and given a mouth.
+e4_006	AGNOLO	Four percent?
+e4_007	BORGES	Everyone talks a little slowly at first.
+e4_008	BORGES	Five. The monitor cards are drawn as web pages and photographed.
+e4_009	BORGES	Six. A timeline places every line, every card, every sound, and every camera move.
+e4_010	BORGES	Seven. The studio renders the frames, mixes the sound, and writes the film.
+e4_011	LEONARDO	Seven steps! Seven tools!
+e5_001	AGNOLO	And the acceptance test?
+e5_002	LEONARDO	The plugin has to produce an episode.
+e5_003	AGNOLO	Which episode?
+e5_004	LEONARDO	This one.
+e5_005	BORGES	This one?
+e5_006	LEONARDO	Same lines, same voices, same order. Every card on screen at the same moment. Same runtime.
+e5_007	AGNOLO	To within what tolerance?
+e5_008	LEONARDO	You decide, Agnolo. You're the strict one.
+e5_009	AGNOLO	Line order, exact. Each line starts within half a second. Each card within half a second. Total runtime within one second.
+e5_010	EVAL	A film that grades its own remake! I have notes!
+e5_011	BORGES	That's the first test. The plugin makes the movie.
+e5_012	LEONARDO	And the second test is for the swarm.
+e5_013	BORGES	Go on.
+e5_014	LEONARDO	We give her two things. The prompt that started this episode, and the architecture. Nothing else.
+e5_015	LEONARDO	Can her swarm reverse engineer the movie?
+e5_016	AGNOLO	Scored by the same test.
+e5_017	BORGES	Forward, the plugin turns a script into a film. Backward, the swarm turns a request into the script, the cards, and the timing.
+e5_018	LEONARDO	If it can do that in seconds, I'll throw ideas all day.
+e5_019	AGNOLO	You already do.
+e6_001	MRS. BUS	All right. Where's this one going?
+e6_002	LEONARDO	A starter repo. Public. She forks it.
+e6_003	MRS. BUS	What's in it?
+e6_004	BORGES	The prompt. The architecture. A plugin skeleton for Hermes. The episode's exact spec. And the acceptance test.
+e6_005	MRS. BUS	And what does she owe us?
+e6_006	AGNOLO	Nothing. It's an invitation, not a contract. No partnership has been agreed.
+e6_007	MRS. BUS	Good. Then it's a game, not a job.
+e6_008	LEONARDO	Annalea. He throws ideas. Here's one.
+e6_009	LEONARDO	Fork it, and show us what your swarm can do.
+e6_010	BORGES	And Jessyka. Thank you for pointing.
+e7_001	LEONARDO	Borges, how long is a second?
+e7_002	BORGES	That depends on who is measuring.
+e7_003	AGNOLO	Ours bill by the hour.

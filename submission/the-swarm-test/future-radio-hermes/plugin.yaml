@@ -1,0 +1,13 @@
+name: future-radio
+version: 0.1.0
+description: "Future Radio, script to screen: seven tools that turn a script into an episode, and an acceptance test that checks it against a spec."
+author: Leo Guinan
+provides_tools:
+  - fr_script
+  - fr_voice
+  - fr_split
+  - fr_prep
+  - fr_cards
+  - fr_timeline
+  - fr_render
+  - fr_accept

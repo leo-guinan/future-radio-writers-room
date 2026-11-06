@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Future Radio · Live Run</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Shantell+Sans:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/station.css">
+<link rel="stylesheet" href="/live.css">
+</head>
+<body>
+<!--
+  The live run: the library plays once, start to finish. Updates on one thread interrupt it:
+  freeze -> announce -> riff (questions to the archive, as long as it is interesting) -> return. Interrupts pause the program; the run's
+  length is the library plus the thread's time. State: /live/feed/state.json (open, CORS *).
+  ?feed=https://another.station   ?kiosk=1 (compositor)   ?bg=transparent
+-->
+<div id="stage">
+  <div id="frame" class="layer">
+    <header>
+      <div class="logo">Future Radio</div>
+      <div class="tag">LIVE RUN · <span id="thread">thread</span></div>
+      <div class="onair"><i></i><span id="onair-label">ON AIR</span></div>
+      <div class="clock" id="clock">--:--</div>
+    </header>
+    <footer>
+      <div class="np"><span class="k" id="np-k">NOW PLAYING</span><span id="np-title">…</span></div>
+      <div class="bar"><i id="np-bar"></i></div>
+      <div class="fine">Interruptions pause the program. The thread's energy becomes broadcast time. · <b id="feedurl">/live/feed/state.json</b></div>
+    </footer>
+  </div>
+
+  <div id="screen">
+    <div id="program" class="layer"><video id="vid" playsinline></video>
+      <div id="ident"><div class="logo">Future Radio</div><div class="k">UP NEXT</div><div id="ident-next"></div></div>
+      <div id="freeze"><span>■ FROZEN</span><b id="freeze-at"></b></div>
+    </div>
+    <div id="update" hidden>
+      <div class="kicker" id="u-kicker"></div>
+      <div class="announce" id="u-announce"></div>
+      <div class="post" id="u-post" hidden>
+        <div class="who"><div class="av" id="u-av"></div><div><span class="nm" id="u-name"></span> <span class="hd" id="u-handle"></span></div></div>
+        <div class="tx" id="u-text"></div>
+      </div>
+      <div class="memory" id="u-memory" hidden></div>
+      <div class="cast" id="u-cast"></div>
+      <div class="caption"><span class="sp" id="u-sp"></span><span id="u-line"></span></div>
+      <div class="riff"><span id="u-ask" class="ask"></span><span id="u-riff"></span></div>
+    </div>
+    <div id="back" hidden><div class="k">FUTURE RADIO</div><div class="logo">Back to our regularly scheduled programming</div><div id="back-title"></div></div>
+    <div id="end" hidden><div class="k">THE LIBRARY IS COMPLETE</div><div class="logo" id="end-runtime"></div><div id="end-detail"></div></div>
+  </div>
+
+  <aside id="wire" class="layer">
+    <div class="k">THREAD → TIME</div>
+    <table id="ledger"></table>
+    <div class="k">INTERRUPTIONS</div>
+    <ol id="events"><li class="dim">None yet. The thread is quiet.</li></ol>
+    <div class="k">ANNOUNCED AS</div>
+    <div id="types" class="dim">reply · quote · repost · like · bookmark · views</div>
+  </aside>
+</div>
+<button id="tune" hidden>▶ Tune in</button>
+<script src="/live.js"></script>
+</body>
+</html>

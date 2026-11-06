@@ -3,9 +3,22 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    environment:
+      STATION_WATCH: "1"
     ports:
       - "8787:8787"
     volumes:
       - room-data:/data
+      # the episodes the station plays (station/programs.json points here)
+      - ./submission:/app/submission:ro
+  # Pushes the composited station to YouTube / Twitch / any RTMP URL (keys in .env).
+  # Start it with: docker compose --profile broadcast up -d
+  compositor:
+    build: { context: ., dockerfile: deploy/station/Dockerfile }
+    profiles: ["broadcast"]
+    restart: unless-stopped
+    env_file: .env
+    depends_on: [room]
+    shm_size: "1gb"
 volumes:
   room-data:

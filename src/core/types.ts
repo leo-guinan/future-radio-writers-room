@@ -49,7 +49,25 @@ export type EventType =
   | "daily.recorded"
   | "scene.happening"
   | "voice.designed"
-  | "voice.selected";
+  | "voice.selected"
+  | "humain.session_opened"
+  | "humain.recording_started"
+  | "humain.recording_stopped"
+  | "humain.transcript"
+  | "humain.plan"
+  | "humain.capabilities"
+  | "humain.estimate"
+  | "humain.approved"
+  | "humain.task_blocked"
+  | "humain.task_result"
+  | "humain.artifact"
+  | "humain.decision"
+  | "humain.contract"
+  | "humain.checkpoint"
+  | "humain.frame"
+  | "humain.repair"
+  | "humain.accounting"
+  | "humain.stopped";
 
 // ---------- Ideas: the central unit of the room ----------
 
@@ -398,6 +416,179 @@ export interface SceneClosed {
   turns: number;
   motivations?: Record<string, string>; // present when revealed
   repo?: { name: string; sha: string; file: string };
+}
+
+// ---------- HumAIn OS: voice-first, human-time-bounded agent sessions ----------
+// Sessions live in the same event log; deadlines and budgets are enforced by the
+// session controller (src/humain/session.ts), never by model prompts.
+
+export interface HumainSessionOpened {
+  sessionId: string; // H-0001
+  inputWindowMin: number; // 2 | 5 | 15 | 60
+  inputDeadlineWall: string; // ISO wall-clock display copy; enforcement uses the monotonic clock
+  saveTranscript: boolean; // transcripts hit the log only with explicit permission
+  reserveMin: number; // human minutes reserved for this session (released when unused)
+  cut?: { episode: string; take: number }; // cut revision target (latest take at open), if this is a revise session
+}
+
+/** Time accounting: human budget vs autonomous execution, recorded separately. */
+export interface HumainAccounting {
+  sessionId: string;
+  humanBudgetMin: number; // daily human budget
+  reserveMin: number;
+  humanUsedSecs: number; // actual active human time charged
+  humanReleasedSecs: number; // reserved but unused, released on completion
+  autonomousSecs: number; // machine execution, recorded separately
+}
+
+export interface HumainRecording {
+  sessionId: string;
+  reason: string;
+}
+
+export interface HumainTranscript {
+  sessionId: string;
+  n: number; // 1-based chunk number
+  text: string;
+  final: boolean;
+  source: string; // adapter id, e.g. "muse-voice-transcribe-1.0" or "browser-speech/offline"
+}
+
+export interface HumainPlanTask {
+  taskId: string; // H-0001-T1
+  title: string;
+  kind: "reuse" | "build";
+  capability: string;
+  detail: string;
+  decision?: string; // unresolved question; must clear before execution or the task blocks
+  frame?: { frameId?: string; hook: string; workA: string; workB: string }; // frame-maker spec (work ids; frameId assigned at contract)
+  cut?: import("../humain/cuts.ts").TaskCutContext; // cut revision context (episode, take, edit index, whole revision)
+  acceptance?: string[]; // acceptance test ids that verify this task
+  estApiUsd: number;
+  estHours: number;
+  estSeconds: number;
+}
+
+export interface HumainAcceptanceTest {
+  id: string; // H-0001-A1
+  description: string;
+  check: string; // machine check id, e.g. "frame.exists", "frame.hook", "frame.serves"
+  target: string; // what it checks, e.g. a frame id
+  expected: string;
+}
+
+/** The change contract: desired vs observed state, delta, and how done is proven. */
+export interface HumainContract {
+  sessionId: string;
+  desired: string;
+  observed: string[]; // observed facts, each with its evidence
+  satisfied: string[]; // requirements already satisfied (with evidence)
+  modifications: string[]; // required modifications (task ids + titles)
+  missing: string[]; // missing capabilities
+  acceptance: HumainAcceptanceTest[];
+  limits: { spendCeilingUsd: number | null; computeDeadlineSecs: number | null };
+}
+
+export interface HumainCheckpoint {
+  sessionId: string;
+  reason: string;
+  remaining: string[]; // requirement/task ids still open
+  passed: string[]; // acceptance test ids passing
+  failed: string[]; // acceptance test ids failing
+  spendUsd: number;
+  state: string; // short observed-state summary
+}
+
+export interface HumainFrame {
+  frameId: string; // F-0001
+  sessionId: string;
+  hook: string;
+  workA: string; // work ids
+  workB: string;
+  path: string; // registry-relative path of the page
+  sha256: string;
+  visits: number; // human views at record time
+  unique: number; // unique visitors at record time
+  verification: number; // verification views at record time
+}
+
+export interface HumainRepair {
+  sessionId: string;
+  taskId: string;
+  attempt: number; // 1-based
+  maxAttempts: number;
+  trigger: string; // which acceptance test failed
+  action: string; // what the repair tried
+  outcome: "fixed" | "still-failing";
+}
+
+export interface HumainPlan {
+  sessionId: string;
+  idea: string; // the spoken idea, as transcribed
+  hook: string;
+  tasks: HumainPlanTask[];
+  planner: string; // adapter id
+}
+
+export interface HumainCapabilities {
+  sessionId: string;
+  reuse: Array<{ capability: string; source: string; evidence: string }>;
+  build: Array<{ capability: string; why: string }>;
+}
+
+export interface HumainEstimate {
+  sessionId: string;
+  label: "ESTIMATE"; // estimates are forecasts, never receipts
+  apiUsd: number;
+  localHours: number;
+  executionSeconds: number;
+  forecastId: string; // the room forecast id this estimate is booked under
+}
+
+export interface HumainApproved {
+  sessionId: string;
+  spendCeilingUsd: number;
+  computeDeadlineSecs: number;
+  computeDeadlineWall: string;
+}
+
+export interface HumainTaskBlocked {
+  sessionId: string;
+  taskId: string;
+  decision: string; // the pending decision that blocked it
+}
+
+export interface HumainTaskResult {
+  sessionId: string;
+  taskId: string;
+  status: "success" | "unverified" | "failed" | "blocked";
+  evidence?: string; // sha256, test output, or artifact ref — required for "success"
+  detail: string;
+  costUsd: number | null;
+  seconds: number;
+}
+
+export interface HumainArtifact {
+  sessionId: string;
+  taskId: string;
+  path: string; // workspace-relative
+  sha256: string;
+  bytes: number;
+  label: string;
+}
+
+export interface HumainDecision {
+  sessionId: string;
+  taskId: string;
+  decision: string;
+  resolution: string;
+  by: string;
+}
+
+export interface HumainStopped {
+  sessionId: string;
+  reason: "input-deadline" | "compute-deadline" | "manual-stop" | "revoked" | "budget" | "blocked" | "stalled" | "safety" | "done";
+  detail: string;
 }
 
 /** A line given a voice, just in time; the audio is cached by content. */
