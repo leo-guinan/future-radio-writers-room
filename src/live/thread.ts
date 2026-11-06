@@ -81,12 +81,15 @@ export class ArchiveThread implements ThreadSource {
     // Replies and quotes the archive has observed: posts mentioning the author since the thread began.
     const day = String(t.created_at).slice(0, 10);
     const s = await this.mcp.tool("ca_search_tweets", { q: t.username, since: day, limit: 50, format: "full" });
-    const all: any[] = s.tweets ?? [];
+    // The author's own replies don't mention their handle, so the search misses them: add their timeline.
+    const own = await this.mcp.tool("ca_account_tweets", { account: t.username, since: day, limit: 200, format: "full" }).catch(() => ({ tweets: [] }));
+    const byId = new Map<string, any>([...(s.tweets ?? []), ...(own.tweets ?? [])].map((x: any) => [String(x.tweet_id), x]));
+    const all: any[] = [...byId.values()];
     const toPost = (x: any): Post => ({ id: x.tweet_id, user: x.username, name: x.account_display_name, text: x.full_text, url: `https://x.com/${x.username}/status/${x.tweet_id}`, created_at: x.created_at });
     return {
       likes: t.favorite_count ?? 0,
       reposts: t.retweet_count ?? 0,
-      replies: all.filter((x) => x.conversation_id === this.tweet && x.tweet_id !== this.tweet).map(toPost),
+      replies: all.filter((x) => (x.conversation_id === this.tweet || x.reply_to_tweet_id === this.tweet) && x.tweet_id !== this.tweet).map(toPost),
       quotes: all.filter((x) => x.quoted_tweet_id === this.tweet).map(toPost),
     };
   }
