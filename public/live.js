@@ -61,7 +61,7 @@
 
   // ---------------------------------------------------------------- program
   const vid = $("vid");
-  let loaded = null;
+  let loaded = null, lastSeek = 0;
   function program(idx, offset, frozen) {
     const p = S.library[idx];
     if (!p) return;
@@ -74,7 +74,8 @@
       if (frozen && Math.abs(vid.currentTime - Math.min(offset, p.duration - 0.05)) > 0.3) vid.currentTime = Math.min(offset, p.duration - 0.05);
       return;
     }
-    if (Math.abs(vid.currentTime - offset) > 1.5) vid.currentTime = offset;
+    if (vid.error) { loaded = null; return; } // reload the file on the next tick
+    if (Math.abs(vid.currentTime - offset) > 1.5 && Date.now() - lastSeek > 15000) { lastSeek = Date.now(); vid.currentTime = offset; }
     if (vid.paused) vid.play().catch(() => askTune());
   }
 

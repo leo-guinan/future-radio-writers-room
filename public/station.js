@@ -65,7 +65,7 @@
 
   // ---------------------------------------------------------------- program track
   const vid = $("vid");
-  let yt = null, ytReady = null, current = null, duck = 1;
+  let yt = null, ytReady = null, current = null, duck = 1, lastKick = 0, lastSeek = 0;
   const programVolume = () => (AUDIO.includes("program") ? duck : 0);
   function loadYT() {
     if (ytReady) return ytReady;
@@ -101,8 +101,16 @@
         vid.currentTime = a.offset;
         vid.play().catch(() => askTune());
       }
-    } else if (!useYT && Math.abs(vid.currentTime - a.offset) > 2.5) {
-      vid.currentTime = a.offset; // drift: everyone stays on the same second
+    } else if (!useYT && (vid.error || (vid.paused && Date.now() - lastKick > 5000))) {
+      // A play() that failed once (autoplay refused, a load that was interrupted, a dropped
+      // connection) used to leave the frame on a still picture for the rest of the program.
+      // Keep asking, and reload the file after an error.
+      lastKick = Date.now();
+      if (vid.error) { vid.src = a.p.media; vid.currentTime = a.offset; }
+      vid.play().catch(() => askTune());
+    } else if (!useYT && Math.abs(vid.currentTime - a.offset) > 2.5 && Date.now() - lastSeek > 15000) {
+      lastSeek = Date.now(); // drift: everyone stays on the same second (a slow machine is not re-seeked every second)
+      vid.currentTime = a.offset;
     } else if (useYT && yt?.getCurrentTime && Math.abs(yt.getCurrentTime() - a.offset) > 2.5) {
       yt.seekTo(a.offset, true);
     }

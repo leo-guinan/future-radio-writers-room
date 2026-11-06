@@ -143,6 +143,11 @@ X has opened the broadcast but isn't receiving a stream it can play. Work down t
    - `screen check: ok (brightness N)` means Chrome is drawing the page. `screen check: BLACK` means
      Chrome isn't drawing, and the log shows Chrome's own errors. It restarts Chrome once, and
      refuses to go live with a black screen.
+   - `page state: …` (at start, then every minute) is what the page is doing. `playing t=…` going up
+     means the program is moving. `PAUSED` with Chrome's media lines under it, or `ERROR=…`, means
+     the video stopped (the page now retries play and reloads after an error by itself). On the
+     live page, `class=-` with no video means no run has started: set `LIVE_AUTOSTART=1` and
+     `LIVE_THREAD`, or `POST /api/live/start`.
    - `route x: off (X_RTMP_URL, X_STREAM_KEY not set)` means `.env` didn't reach the container.
      Recreate it: `docker compose --profile broadcast up -d --force-recreate compositor`.
    - `error opening`, `Connection refused`, `Input/output error` or `All tee outputs failed` means
