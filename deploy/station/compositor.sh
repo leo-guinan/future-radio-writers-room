@@ -5,6 +5,7 @@
 # the program straight from YouTube. The compositor plays the station's own files instead, so
 # nothing is restreamed from YouTube's player.
 set -euo pipefail
+echo "compositor 2026-11-05c"   # if your log doesn't show this line, the container runs old code: git pull, then rebuild
 ROUTES="${STATION_ROUTES:-station/routes.json}"
 BASE="${STATION_BASE:-http://localhost:8787}"
 PAGE="$BASE${STATION_PAGE:-$(node -e "process.stdout.write(require('./$ROUTES').page)")}"  # the live run: STATION_PAGE=/live.html?kiosk=1
@@ -32,9 +33,31 @@ CHROME="${CHROME:-$(command -v google-chrome || command -v chromium || command -
 # captured too (two copies of the station, a few milliseconds apart, sound like an echo).
 PROFILE="$(mktemp -d /tmp/station-chrome.XXXXXX)"
 trap 'rm -rf "$PROFILE"' EXIT
-"$CHROME" --no-sandbox --kiosk --no-first-run --no-default-browser-check --disable-infobars --autoplay-policy=no-user-gesture-required \
-  --window-position=0,0 --window-size="$W,$H" --disable-session-crashed-bubble --hide-crash-restore-bubble --user-data-dir="$PROFILE" "$PAGE" >/dev/null 2>&1 &
-sleep "${STATION_WARMUP:-8}"
+# Is the page reachable from here?
+node -e "fetch(process.argv[1]).then(r => console.log('page check:', r.status, process.argv[1])).catch(e => { console.log('page check: UNREACHABLE', process.argv[1], e.message); process.exit(3) })" "$PAGE"
+start_chrome() {
+  # --disable-gpu and --disable-dev-shm-usage: Chromium in Docker (notably on Apple Silicon) often
+  # starts with a blank or crashed renderer without them. Its log goes to /tmp/chrome.log.
+  "$CHROME" --no-sandbox --disable-gpu --disable-dev-shm-usage --kiosk --no-first-run --no-default-browser-check --disable-infobars \
+    --autoplay-policy=no-user-gesture-required --window-position=0,0 --window-size="$W,$H" \
+    --disable-session-crashed-bubble --hide-crash-restore-bubble --user-data-dir="$PROFILE" "$PAGE" >/tmp/chrome.log 2>&1 &
+  sleep "${STATION_WARMUP:-8}"
+}
+# How bright is the virtual screen? About 16 = black (video black level): nothing is drawing on it.
+brightness() {
+  ffmpeg -nostdin -v info -f x11grab -video_size "${W}x${H}" -i :99 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG -f null - 2>&1 \
+    | grep -o 'YAVG=[0-9.]*' | head -1 | cut -d= -f2 || true
+}
+start_chrome
+Y="$(brightness)"; Y="${Y:-0}"
+if awk "BEGIN{exit !($Y < 20)}"; then
+  echo "screen check: BLACK (brightness $Y). Chrome log:"; tail -n 25 /tmp/chrome.log | sed 's/^/  chrome: /'
+  echo "screen check: restarting Chrome once"
+  pkill -f "$PROFILE" || true; sleep 1; start_chrome
+  Y="$(brightness)"; Y="${Y:-0}"
+  awk "BEGIN{exit !($Y < 20)}" && { echo "screen check: still BLACK. Not going live with a black screen."; tail -n 25 /tmp/chrome.log | sed 's/^/  chrome: /'; exit 4; }
+fi
+echo "screen check: ok (brightness $Y)"
 echo "capturing $PAGE → routes"
 ffmpeg -nostdin -loglevel warning -stats_period 10 -stats -thread_queue_size 1024 -f x11grab -framerate "$FPS" -video_size "${W}x${H}" -draw_mouse 0 -i :99 \
   -thread_queue_size 1024 -f pulse -i station.monitor "${DUR[@]}" \

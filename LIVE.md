@@ -134,7 +134,15 @@ X has opened the broadcast but isn't receiving a stream it can play. Work down t
    docker compose logs compositor --tail 40
    ```
 
+   - The first line should be `compositor 2026-11-05c`. If it isn't, the container is running old
+     code: `git pull`, then
+     `docker compose --profile broadcast build --no-cache compositor && docker compose --profile broadcast up -d --force-recreate compositor`.
    - `route x: on → rtmps://…/x/abc…yz` is where it's pushing, with the key masked.
+   - `page check: 200` means the compositor can load the page. `UNREACHABLE` means it can't reach the
+     room container.
+   - `screen check: ok (brightness N)` means Chrome is drawing the page. `screen check: BLACK` means
+     Chrome isn't drawing, and the log shows Chrome's own errors. It restarts Chrome once, and
+     refuses to go live with a black screen.
    - `route x: off (X_RTMP_URL, X_STREAM_KEY not set)` means `.env` didn't reach the container.
      Recreate it: `docker compose --profile broadcast up -d --force-recreate compositor`.
    - `error opening`, `Connection refused`, `Input/output error` or `All tee outputs failed` means
